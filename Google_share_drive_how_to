@@ -1,0 +1,41 @@
+Solution
+Approach
+Set Up Google Drive API:
+Create a service account and download credentials (credentials.json).
+Share the Shared Drive folder with the service account.
+Install @googleapis/drive.
+Update server.cjs:
+Replace fs.readdir in /api/list with Google Drive API to list PDFs in the Incoming Orders folder.
+Update /api/file/:id to download PDFs from Google Drive.
+Modify /api/print to move PDFs to a Printed Orders folder in the Shared Drive.
+Keep /api/printed and /api/reprint compatible with Google Drive.
+Maintain printHistory.json locally.
+Keep App.jsx Unchanged:
+The frontend already fetches from /api/list and /api/file/:id, so no changes are needed unless API responses change.
+Debugging:
+Verify Google Drive authentication and folder access.
+Log API responses to ensure 10 PDFs are listed.
+Test printing and moving files to Printed Orders.
+Step 1: Set Up Google Drive API
+Create Google Cloud Project:
+Go to Google Cloud Console.
+Create a project (e.g., Order-Dashboard).
+Enable the Google Drive API:
+Navigate to "APIs & Services" → "Library".
+Search for "Google Drive API" and enable it.
+Create Service Account:
+Go to "IAM & Admin" → "Service Accounts".
+Click "Create Service Account".
+Name: order-dashboard-service-account.
+Role: None (Drive access is granted via folder sharing).
+Key: Create a JSON key and download (credentials.json).
+Save credentials.json to /Users/wes/my-order-dashboard/credentials.json.
+Share Shared Drive Folder:
+Open Google Drive and locate the Shared Drive.
+Identify the folder for incoming PDFs (e.g., Incoming Orders).
+Right-click → "Share" → Add the service account email (e.g., order-dashboard-service-account@order-dashboard.iam.gserviceaccount.com) with Editor access.
+Create a Printed Orders folder in the Shared Drive and share it similarly.
+Get folder IDs:
+Open the folder in Google Drive.
+URL: https://drive.google.com/drive/folders/<folder-id>.
+Copy <folder-id> for Incoming Orders and Printed Orders.

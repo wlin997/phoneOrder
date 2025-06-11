@@ -1,0 +1,32 @@
+How to Configure the Printer
+You configure the printer through its own internal web page. Here’s the step-by-step process:
+
+1. Connect the Printer to the Internet:
+
+Make sure your TSP100IV printer is connected to your router with an Ethernet cable. It needs internet access to reach your server on Render.
+2. Find Your Printer's IP Address:
+
+This is the most critical step. You need to get the IP address that your router has assigned to the printer.
+Method: Turn the printer off. Hold down the FEED button on the front of the printer. While still holding the FEED button, turn the printer back on.
+The printer will print out one or two long receipts with its hardware and network configuration details. Look for the line that says "IP Address". It will be something like 192.168.1.123.
+3. Access the Printer's Web Interface:
+
+On a computer that is connected to the same local network as the printer, open a web browser (like Chrome, Firefox, etc.).
+In the address bar, type the IP address you found in the previous step and press Enter.
+This will load the "Star Network Utility" web page, which is hosted directly on the printer itself.
+4. Configure the CloudPRNT URL:
+
+In the menu on the left side of the printer's web page, look for a section named "Star CloudPRNT" or something similar.
+
+Inside that section, you will find a field for "Server URL".
+
+This is where you will enter the public URL to your server's polling endpoint. Once you deploy to Render, it will be:
+
+https://your-app-name.onrender.com/api/cloudprnt
+
+5. Enable and Save:
+
+Ensure the CloudPRNT service is Enabled.
+Click the "Submit" or "Save" button.
+The printer will likely ask you to save the settings and reboot. After it reboots, it will immediately start trying to contact your server at the URL you provided.
+Very Important Tip: Since your Render URL uses https, you must also ensure that SSL/TLS is enabled in the printer's security settings (usually on the same CloudPRNT configuration page). If SSL is disabled, the printer will fail to connect to your secure https server.

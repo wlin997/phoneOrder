@@ -1,0 +1,30 @@
+I already have my service_account.json in the root directory of my-order-dashboard as orderagent-460001-5fb1b5608046.json, do I need to copy it again into order-watcher folder?
+
+
+my-order-dashboard/
+│── eslint.config.js
+│── index.html
+│── orderagent-460001-5fb1b5608046.json
+│── package-lock.json
+│── package.json
+│── postcss.config.js
+│── printHistory.json
+│── server.cjs
+│── tailwind.config.js
+│── vite.config.js
+│── yarn.lock
+│__ order-watcher/
+		│── watchSheet.js          ← (the file below)
+		│── service_account.json   ← your Google service-account key
+		└── package.json 
+│__ src/
+		│── App.css          ← (the file below)
+		│── App.jsx   ← your Google service-account key
+		└── index.css
+		└── main.jsx
+		│__ assets/
+
+		│__ components/
+
+			│── FileList.jsx
+│__ node_modules/

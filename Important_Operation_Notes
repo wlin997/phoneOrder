@@ -1,0 +1,96 @@
+Important notes
+
+Tree structure:
+
+my-order-dashboard/
+│── eslint.config.js
+│── index.html
+│── orderagent-460001-5fb1b5608046.json
+│── package-lock.json
+│── package.json
+│── postcss.config.js
+│── printHistory.json
+│── server.cjs
+│── tailwind.config.js
+│── vite.config.js
+│── yarn.lock
+│__ order-watcher/
+		│── watchSheet.js          ← (the file below)
+		│── service_account.json   ← your Google service-account key
+		└── package.json 
+│__ src/
+		│── App.css          ← (the file below)
+		│── App.jsx   ← your Google service-account key
+		└── index.css
+		└── main.jsx
+		│__ assets/
+
+		│__ components/
+
+			│── FileList.jsx
+│__ node_modules/
+
+
+
+
+
+
+
+There are three server that needs to be turned on
+
+1. Front end server (UI)
+	
+	Tree structure:
+	Root directory/
+		my-order-dashboard/
+			
+	Root directory (wes@Wess-Mac-mini)
+		then CD my-order-dashboard
+
+		So it looks like this: (base) wes@Wess-Mac-mini my-order-dashboard %
+
+		To engage the server, you will type:  npm run dev
+
+
+2. Back end server (connects to the google share drive):
+	   Reads the pdf stored in the Order folder, move then to PrintedOrder
+	   folder once user hits print Order from the UI)
+	
+	Tree structure:
+	Root directory/
+		my-order-dashboard/
+			
+	Root directory (wes@Wess-Mac-mini)
+		then CD my-order-dashboard
+
+
+		So it looks like this: (base) wes@Wess-Mac-mini my-order-dashboard %
+
+		To engage the server, you will type:  node server.cjs
+
+
+
+2. listener that read/checks the google sheets int the Order folder for any new order records, and pulls the order data and converts it into pdf file and drops it in the same directory as the google sheets.
+	
+	Directory structure:
+
+	Root directory/
+		my-order-dashboard/
+			│__ order-watcher/
+					│── watchSheet.js 
+
+
+	Root directory (wes@Wess-Mac-mini)
+		then CD my-order-dashboard
+			then CD my order-watcher 
+
+
+
+
+		So it looks like this: (base) wes@Wess-Mac-mini order-watcher %
+
+		To engage the server, you will type:  node watchSheet.js
+
+
+
+
