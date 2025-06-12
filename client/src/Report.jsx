@@ -34,7 +34,7 @@ function Report() {
 
   const fetchHourlyData = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/hourly-orders');
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/hourly-orders`);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
       const formattedData = Object.entries(data).map(([hour, count]) => ({ hour, count }));
@@ -47,9 +47,9 @@ function Report() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const statsUrl = `http://localhost:3001/api/order-stats?range=${range}`;
-        const itemsUrl = `http://localhost:3001/api/popular-items?range=${range}`;
-        const customerStatsUrl = `http://localhost:3001/api/customer-stats?range=${range}`;
+        const statsUrl = ${process.env.REACT_APP_API_URL}/api/order-stats?range=${range}`;
+        const itemsUrl = `http://${process.env.REACT_APP_API_URL}/api/popular-items?range=${range}`;
+        const customerStatsUrl = `http://${process.env.REACT_APP_API_URL}/api/customer-stats?range=${range}`;
 
         const [statsRes, itemsRes, customerStatsRes] = await Promise.all([
           fetch(statsUrl),

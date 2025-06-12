@@ -1,0 +1,9 @@
+# Ignore Node.js dependencies
+node_modules
+
+# Ignore sensitive credential files
+orderagent-460001-5fb1b5608046.json
+*.json
+
+# Ignore personal notes folder
+Note/

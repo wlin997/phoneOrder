@@ -171,7 +171,7 @@ function App() {
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000);
-            const res = await fetch("http://localhost:3001/api/list", { signal: controller.signal });
+            const res = await fetch(`${process.env.REACT_APP_API_URL}/api/list`, { signal: controller.signal });
             clearTimeout(timeoutId);
             if (!res.ok) {
                 throw new Error(`Failed to fetch incoming orders: ${res.status} ${res.statusText}`);
@@ -221,7 +221,7 @@ function App() {
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000);
-            const res = await fetch("http://localhost:3001/api/printed", { signal: controller.signal });
+            const res = await fetch(`${process.env.REACT_APP_API_URL}/api/printed`, { signal: controller.signal });
             clearTimeout(timeoutId);
             if (!res.ok) {
                 throw new Error(`Failed to fetch processed orders: ${res.status} ${res.statusText}`);
@@ -251,7 +251,7 @@ function App() {
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000);
-            const res = await fetch("http://localhost:3001/api/updating", { signal: controller.signal });
+            const res = await fetch(`${process.env.REACT_APP_API_URL}/api/updating`, { signal: controller.signal });
             clearTimeout(timeoutId);
             if (!res.ok) {
                 throw new Error(`Failed to fetch updating orders: ${res.status} ${res.statusText}`);
@@ -283,7 +283,7 @@ function App() {
     const handleFireToKitchen = async (rowIndex) => {
         setIsProcessing(true);
         try {
-            const response = await fetch('http://localhost:3001/api/fire-order', {
+            const response = await fetch(`${process.env.REACT_APP_API_URL}/api/fire-order`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ rowIndex })
@@ -306,7 +306,7 @@ function App() {
         setIsProcessing(true);
         console.log(`[App.jsx] Reprinting order at rowIndex: ${order.rowIndex}`);
         try {
-            const response = await fetch('http://localhost:3001/api/fire-order', {
+            const response = await fetch(`${process.env.REACT_APP_API_URL}/api/fire-order`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ rowIndex: order.rowIndex })
@@ -366,7 +366,7 @@ function App() {
             toggledOrdersRef.current[id] = true;
 
             try {
-                const response = await fetch(`http://localhost:3001/api/order-by-row/${id}`);
+                const response = await fetch(`${process.env.REACT_APP_API_URL}/api/order-by-row/${id}`);
                 if (!response.ok) {
                     throw new Error(`Failed to fetch order details for rowIndex ${id}: ${response.statusText}`);
                 }
@@ -421,7 +421,7 @@ function App() {
         }
 
         try {
-            const response = await fetch(`http://localhost:3001/api/order-by-row/${order.rowIndex}`);
+            const response = await fetch(`${process.env.REACT_APP_API_URL}/api/order-by-row/${order.rowIndex}`);
             if (!response.ok) {
                 throw new Error(`Failed to fetch order details for rowIndex ${order.rowIndex}: ${response.statusText}`);
             }
@@ -494,7 +494,7 @@ function App() {
     useEffect(() => {
         const checkPrinterStatus = async () => {
             try {
-                const response = await fetch('http://localhost:3001/api/printer-status');
+                const response = await fetch(`${process.env.REACT_APP_API_URL}/api/printer-status`);
                 if (!response.ok) throw new Error(`Status check failed: ${response.status}`);
                 const data = await response.json();
                 setPrinterStatus(data.available ? 'Connected' : 'Not Connected');

@@ -1,0 +1,270 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SendOrderToMake_Tool Parameters Schema",
+  "type": "object",
+  "properties": {
+    "Time_ordered": {
+      "type": "string",
+      "description": "The time the order was placed"
+    },
+    "Order_type": {
+      "type": "string",
+      "enum": ["Pickup", "Delivery"],
+      "description": "The type of order"
+    },
+    "Caller_name": {
+      "type": "string",
+      "description": "The name of the caller"
+    },
+    "Caller_phone": {
+      "type": "string",
+      "description": "The phone number of the caller"
+    },
+    "Caller_address": {
+      "type": "string",
+      "description": "The address of the caller (required for delivery, optional for pickup)"
+    },
+    "Order_item_1": {
+      "type": "string",
+      "description": "First order item"
+    },
+    "Qty_1": {
+      "type": "string",
+      "description": "Quantity of the first order item"
+    },
+    "modifier_1": {
+      "type": "string",
+      "description": "Modifier for the first order item"
+    },
+    "Order_item_2": {
+      "type": "string",
+      "description": "Second order item"
+    },
+    "Qty_2": {
+      "type": "string",
+      "description": "Quantity of the second order item"
+    },
+    "modifier_2": {
+      "type": "string",
+      "description": "Modifier for the second order item"
+    },
+    "Order_item_3": {
+      "type": "string",
+      "description": "Third order item"
+    },
+    "Qty_3": {
+      "type": "string",
+      "description": "Quantity of the third order item"
+    },
+    "modifier_3": {
+      "type": "string",
+      "description": "Modifier for the third order item"
+    },
+    "Order_item_4": {
+      "type": "string",
+      "description": "Fourth order item"
+    },
+    "Qty_4": {
+      "type": "string",
+      "description": "Quantity of the fourth order item"
+    },
+    "modifier_4": {
+      "type": "string",
+      "description": "Modifier for the fourth order item"
+    },
+    "Order_item_5": {
+      "type": "string",
+      "description": "Fifth order item"
+    },
+    "Qty_5": {
+      "type": "string",
+      "description": "Quantity of the fifth order item"
+    },
+    "modifier_5": {
+      "type": "string",
+      "description": "Modifier for the fifth order item"
+    },
+    "Order_item_6": {
+      "type": "string",
+      "description": "Sixth order item"
+    },
+    "Qty_6": {
+      "type": "string",
+      "description": "Quantity of the sixth order item"
+    },
+    "modifier_6": {
+      "type": "string",
+      "description": "Modifier for the sixth order item"
+    },
+    "Order_item_7": {
+      "type": "string",
+      "description": "Seventh order item"
+    },
+    "Qty_7": {
+      "type": "string",
+      "description": "Quantity of the seventh order item"
+    },
+    "modifier_7": {
+      "type": "string",
+      "description": "Modifier for the seventh order item"
+    },
+    "Order_item_8": {
+      "type": "string",
+      "description": "Eighth order item"
+    },
+    "Qty_8": {
+      "type": "string",
+      "description": "Quantity of the eighth order item"
+    },
+    "modifier_8": {
+      "type": "string",
+      "description": "Modifier for the eighth order item"
+    },
+    "Order_item_9": {
+      "type": "string",
+      "description": "Ninth order item"
+    },
+    "Qty_9": {
+      "type": "string",
+      "description": "Quantity of the ninth order item"
+    },
+    "modifier_9": {
+      "type": "string",
+      "description": "Modifier for the ninth order item"
+    },
+    "Order_item_10": {
+      "type": "string",
+      "description": "Tenth order item"
+    },
+    "Qty_10": {
+      "type": "string",
+      "description": "Quantity of the tenth order item"
+    },
+    "modifier_10": {
+      "type": "string",
+      "description": "Modifier for the tenth order item"
+    },
+    "Order_item_11": {
+      "type": "string",
+      "description": "Eleventh order item"
+    },
+    "Qty_11": {
+      "type": "string",
+      "description": "Quantity of the eleventh order item"
+    },
+    "modifier_11": {
+      "type": "string",
+      "description": "Modifier for the eleventh order item"
+    },
+    "Order_item_12": {
+      "type": "string",
+      "description": "Twelfth order item"
+    },
+    "Qty_12": {
+      "type": "string",
+      "description": "Quantity of the twelfth order item"
+    },
+    "modifier_12": {
+      "type": "string",
+      "description": "Modifier for the twelfth order item"
+    },
+    "Order_item_13": {
+      "type": "string",
+      "description": "Thirteenth order item"
+    },
+    "Qty_13": {
+      "type": "string",
+      "description": "Quantity of the thirteenth order item"
+    },
+    "modifier_13": {
+      "type": "string",
+      "description": "Modifier for the thirteenth order item"
+    },
+    "Order_item_14": {
+      "type": "string",
+      "description": "Fourteenth order item"
+    },
+    "Qty_14": {
+      "type": "string",
+      "description": "Quantity of the fourteenth order item"
+    },
+    "modifier_14": {
+      "type": "string",
+      "description": "Modifier for the fourteenth order item"
+    },
+    "Order_item_15": {
+      "type": "string",
+      "description": "Fifteenth order item"
+    },
+    "Qty_15": {
+      "type": "string",
+      "description": "Quantity of the fifteenth order item"
+    },
+    "modifier_15": {
+      "type": "string",
+      "description": "Modifier for the fifteenth order item"
+    },
+    "Order_item_16": {
+      "type": "string",
+      "description": "Sixteenth order item"
+    },
+    "Qty_16": {
+      "type": "string",
+      "description": "Quantity of the sixteenth order item"
+    },
+    "modifier_16": {
+      "type": "string",
+      "description": "Modifier for the sixteenth order item"
+    },
+    "Order_item_17": {
+      "type": "string",
+      "description": "Seventeenth order item"
+    },
+    "Qty_17": {
+      "type": "string",
+      "description": "Quantity of the seventeenth order item"
+    },
+    "modifier_17": {
+      "type": "string",
+      "description": "Modifier for the seventeenth order item"
+    },
+    "Order_item_18": {
+      "type": "string",
+      "description": "Eighteenth order item"
+    },
+    "Qty_18": {
+      "type": "string",
+      "description": "Quantity of the eighteenth order item"
+    },
+    "modifier_18": {
+      "type": "string",
+      "description": "Modifier for the eighteenth order item"
+    },
+    "Order_item_19": {
+      "type": "string",
+      "description": "Nineteenth order item"
+    },
+    "Qty_19": {
+      "type": "string",
+      "description": "Quantity of the nineteenth order item"
+    },
+    "modifier_19": {
+      "type": "string",
+      "description": "Modifier for the nineteenth order item"
+    },
+    "Order_item_20": {
+      "type": "string",
+      "description": "Twentieth order item"
+    },
+    "Qty_20": {
+      "type": "string",
+      "description": "Quantity of the twentieth order item"
+    },
+    "modifier_20": {
+      "type": "string",
+      "description": "Modifier for the twentieth order item"
+    }
+  },
+  "required": ["Time_ordered", "Order_type", "Caller_name", "Caller_phone", "Order_item_1", "Qty_1"],
+  "additionalProperties": false
+}

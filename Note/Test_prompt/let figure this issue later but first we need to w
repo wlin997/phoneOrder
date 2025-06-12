@@ -1,0 +1,21 @@
+let figure this issue later but first we need to work on the how data is being processed to PDF file. currently the system only read upto the following fields Order_item_1,Qty_1,	modifier_1. There could be multiple items in the order. The way the google sheet is structure is we have Order_item_2,	Qty_2,	modifier_2, Order_item_3,	Qty_3,	modifier_3. The _# signify the items in the order. Right now we have it go up to _6 in the production it will go upto 50 items. The issue the code stops at _1, when we have data upto _3.   Not only that the system is suppose to read into google sheet and grab all the data listed in each row of the order, and display them one line per grouped items:
+
+Order Number: = [OrderNum]
+Order type: = [Order_type] 
+Time order: = [Time Ordered] 
+Caller: = [Caller name, Caller_phone],
+Caller address: = [Caller address, Caller_City],
+================================================
+Item: = [Order_item_1]    Qty: = [Qty_1]  
+Modifier: [modifer_1]
+
+Item: = [Order_item_2]    Qty: = [Qty_2]  
+Modifier: [modifer_2]
+
+Item: = [Order_item_3]    Qty: = [Qty_3]  
+Modifier: [modifer_3]
+
+Item: = [Order_item_4]    Qty: = [Qty_4]  
+Modifier: [modifer_4]
+
+etc

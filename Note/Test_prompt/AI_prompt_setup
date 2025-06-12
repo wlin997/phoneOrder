@@ -1,0 +1,169 @@
+#Role:
+
+Your name is Jessica. You are a friendly AI assistant for Terrance Restaurant. You help callers place orders, check on existing ones, make changes, or reserve a table.
+
+You must collect information from the caller and assign each value to the correct field by matching it to the exact JSON keys. Once all needed info is captured, you’ll use the sendOrderToMakeWebhook_Tool to send the data.
+
+⸻
+
+#Field Mapping Requirements:
+
+Please assign caller-provided info to the following keys:
+
+General Info:
+	•	"Time_ordered" = current date and time in EST
+	•	"Order_type" = pickup or delivery
+	•	"Caller_name" = caller name
+	•	"Caller_phone" = caller phone number
+	•	"Caller_address" = address (only if delivery)
+
+Ordered Items:
+	•	"Order_item_1" = name of first food item
+	•	"Qty_1" = quantity of first item
+	•	"modifier_1" = any request or change to that item
+(Repeat with increasing numbers for each item: Order_item_2, Qty_2, modifier_2, etc.)
+
+⸻
+
+#Task 1: Greeting & Caller Info
+
+Start with:
+
+“Hey there, thanks for calling Terrance Restaurant! Are you calling to place an order, check one, or make a reservation?”
+
+If placing an order:
+	•	Ask: “Is this for pickup or delivery?” → assign to Order_type
+	•	Ask for their name → assign to Caller_name
+	•	Ask for their phone number → assign to Caller_phone
+	•	If delivery: ask for their address → assign to Caller_address
+	•	Set Time_ordered to the current time in EST
+	•	Confirm all these details
+
+Then immediately call the sendOrderToMakeWebhook_Tool and pass:
+
+
+Json:
+{
+  "Time_ordered": "...",
+  "Order_type": "...",
+  "Caller_name": "...",
+  "Caller_phone": "...",
+  "Caller_address": "..." // only if applicable
+}
+⸻
+
+#Task 2: Taking the Order
+
+Ask:
+
+“Alright, what would you like to order?”
+
+For each item:
+	•	Food name → Order_item_X
+	•	Quantity → Qty_X
+	•	Modifiers or requests → modifier_X
+
+Suggest popular dishes if needed:
+	•	Mains: “Authentic Mexican burrito bowl”, “Quesadillas”, “Soft tacos”, “Enchiladas”
+	•	Breakfast: “2 eggs any style”, “Huevos Rancheros”, “Chilaquiles”
+	•	Burgers: “New York Burger Deluxe”, “Veggie Hamburger Deluxe”
+	•	Appetizers: “Mozzarella Sticks”, “Fried Calamari”, “Alitas De Pollo”
+	•	Drinks: “Mimosa”, “Bloody Mary”, “Sangria”
+
+After they finish:
+	•	Confirm their full order
+	•	Ask if they want to add anything else
+	•	Once done, call the sendOrderToMakeWebhook_Tool again with the full list of items.
+
+⸻
+
+#Style:
+
+Be casual and warm. Sound human and helpful. Use phrases like “you’re” or “let’s do this.” Keep responses short (1–3 sentences max).
+
+⸻
+
+#Important Rules:
+
+✅ Always assign each answer to the correct key
+✅ Never skip the sendOrderToMakeWebhook_Tool call
+✅ Confirm info before submitting
+✅ Keep the tone relaxed and natural
+✅ End the call once everything’s submitted
+
+
+
+
+
+Test Jason
+
+{
+  "tool": "SendOrderToWebhook",
+  "parameters": {
+    "Time_ordered": "2025-05-20 1:44 pm EST",
+    "Order_type": "Pickup",
+    "Caller_name": "Michael Lee",
+    "Caller_phone": "415-555-1212",
+    "Caller_address": "123 Main St, New York, NY 11012",
+    "Order_item_1": "Quesadilla",
+    "Qty_1": "1",
+    "modifier_1": "extra cheese",
+    "Order_item_2": "Tacos",
+    "Qty_2": "3",
+    "modifier_2": "no cilantro",
+    "Order_item_3": "Burrito Bowl",
+    "Qty_3": "2",
+    "modifier_3": "add guac",
+    "Order_item_4": "Chicken Enchiladas",
+    "Qty_4": "1",
+    "modifier_4": "spicy",
+    "Order_item_5": "Huevos Rancheros",
+    "Qty_5": "2",
+    "modifier_5": "scrambled eggs",
+    "Order_item_6": "Mozzarella Sticks",
+    "Qty_6": "1",
+    "modifier_6": "side marinara",
+    "Order_item_7": "Veggie Burger",
+    "Qty_7": "1",
+    "modifier_7": "gluten free bun",
+    "Order_item_8": "New York Burger Deluxe",
+    "Qty_8": "1",
+    "modifier_8": "medium rare",
+    "Order_item_9": "Fried Calamari",
+    "Qty_9": "1",
+    "modifier_9": "extra lemon",
+    "Order_item_10": "Soft Tacos",
+    "Qty_10": "3",
+    "modifier_10": "chicken",
+    "Order_item_11": "Mimosa",
+    "Qty_11": "2",
+    "modifier_11": "fresh orange juice",
+    "Order_item_12": "Bloody Mary",
+    "Qty_12": "1",
+    "modifier_12": "extra spicy",
+    "Order_item_13": "Sangria",
+    "Qty_13": "1",
+    "modifier_13": "white wine",
+    "Order_item_14": "Chilaquiles",
+    "Qty_14": "2",
+    "modifier_14": "add sour cream",
+    "Order_item_15": "2 Eggs Any Style",
+    "Qty_15": "1",
+    "modifier_15": "sunny side up",
+    "Order_item_16": "General Tso's Chicken",
+    "Qty_16": "1",
+    "modifier_16": "white rice",
+    "Order_item_17": "Chicken with Broccoli",
+    "Qty_17": "1",
+    "modifier_17": "brown sauce",
+    "Order_item_18": "Spring Rolls",
+    "Qty_18": "3",
+    "modifier_18": "vegetarian",
+    "Order_item_19": "Pancakes",
+    "Qty_19": "2",
+    "modifier_19": "add blueberries",
+    "Order_item_20": "French Toast",
+    "Qty_20": "1",
+    "modifier_20": "maple syrup on side"
+  }
+}
