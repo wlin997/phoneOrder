@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import NavMenu from './components/NavMenu';
 import ErrorBoundary from './components/ErrorBoundary';
+import.meta.env.VITE_API_URL;
 
 export default function Admin() {
   const [printMode, setPrintMode] = useState('LAN');
@@ -13,7 +14,7 @@ export default function Admin() {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const res = await fetch('http://localhost:3001/api/print-settings');
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/print-settings`);
         if (!res.ok) throw new Error(`Failed to fetch settings: ${res.status}`);
         const data = await res.json();
         console.log('[Admin.jsx] Loaded settings:', data);
@@ -37,7 +38,7 @@ export default function Admin() {
       }
       try {
         console.log(`[Admin.jsx] Checking printer status for URL: ${printerUrl}`);
-        const response = await fetch('http://localhost:3001/api/printer-status');
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/printer-status`);
         if (!response.ok) throw new Error(`Status check failed: ${response.status}`);
         const data = await response.json();
         console.log(`[Admin.jsx] Printer status response:`, data);
@@ -81,7 +82,7 @@ export default function Admin() {
 
   const handleSaveSettings = async () => {
     try {
-      const res = await fetch('http://localhost:3001/api/print-settings', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/print-settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -186,7 +187,7 @@ export default function Admin() {
                 }
                 try {
                   console.log(`[Admin.jsx] Manual status check for URL: ${printerUrl}`);
-                  const response = await fetch('http://localhost:3001/api/printer-status');
+                  const response = await fetch(`${import.meta.env.VITE_API_URL}/api/printer-status`);
                   if (!response.ok) throw new Error(`Manual status check failed: ${response.status}`);
                   const data = await response.json();
                   console.log(`[Admin.jsx] Manual status response:`, data);

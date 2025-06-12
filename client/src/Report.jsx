@@ -6,6 +6,7 @@ import {
 } from 'recharts';
 import NavMenu from './components/NavMenu';
 import ErrorBoundary from './components/ErrorBoundary';
+import.meta.env.VITE_API_URL;
 
 function Report() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -34,7 +35,7 @@ function Report() {
 
   const fetchHourlyData = async () => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/hourly-orders`);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/hourly-orders`);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
       const formattedData = Object.entries(data).map(([hour, count]) => ({ hour, count }));
@@ -47,9 +48,9 @@ function Report() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const statsUrl = `${process.env.REACT_APP_API_URL}/api/order-stats?range=${range}`;
-        const itemsUrl = `${process.env.REACT_APP_API_URL}/api/popular-items?range=${range}`;
-        const customerStatsUrl = `${process.env.REACT_APP_API_URL}/api/customer-stats?range=${range}`;
+        const statsUrl = `${import.meta.env.VITE_API_URL}/api/order-stats?range=${range}`;
+        const itemsUrl = `${import.meta.env.VITE_API_URL}/api/popular-items?range=${range}`;
+        const customerStatsUrl = `${import.meta.env.VITE_API_URL}/api/customer-stats?range=${range}`;
 
         const [statsRes, itemsRes, customerStatsRes] = await Promise.all([
           fetch(statsUrl),
