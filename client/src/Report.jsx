@@ -14,7 +14,6 @@ function Report() {
   const [dateData, setDateData] = useState([]);
   const [popularItems, setPopularItems] = useState([]);
   const [hourlyData, setHourlyData] = useState([]);
-  const [todayStats, setTodayStats] = useState({ total: 0, processed: 0 });
   const [customerStats, setCustomerStats] = useState({
     totalOrders: 0,
     repeatCustomers: 0,
@@ -24,19 +23,17 @@ function Report() {
 
   const generateDateRange = (days) => {
     const dates = [];
-    const endDate = new Date();
-    endDate.setDate(endDate.getDate() - 1); // 👈 shift to "yesterday"
-    endDate.setHours(0, 0, 0, 0);
-
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     for (let i = days - 1; i >= 0; i--) {
-      const date = new Date(endDate);
+      const date = new Date(today);
       date.setDate(date.getDate() - i);
       dates.push(date.toISOString().split('T')[0]);
     }
     return dates;
   };
 
-    const fetchHourlyData = async () => {
+  const fetchHourlyData = async () => {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/hourly-orders`);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -48,18 +45,33 @@ function Report() {
     }
   };
 
-  const fetchTodaysOrders = async () => {
+  useEffect(() => {
+    
+  const fetchOrderLists = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/todays-orders`);
-      const json = await response.json();
-      setTodayStats(json);
+      const [incomingRes, printedRes, updatingRes] = await Promise.all([
+        fetch(`${import.meta.env.VITE_API_URL}/api/list`),
+        fetch(`${import.meta.env.VITE_API_URL}/api/printed`),
+        fetch(`${import.meta.env.VITE_API_URL}/api/updating`)
+      ]);
+
+      if (!incomingRes.ok || !printedRes.ok || !updatingRes.ok) {
+        throw new Error("Failed to fetch one or more order sources.");
+      }
+
+      const incoming = await incomingRes.json();
+      const printed = await printedRes.json();
+      const updating = await updatingRes.json();
+
+      setIncomingOrders(incoming);
+      setPrintedOrders(printed);
+      setUpdatingOrders(updating);
     } catch (err) {
-      console.error('Failed to fetch today\'s orders:', err);
+      console.error("Failed to fetch order records:", err);
     }
   };
 
-useEffect(() => {
-    const fetchData = async () => {
+const fetchData = async () => {
       try {
         const statsUrl = `${import.meta.env.VITE_API_URL}/api/order-stats?range=${range}`;
         const itemsUrl = `${import.meta.env.VITE_API_URL}/api/popular-items?range=${range}`;
@@ -98,17 +110,13 @@ useEffect(() => {
 
     fetchData();
     fetchHourlyData();
-    fetchTodaysOrders(); // ✅ Added
-
-    const intervalId = setInterval(() => {
-      fetchHourlyData();
-      fetchTodaysOrders();
-    }, 5 * 60 * 1000);
-
+    fetchOrderLists();
+    
+    const intervalId = setInterval(fetchHourlyData, 5 * 60 * 1000);
     return () => clearInterval(intervalId);
   }, [range]);
 
-useEffect(() => {
+  useEffect(() => {
     const handleClickOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         const menuButton = menuRef.current.previousElementSibling;
@@ -141,7 +149,7 @@ useEffect(() => {
               <h2 className="text-2xl font-bold text-gray-800">Order Report</h2>
               
               <div className="flex gap-4 mb-6">
-                {['7', '14', '30', '60'].map(option => (
+                {['7', '14', '30', '60', '90', 'YTD'].map(option => (
                   <button key={option} className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${range === option ? 'bg-cyan-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`} onClick={() => setRange(option)}>
                     {option === 'YTD' ? 'Year to Date' : `Last ${option} days`}
                   </button>
@@ -161,16 +169,6 @@ useEffect(() => {
                     <h2 className="text-lg font-medium text-gray-600">Total Orders</h2>
                     <p className="text-4xl font-bold text-gray-800">{customerStats.totalOrders}</p>
                     <p className="text-sm text-gray-500 mt-1">in selected range</p>
-                </div>
-                <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center text-center border">
-                  <div className="text-gray-600 mb-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mx-auto text-cyan-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
-                    </svg>
-                  </div>
-                  <h2 className="text-lg font-medium text-gray-600">Today's Orders</h2>
-                  <p className="text-3xl font-bold text-gray-800">{todayStats.total}</p>
-                  <p className="text-sm text-gray-500 mt-1">Processed: {todayStats.processed}</p>
                 </div>
                 
                 {/* Repeat Customers Card */}
