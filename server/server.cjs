@@ -411,14 +411,24 @@ const filterByCurrentDate = (order) => {
 app.get("/api/list", async (req, res) => {
     try {
         const allOrders = await getSheetData();
+
         const incomingOrdersToday = allOrders
-            .filter(o => !o.cancelled && !o.orderProcessed && o.orderUpdateStatus === 'NONE' && filterByCurrentDate(o))
+            .filter(o =>
+                String(o.cancelled).toUpperCase() !== 'TRUE' &&
+                String(o.orderProcessed).toUpperCase() !== 'TRUE' &&
+                (o.orderUpdateStatus || '').toUpperCase() === 'NONE' &&
+                filterByCurrentDate(o)
+            )
             .sort((a, b) => new Date(a.timeOrdered).getTime() - new Date(b.timeOrdered).getTime());
+
+        console.log(`[Backend] ✅ Orders fetched: ${incomingOrdersToday.length}`);
         res.json(incomingOrdersToday);
     } catch (err) {
+        console.error("[Backend] ❌ Failed to fetch incoming orders:", err.message);
         res.status(500).json({ error: "Failed to fetch incoming orders: " + err.message });
     }
 });
+
 
 app.get("/api/updating", async (req, res) => {
     try {
