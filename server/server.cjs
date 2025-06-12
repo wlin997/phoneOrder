@@ -39,7 +39,8 @@ app.use(cors({
 
 app.use(express.json());
 
-const SERVICE_ACCOUNT_FILE = path.join(__dirname, "orderagent-460001-5fb1b5608046.json");
+//const SERVICE_ACCOUNT_FILE = path.join(__dirname, "orderagent-460001-5fb1b5608046.json");
+const SERVICE_ACCOUNT_FILE = path.join(__dirname, process.env.GOOGLE_APPLICATION_CREDENTIALS);
 const SHEET_ID = '1jhfeNgtIsnZZya8R91dPoMmXdbAUT_0wtcCq_022MGE';
 const SHEET_TAB = 'orderItems';
 const ORDER_HISTORY_TAB = 'orderHistory';
