@@ -821,6 +821,33 @@ app.post('/api/print-settings', async (req, res) => {
     }
 });
 
+app.get('/api/todays-orders', async (req, res) => {
+  try {
+    const allItems = await getSheetData(false, 'orderItems'); // Use your existing helper
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+
+    let totalOrders = 0;
+    let processedOrders = 0;
+
+    for (const item of allItems) {
+      const orderDate = item.orderDate || item.timestamp || item.OrderDate;
+      if (orderDate && orderDate.startsWith(todayStr)) {
+        totalOrders++;
+        if (item.Order_Processed === 'Y') {
+          processedOrders++;
+        }
+      }
+    }
+
+    res.json({ total: totalOrders, processed: processedOrders });
+  } catch (err) {
+    console.error('Error fetching today\'s orders:', err);
+    res.status(500).json({ error: 'Failed to retrieve today\'s orders' });
+  }
+});
+
+
 
 // =================================================================================
 // SERVER INITIALIZATION
