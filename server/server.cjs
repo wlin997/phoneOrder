@@ -1,5 +1,3 @@
-
-
 const axios = require('axios');
 const express = require("express");
 const { google } = require("googleapis");
@@ -19,18 +17,16 @@ const PORT = process.env.PORT || 3001;
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
-  'http://localhost:5173',          // <-- ADD THIS LINE
+  'http://localhost:5173',
   'http://127.0.0.1:3000',
   'http://127.0.0.1:3001',
-  'http://127.0.0.1:5173',          // <-- Also good to add this variation
+  'http://127.0.0.1:5173',
   process.env.RENDER_FRONTEND_URL 
 ];
 
 app.use(cors({
   origin: function (origin, callback) {
-    // ADD THIS LINE TO DEBUG
     console.log('>>>>> INCOMING REQUEST ORIGIN:', origin);
-
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -41,7 +37,6 @@ app.use(cors({
 
 app.use(express.json());
 
-//const SERVICE_ACCOUNT_FILE = path.join(__dirname, "orderagent-460001-5fb1b5608046.json");
 const SERVICE_ACCOUNT_FILE = path.join(__dirname, process.env.GOOGLE_APPLICATION_CREDENTIALS);
 const SHEET_ID = '1jhfeNgtIsnZZya8R91dPoMmXdbAUT_0wtcCq_022MGE';
 const SHEET_TAB = 'orderItems';
@@ -75,7 +70,7 @@ const COLUMN_HEADERS = {
 const printHistoryFile = path.join(__dirname, "printHistory.json");
 let printHistory = [];
 let sheets;
-let cloudPrintJobs = []; // In-memory queue for CloudPRNT jobs
+let cloudPrintJobs = []; 
 
 let sheetDataCache = {
     data: [],
@@ -84,7 +79,6 @@ let sheetDataCache = {
     isFetching: false,
     fetchPromise: null
 };
-
 
 // =================================================================================
 // HELPER AND UTILITY FUNCTIONS
@@ -411,21 +405,15 @@ const filterByCurrentDate = (order) => {
 app.get("/api/list", async (req, res) => {
   try {
     const allOrders = await getSheetData();
-
-    console.log("[Backend] ✅ Raw order rows from Google Sheet:");
-    console.log(JSON.stringify(allOrders, null, 2)); // full inspection
-
     const incomingOrdersToday = allOrders
       .filter(o => {
           const isToday = (() => {
+            if (!o.timeOrdered) return false;
             const orderDate = new Date(o.timeOrdered);
             const now = new Date();
-
-            return (
-              orderDate.getFullYear() === now.getFullYear() &&
-              orderDate.getMonth() === now.getMonth() &&
-              orderDate.getDate() === now.getDate()
-            );
+            return orderDate.getFullYear() === now.getFullYear() &&
+                   orderDate.getMonth() === now.getMonth() &&
+                   orderDate.getDate() === now.getDate();
           })();
 
           return (
@@ -436,16 +424,12 @@ app.get("/api/list", async (req, res) => {
           );
         })
       .sort((a, b) => new Date(a.timeOrdered).getTime() - new Date(b.timeOrdered).getTime());
-
-    console.log(`[Backend] ✅ Incoming orders after filter: ${incomingOrdersToday.length}`);
     res.json(incomingOrdersToday);
   } catch (err) {
     console.error("[Backend] ❌ Failed to fetch incoming orders:", err.message);
     res.status(500).json({ error: "Failed to fetch incoming orders: " + err.message });
   }
 });
-
-
 
 app.get("/api/updating", async (req, res) => {
     try {
@@ -487,19 +471,43 @@ app.get("/api/order-by-row/:rowIndex", async (req, res) => {
 // REPORTING ENDPOINTS
 // =================================================================================
 
+// --- NEW: Endpoint for "Today's Orders" card ---
+app.get('/api/today-stats', async (req, res) => {
+    try {
+        const allOrders = await getSheetData(true); // Force fetch for real-time data
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        const todayOrders = allOrders.filter(order => {
+            if (!order.timeOrdered) return false;
+            return new Date(order.timeOrdered).toISOString().split('T')[0] === todayStr;
+        });
+        
+        const total = todayOrders.filter(o => !o.cancelled).length;
+        const processed = todayOrders.filter(o => !o.cancelled && o.orderProcessed).length;
+
+        res.json({ total, processed });
+    } catch (error) {
+        console.error('Error fetching today\'s stats:', error);
+        res.status(500).json({ error: 'Failed to fetch today\'s stats: ' + error.message });
+    }
+});
+
+
+// --- UPDATED: All reporting endpoints now calculate date ranges from yesterday ---
 app.get('/api/order-stats', async (req, res) => {
     try {
         const { range } = req.query;
         const days = range === 'YTD' ?
-            Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 1)) / (1000 * 60 * 60 * 24)) + 1 :
+            Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 1)) / (1000 * 60 * 60 * 24)) :
             parseInt(range, 10);
 
         const dateRange = [];
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const endDate = new Date();
+        endDate.setDate(endDate.getDate() - 1); // Set the end date to yesterday
+        endDate.setHours(0, 0, 0, 0);
 
-        for (let i = days - 1; i >= 0; i--) {
-            const date = new Date(today);
+        for (let i = 0; i < days; i++) {
+            const date = new Date(endDate);
             date.setDate(date.getDate() - i);
             dateRange.push(date.toLocaleDateString('en-CA'));
         }
@@ -530,11 +538,15 @@ app.get('/api/popular-items', async (req, res) => {
     try {
         const { range } = req.query;
         const days = range === 'YTD'
-            ? Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 1)) / (1000 * 60 * 60 * 24)) + 1
+            ? Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 1)) / (1000 * 60 * 60 * 24))
             : parseInt(range, 10);
 
-        const startDate = new Date();
-        startDate.setDate(startDate.getDate() - days);
+        const endDate = new Date();
+        endDate.setDate(endDate.getDate() - 1); // Set end of range to yesterday
+        endDate.setHours(23, 59, 59, 999);
+
+        const startDate = new Date(endDate);
+        startDate.setDate(startDate.getDate() - (days - 1));
         startDate.setHours(0, 0, 0, 0);
 
         const orderRows = await getOrderRows();
@@ -546,7 +558,7 @@ app.get('/api/popular-items', async (req, res) => {
             const rawDate = row[COLUMN_HEADERS.TIME_ORDERED];
             if (!rawDate) return;
             const orderDate = new Date(rawDate);
-            if (orderDate < startDate) return;
+            if (orderDate < startDate || orderDate > endDate) return;
 
              if (row[COLUMN_HEADERS.ORDER_PROCESSED] === 'Y' && row[COLUMN_HEADERS.CANCELLED] !== 'TRUE') {
                 for (let i = 1; i <= 20; i++) {
@@ -611,10 +623,14 @@ app.get('/api/customer-stats', async (req, res) => {
     try {
         const { range } = req.query;
         const days = range === 'YTD' ? 
-            Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 1)) / (1000 * 60 * 60 * 24)) + 1 :
+            Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 1)) / (1000 * 60 * 60 * 24)) :
             parseInt(range, 10);
 
-        const startDate = new Date();
+        const endDate = new Date();
+        endDate.setDate(endDate.getDate() - 1);
+        endDate.setHours(23, 59, 59, 999);
+
+        const startDate = new Date(endDate);
         startDate.setDate(startDate.getDate() - (days - 1));
         startDate.setHours(0, 0, 0, 0);
         
@@ -624,7 +640,7 @@ app.get('/api/customer-stats', async (req, res) => {
             const rawDate = row[COLUMN_HEADERS.TIME_ORDERED];
             if (!rawDate) return false;
             const orderDate = new Date(rawDate);
-            return orderDate >= startDate && 
+            return orderDate >= startDate && orderDate <= endDate &&
                    row[COLUMN_HEADERS.ORDER_PROCESSED] === 'Y' && 
                    row[COLUMN_HEADERS.CANCELLED] !== 'TRUE';
         });
@@ -820,34 +836,6 @@ app.post('/api/print-settings', async (req, res) => {
         res.status(500).json({ error: 'Failed to save printer settings: ' + err.message });
     }
 });
-
-app.get('/api/todays-orders', async (req, res) => {
-  try {
-    const allItems = await getSheetData(false, 'orderItems'); // Use your existing helper
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
-
-    let totalOrders = 0;
-    let processedOrders = 0;
-
-    for (const item of allItems) {
-      const orderDate = item.orderDate || item.timestamp || item.OrderDate;
-      if (orderDate && orderDate.startsWith(todayStr)) {
-        totalOrders++;
-        if (item.Order_Processed === 'Y') {
-          processedOrders++;
-        }
-      }
-    }
-
-    res.json({ total: totalOrders, processed: processedOrders });
-  } catch (err) {
-    console.error('Error fetching today\'s orders:', err);
-    res.status(500).json({ error: 'Failed to retrieve today\'s orders' });
-  }
-});
-
-
 
 // =================================================================================
 // SERVER INITIALIZATION

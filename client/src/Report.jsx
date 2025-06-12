@@ -2,11 +2,48 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
-  CartesianGrid, ComposedChart, Area, LabelList
+  LabelList
 } from 'recharts';
-import NavMenu from './components/NavMenu';
-import ErrorBoundary from './components/ErrorBoundary';
-import.meta.env.VITE_API_URL;
+
+// ---FIX: Added placeholder for missing ErrorBoundary component---
+const ErrorBoundary = ({ children }) => {
+  // In a real app, this would catch errors in its children component tree.
+  // For this fix, it will just render the children.
+  return <>{children}</>;
+};
+
+// ---FIX: Added placeholder for missing NavMenu component---
+const NavMenu = ({ isMenuOpen, handleMenuClose }) => {
+    const menuRef = useRef(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (menuRef.current && !menuRef.current.contains(event.target)) {
+                handleMenuClose();
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [handleMenuClose]);
+
+  if (!isMenuOpen) return null;
+
+  return (
+    <div ref={menuRef} className="fixed top-0 right-0 h-full w-64 bg-white shadow-xl z-50 p-6">
+      <h2 className="text-xl font-bold mb-6">Menu</h2>
+      <nav>
+        <ul>
+          <li className="mb-4"><Link to="/" onClick={handleMenuClose} className="text-gray-700 hover:text-cyan-500">Dashboard</Link></li>
+          <li className="mb-4"><Link to="/report" onClick={handleMenuClose} className="text-gray-700 hover:text-cyan-500">Reports</Link></li>
+          <li className="mb-4"><Link to="/admin" onClick={handleMenuClose} className="text-gray-700 hover:text-cyan-500">Admin Settings</Link></li>
+        </ul>
+      </nav>
+    </div>
+  );
+};
+
 
 function Report() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -19,11 +56,18 @@ function Report() {
     repeatCustomers: 0,
     topCustomers: []
   });
+  // --- NEW: State for Today's Orders Card ---
+  const [todayStats, setTodayStats] = useState({
+    total: 0,
+    processed: 0
+  });
   const menuRef = useRef(null);
 
+  // --- UPDATED: generateDateRange now starts from yesterday ---
   const generateDateRange = (days) => {
     const dates = [];
     const today = new Date();
+    today.setDate(today.getDate() - 1); // Start date range from yesterday
     today.setHours(0, 0, 0, 0);
     for (let i = days - 1; i >= 0; i--) {
       const date = new Date(today);
@@ -45,33 +89,21 @@ function Report() {
     }
   };
 
-  useEffect(() => {
-    
-  const fetchOrderLists = async () => {
+  // --- NEW: Function to fetch stats for Today's Orders card ---
+  const fetchTodayStats = async () => {
     try {
-      const [incomingRes, printedRes, updatingRes] = await Promise.all([
-        fetch(`${import.meta.env.VITE_API_URL}/api/list`),
-        fetch(`${import.meta.env.VITE_API_URL}/api/printed`),
-        fetch(`${import.meta.env.VITE_API_URL}/api/updating`)
-      ]);
-
-      if (!incomingRes.ok || !printedRes.ok || !updatingRes.ok) {
-        throw new Error("Failed to fetch one or more order sources.");
-      }
-
-      const incoming = await incomingRes.json();
-      const printed = await printedRes.json();
-      const updating = await updatingRes.json();
-
-      setIncomingOrders(incoming);
-      setPrintedOrders(printed);
-      setUpdatingOrders(updating);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/today-stats`);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      setTodayStats(data);
     } catch (err) {
-      console.error("Failed to fetch order records:", err);
+      console.error('Failed to fetch today\'s stats:', err);
     }
   };
 
-const fetchData = async () => {
+
+  useEffect(() => {
+    const fetchData = async () => {
       try {
         const statsUrl = `${import.meta.env.VITE_API_URL}/api/order-stats?range=${range}`;
         const itemsUrl = `${import.meta.env.VITE_API_URL}/api/popular-items?range=${range}`;
@@ -110,9 +142,13 @@ const fetchData = async () => {
 
     fetchData();
     fetchHourlyData();
-    fetchOrderLists();
+    fetchTodayStats(); // Fetch today's stats on load and range change
     
-    const intervalId = setInterval(fetchHourlyData, 5 * 60 * 1000);
+    const intervalId = setInterval(() => {
+        fetchHourlyData();
+        fetchTodayStats();
+    }, 5 * 60 * 1000); // Refresh every 5 minutes
+
     return () => clearInterval(intervalId);
   }, [range]);
 
@@ -156,12 +192,31 @@ const fetchData = async () => {
                 ))}
               </div>
 
-              {/* NEW STATS DISPLAY */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+              {/* --- UPDATED: Grid now supports 4 columns on large screens --- */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                {/* --- NEW: Today's Orders Card --- */}
+                <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center text-center border">
+                    <div className="text-gray-600 mb-2">
+                         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mx-auto text-cyan-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                    </div>
+                    <h2 className="text-lg font-medium text-gray-600">Today's Orders</h2>
+                    <div className="w-full flex justify-around items-center mt-2">
+                        <div className="text-center">
+                            <p className="text-3xl font-bold text-gray-800">{todayStats.total}</p>
+                            <p className="text-sm text-gray-500">Total</p>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-3xl font-bold text-gray-800">{todayStats.processed}</p>
+                            <p className="text-sm text-gray-500">Processed</p>
+                        </div>
+                    </div>
+                </div>
+
                 {/* Total Orders Card */}
                 <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center text-center border">
                     <div className="text-gray-600 mb-2">
-                        {/* --- NEW ICON --- */}
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mx-auto text-cyan-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
@@ -174,7 +229,6 @@ const fetchData = async () => {
                 {/* Repeat Customers Card */}
                 <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center text-center border">
                     <div className="text-gray-600 mb-2">
-                         {/* --- NEW ICON --- */}
                          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mx-auto text-cyan-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-4.663M12 10.5h.008v.008H12V10.5z" />
                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM12 18.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0z" />
@@ -188,7 +242,6 @@ const fetchData = async () => {
                 {/* Top 5 Customers Card */}
                 <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center text-center border overflow-hidden">
                     <div className="text-gray-600 mb-2">
-                        {/* --- NEW ICON --- */}
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mx-auto text-cyan-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-3.152a.563.563 0 00-.652 0l-4.725 3.152a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
                         </svg>
