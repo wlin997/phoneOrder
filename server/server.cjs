@@ -416,12 +416,25 @@ app.get("/api/list", async (req, res) => {
     console.log(JSON.stringify(allOrders, null, 2)); // full inspection
 
     const incomingOrdersToday = allOrders
-      .filter(o =>
-        String(o.cancelled).toUpperCase() !== 'TRUE' &&
-        String(o.orderProcessed).toUpperCase() !== 'TRUE' &&
-        (o.orderUpdateStatus || '').toUpperCase() === 'NONE' &&
-        filterByCurrentDate(o)
-      )
+      .filter(o => {
+          const isToday = (() => {
+            const orderDate = new Date(o.timeOrdered);
+            const now = new Date();
+
+            return (
+              orderDate.getFullYear() === now.getFullYear() &&
+              orderDate.getMonth() === now.getMonth() &&
+              orderDate.getDate() === now.getDate()
+            );
+          })();
+
+          return (
+            String(o.cancelled).toUpperCase() !== 'TRUE' &&
+            String(o.orderProcessed).toUpperCase() !== 'TRUE' &&
+            (o.orderUpdateStatus || '').toUpperCase() === 'NONE' &&
+            isToday
+          );
+        })
       .sort((a, b) => new Date(a.timeOrdered).getTime() - new Date(b.timeOrdered).getTime());
 
     console.log(`[Backend] ✅ Incoming orders after filter: ${incomingOrdersToday.length}`);
