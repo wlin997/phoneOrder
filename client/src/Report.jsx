@@ -47,9 +47,9 @@ function Report() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const statsUrl = ${process.env.REACT_APP_API_URL}/api/order-stats?range=${range}`;
-        const itemsUrl = `http://${process.env.REACT_APP_API_URL}/api/popular-items?range=${range}`;
-        const customerStatsUrl = `http://${process.env.REACT_APP_API_URL}/api/customer-stats?range=${range}`;
+        const statsUrl = `${process.env.REACT_APP_API_URL}/api/order-stats?range=${range}`;
+        const itemsUrl = `${process.env.REACT_APP_API_URL}/api/popular-items?range=${range}`;
+        const customerStatsUrl = `${process.env.REACT_APP_API_URL}/api/customer-stats?range=${range}`;
 
         const [statsRes, itemsRes, customerStatsRes] = await Promise.all([
           fetch(statsUrl),
