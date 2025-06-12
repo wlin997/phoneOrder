@@ -157,8 +157,7 @@ const fetchData = async () => {
               </div>
 
               {/* NEW STATS DISPLAY */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                 {/* Total Orders Card */}
                 <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center text-center border">
                     <div className="text-gray-600 mb-2">
@@ -166,20 +165,7 @@ const fetchData = async () => {
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mx-auto text-cyan-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
-                    
-
-  {/* Today's Orders Card */}
-  <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center text-center border">
-    <div className="text-gray-600 mb-2">
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mx-auto text-cyan-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
-      </svg>
-    </div>
-    <h2 className="text-lg font-medium text-gray-600">Today's Orders</h2>
-    <p className="text-3xl font-bold text-gray-800">{incomingOrders.length + printedOrders.length + updatingOrders.length}</p>
-    <p className="text-sm text-gray-500 mt-1">Processed: {printedOrders.length}</p>
-  </div>
-</div>
+                    </div>
                     <h2 className="text-lg font-medium text-gray-600">Total Orders</h2>
                     <p className="text-4xl font-bold text-gray-800">{customerStats.totalOrders}</p>
                     <p className="text-sm text-gray-500 mt-1">in selected range</p>
