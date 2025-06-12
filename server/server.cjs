@@ -583,7 +583,11 @@ app.get('/api/hourly-orders', async (req, res) => {
 
         todayOrders.forEach(order => {
             if (order.timeOrdered) {
-                const orderHour = new Date(order.timeOrdered).getHours();
+                const orderHour = new Date(
+                  new Date(order.timeOrdered).toLocaleString("en-US", {
+                    timeZone: "America/New_York",
+                  })
+                ).getHours();
                 const hourLabel = orderHour < 12 ? `${orderHour === 0 ? 12 : orderHour} AM` : `${orderHour === 12 ? 12 : orderHour - 12} PM`;
                 if (hourlyCounts.hasOwnProperty(hourLabel)) {
                     hourlyCounts[hourLabel]++;
