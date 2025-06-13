@@ -1,3 +1,7 @@
+// --- FIX: Set the application's timezone to New York ---
+// This ensures all date operations are relative to your business hours.
+process.env.TZ = 'America/New_York';
+
 const axios = require('axios');
 const express = require("express");
 const { google } = require("googleapis");
@@ -85,25 +89,20 @@ let sheetDataCache = {
 // =================================================================================
 
 /**
- * --- NEW: Timezone-aware function to check if an order's date matches the current date in New York.
- * This is the core of the fix.
- * @param {string} orderTimestamp - The timestamp string from the Google Sheet (e.g., "2025-06-12T22:37:22.383-04:00").
- * @returns {boolean} - True if the order date is today in the 'America/New_York' timezone, false otherwise.
+ * --- FIX: Simplified date check.
+ * Because the process timezone is now set to 'America/New_York', we can directly compare date components.
+ * @param {string} orderTimestamp - The timestamp string from the Google Sheet.
+ * @returns {boolean} - True if the order date is today.
  */
-const isTodayInNewYork = (orderTimestamp) => {
+const isToday = (orderTimestamp) => {
     if (!orderTimestamp) return false;
     try {
-        const timeZone = 'America/New_York';
+        const orderDate = new Date(orderTimestamp);
+        const now = new Date(); // This now correctly represents the current time in New York.
 
-        // Get the current date in the specified timezone as a string (e.g., "2025-6-12")
-        const nowInNY = new Date().toLocaleDateString('en-US', { timeZone });
-
-        // Get the order's date in the specified timezone as a string
-        const orderDateInNY = new Date(orderTimestamp).toLocaleDateString('en-US', { timeZone });
-        
-        // Compare the date strings. This is a reliable, timezone-proof way to check.
-        return nowInNY === orderDateInNY;
-
+        return orderDate.getFullYear() === now.getFullYear() &&
+               orderDate.getMonth() === now.getMonth() &&
+               orderDate.getDate() === now.getDate();
     } catch (e) {
         console.error(`Error processing date: ${orderTimestamp}`, e);
         return false;
@@ -417,19 +416,17 @@ async function archiveOrders() {
 app.get("/", (req, res) => res.send("✅ Backend server is alive"));
 
 
-// --- FIX: Corrected the logic for fetching incoming orders ---
+// --- Corrected the logic for fetching incoming orders ---
 app.get("/api/list", async (req, res) => {
   try {
     const allOrders = await getSheetData();
     const incomingOrdersToday = allOrders
       .filter(o => {
-          // These checks ensure we only get unprocessed, uncancelled, current-day orders.
-          // This now uses the reliable, timezone-aware function.
           return (
             !o.cancelled &&
             !o.orderProcessed &&
             (o.orderUpdateStatus || '').toUpperCase() === 'NONE' &&
-            isTodayInNewYork(o.timeOrdered) 
+            isToday(o.timeOrdered) 
           );
         })
       .sort((a, b) => new Date(a.timeOrdered).getTime() - new Date(b.timeOrdered).getTime());
@@ -444,7 +441,7 @@ app.get("/api/updating", async (req, res) => {
     try {
         const allOrders = await getSheetData();
         const updatingOrdersToday = allOrders
-            .filter(o => !o.cancelled && !o.orderProcessed && o.orderUpdateStatus === 'ChkRecExist' && isTodayInNewYork(o.timeOrdered))
+            .filter(o => !o.cancelled && !o.orderProcessed && o.orderUpdateStatus === 'ChkRecExist' && isToday(o.timeOrdered))
             .sort((a, b) => new Date(b.timeOrdered).getTime() - new Date(a.timeOrdered).getTime());
         res.json(updatingOrdersToday);
     } catch (err) {
@@ -480,13 +477,12 @@ app.get("/api/order-by-row/:rowIndex", async (req, res) => {
 // REPORTING ENDPOINTS
 // =================================================================================
 
-// --- FIX: Endpoint for "Today's Orders" now uses the timezone-aware function ---
+// --- Endpoint for "Today's Orders" now uses the correct timezone logic ---
 app.get('/api/today-stats', async (req, res) => {
     try {
-        const allOrders = await getSheetData(true); // Force fetch for real-time data
+        const allOrders = await getSheetData(true); 
         
-        // Filter for orders that match the current date using the reliable function
-        const todayOrders = allOrders.filter(order => isTodayInNewYork(order.timeOrdered));
+        const todayOrders = allOrders.filter(order => isToday(order.timeOrdered));
         
         const total = todayOrders.filter(o => !o.cancelled).length;
         const processed = todayOrders.filter(o => !o.cancelled && o.orderProcessed).length;
@@ -499,7 +495,7 @@ app.get('/api/today-stats', async (req, res) => {
 });
 
 
-// --- UPDATED: All reporting endpoints now calculate date ranges from yesterday ---
+// --- All reporting endpoints now calculate date ranges from yesterday ---
 app.get('/api/order-stats', async (req, res) => {
     try {
         const { range } = req.query;
@@ -509,7 +505,7 @@ app.get('/api/order-stats', async (req, res) => {
 
         const dateRange = [];
         const endDate = new Date();
-        endDate.setDate(endDate.getDate() - 1); // Set the end date to yesterday
+        endDate.setDate(endDate.getDate() - 1); 
         endDate.setHours(0, 0, 0, 0);
 
         for (let i = 0; i < days; i++) {
@@ -548,7 +544,7 @@ app.get('/api/popular-items', async (req, res) => {
             : parseInt(range, 10);
 
         const endDate = new Date();
-        endDate.setDate(endDate.getDate() - 1); // Set end of range to yesterday
+        endDate.setDate(endDate.getDate() - 1); 
         endDate.setHours(23, 59, 59, 999);
 
         const startDate = new Date(endDate);
@@ -586,8 +582,9 @@ app.get('/api/popular-items', async (req, res) => {
 
 app.get('/api/hourly-orders', async (req, res) => {
     try {
+        // --- FIX: Logic now works correctly because the process timezone is set. ---
         const now = new Date();
-        const currentHour = now.getHours();
+        const currentHour = now.getHours(); 
         const startHour = 8;
         
         const hourlyCounts = {};
@@ -597,15 +594,12 @@ app.get('/api/hourly-orders', async (req, res) => {
         }
 
         const allOrders = await getSheetData();
-        const todayOrders = allOrders.filter(order => isTodayInNewYork(order.timeOrdered));
+        const todayOrders = allOrders.filter(order => isToday(order.timeOrdered));
 
         todayOrders.forEach(order => {
             if (order.timeOrdered) {
-                const orderHour = new Date(
-                  new Date(order.timeOrdered).toLocaleString("en-US", {
-                    timeZone: "America/New_York",
-                  })
-                ).getHours();
+                // The orderDate is already in the correct timezone because of the process setting
+                const orderHour = new Date(order.timeOrdered).getHours();
                 const hourLabel = orderHour < 12 ? `${orderHour === 0 ? 12 : orderHour} AM` : `${orderHour === 12 ? 12 : orderHour - 12} PM`;
                 if (hourlyCounts.hasOwnProperty(hourLabel)) {
                     hourlyCounts[hourLabel]++;
@@ -660,8 +654,7 @@ app.get('/api/customer-stats', async (req, res) => {
                 customerData[phone] = { count: 0, name: order[COLUMN_HEADERS.CALLER_NAME] };
             }
             customerData[phone].count++;
-            customerData[phone].name = order[COLUMN_HEADERS.CALLER_NAME]; // Keep the most recent name
-        });
+            customerData[phone].name = order[COLUMN_HEADERS.CALLER_NAME]; 
 
         const totalOrders = filteredOrders.length;
         const repeatCustomers = Object.values(customerData).filter(data => data.count > 1).length;
