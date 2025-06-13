@@ -4,50 +4,13 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
   LabelList
 } from 'recharts';
+import ErrorBoundary from './components/ErrorBoundary';
+import NavMenu from './components/NavMenu';
 
-// ---FIX: Added placeholder for missing ErrorBoundary component---
-const ErrorBoundary = ({ children }) => {
-  // In a real app, this would catch errors in its children component tree.
-  // For this fix, it will just render the children.
-  return <>{children}</>;
-};
-
-// ---FIX: Added placeholder for missing NavMenu component---
-const NavMenu = ({ isMenuOpen, handleMenuClose }) => {
-    const menuRef = useRef(null);
-
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (menuRef.current && !menuRef.current.contains(event.target)) {
-                handleMenuClose();
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, [handleMenuClose]);
-
-  if (!isMenuOpen) return null;
-
-  return (
-    <div ref={menuRef} className="fixed top-0 right-0 h-full w-64 bg-white shadow-xl z-50 p-6">
-      <h2 className="text-xl font-bold mb-6">Menu</h2>
-      <nav>
-        <ul>
-          <li className="mb-4"><Link to="/" onClick={handleMenuClose} className="text-gray-700 hover:text-cyan-500">Dashboard</Link></li>
-          <li className="mb-4"><Link to="/report" onClick={handleMenuClose} className="text-gray-700 hover:text-cyan-500">Reports</Link></li>
-          <li className="mb-4"><Link to="/admin" onClick={handleMenuClose} className="text-gray-700 hover:text-cyan-500">Admin Settings</Link></li>
-        </ul>
-      </nav>
-    </div>
-  );
-};
-
-
+// The main component for displaying order reports.
 function Report() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [range, setRange] = useState('7');
+  const [range, setRange] = useState('7'); // Default date range (7 days)
   const [dateData, setDateData] = useState([]);
   const [popularItems, setPopularItems] = useState([]);
   const [hourlyData, setHourlyData] = useState([]);
@@ -56,14 +19,13 @@ function Report() {
     repeatCustomers: 0,
     topCustomers: []
   });
-  // --- NEW: State for Today's Orders Card ---
+  // State for the "Today's Orders" card
   const [todayStats, setTodayStats] = useState({
     total: 0,
     processed: 0
   });
-  const menuRef = useRef(null);
 
-  // --- UPDATED: generateDateRange now starts from yesterday ---
+  // Generates a date range array starting from yesterday.
   const generateDateRange = (days) => {
     const dates = [];
     const today = new Date();
@@ -77,6 +39,7 @@ function Report() {
     return dates;
   };
 
+  // Fetches data for the "Today's Activities by Hour" chart.
   const fetchHourlyData = async () => {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/hourly-orders`);
@@ -89,7 +52,7 @@ function Report() {
     }
   };
 
-  // --- NEW: Function to fetch stats for Today's Orders card ---
+  // Fetches statistics for the "Today's Orders" card.
   const fetchTodayStats = async () => {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/today-stats`);
@@ -102,6 +65,7 @@ function Report() {
   };
 
 
+  // Main data fetching effect, runs when the date range changes.
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -144,39 +108,32 @@ function Report() {
     fetchHourlyData();
     fetchTodayStats(); // Fetch today's stats on load and range change
     
+    // Set up an interval to refresh real-time data every 5 minutes.
     const intervalId = setInterval(() => {
         fetchHourlyData();
         fetchTodayStats();
-    }, 5 * 60 * 1000); // Refresh every 5 minutes
+    }, 5 * 60 * 1000); 
 
     return () => clearInterval(intervalId);
   }, [range]);
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
-        const menuButton = menuRef.current.previousElementSibling;
-        if (menuButton && !menuButton.contains(event.target)) setIsMenuOpen(false);
-        else if (!menuButton) setIsMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
-  const handleMenuOpen = () => setIsMenuOpen(prev => !prev);
+  const handleMenuOpen = () => setIsMenuOpen(true);
   const handleMenuClose = () => setIsMenuOpen(false);
 
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-gray-100 text-gray-800">
+        {/* Hamburger Menu Button */}
         <button
           onClick={handleMenuOpen}
           className="fixed top-4 right-4 z-50 text-gray-600 hover:text-gray-800 focus:outline-none p-2 bg-white rounded-full shadow-md"
+          aria-label="Open menu"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
         </button>
 
+        {/* Navigation Menu Component */}
         <NavMenu isMenuOpen={isMenuOpen} handleMenuClose={handleMenuClose} />
 
         <div className="mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full max-w-[1800px]">
@@ -184,6 +141,7 @@ function Report() {
             <main className="space-y-8">
               <h2 className="text-2xl font-bold text-gray-800">Order Report</h2>
               
+              {/* Date Range Selection Buttons */}
               <div className="flex gap-4 mb-6">
                 {['7', '14', '30', '60', '90', 'YTD'].map(option => (
                   <button key={option} className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${range === option ? 'bg-cyan-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`} onClick={() => setRange(option)}>
@@ -192,9 +150,9 @@ function Report() {
                 ))}
               </div>
 
-              {/* --- UPDATED: Grid now supports 4 columns on large screens --- */}
+              {/* Statistics Cards Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                {/* --- NEW: Today's Orders Card --- */}
+                {/* Today's Orders Card */}
                 <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center text-center border">
                     <div className="text-gray-600 mb-2">
                          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mx-auto text-cyan-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
@@ -258,6 +216,7 @@ function Report() {
             </div>
 
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-12">
+                {/* Daily Orders Chart */}
                 <div className="bg-white p-4 rounded-xl shadow min-w-0">
                   <h3 className="text-xl font-semibold mb-4">Daily Orders</h3>
                   <div className="h-[400px]">
@@ -274,7 +233,8 @@ function Report() {
                     </ResponsiveContainer>
                   </div>
                 </div>
-
+                
+                {/* Hourly Activity Chart */}
                 <div className="bg-white p-4 rounded-xl shadow min-w-0">
                   <h3 className="text-xl font-semibold mb-4">Today's Activities by Hour</h3>
                   <div className="h-[400px]">
@@ -293,6 +253,7 @@ function Report() {
                 </div>
               </div>
 
+              {/* Popular Items Chart */}
               <div className="bg-white p-4 rounded-xl shadow">
                 <h3 className="text-xl font-semibold mb-4">Top 10 Most Popular Items</h3>
                 <div className="h-[400px]">

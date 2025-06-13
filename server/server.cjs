@@ -21,7 +21,7 @@ const allowedOrigins = [
   'http://127.0.0.1:3000',
   'http://127.0.0.1:3001',
   'http://127.0.0.1:5173',
-  process.env.RENDER_FRONTEND_URL 
+  process.env.RENDER_FRONTEND_URL
 ];
 
 app.use(cors({
@@ -70,7 +70,7 @@ const COLUMN_HEADERS = {
 const printHistoryFile = path.join(__dirname, "printHistory.json");
 let printHistory = [];
 let sheets;
-let cloudPrintJobs = []; 
+let cloudPrintJobs = [];
 
 let sheetDataCache = {
     data: [],
@@ -216,7 +216,7 @@ async function testPrinterConnectivity(printerUrl, mode = 'LAN') {
             resolve({ available: false, error: 'Connection timed out.' });
         });
         req.on('error', (err) => resolve({ available: false, error: `Request error: ${err.message}` }));
-        
+
         if (method === 'POST') {
             req.write(testPayload);
         }
@@ -394,33 +394,29 @@ const filterByCurrentDate = (order) => {
     try {
         const orderDate = new Date(order.timeOrdered);
         if (isNaN(orderDate.getTime())) return false;
-        const normalizedOrderDate = normalizeToUTCMidnight(orderDate);
-        const todayUtcMidnight = normalizeToUTCMidnight(new Date());
-        return normalizedOrderDate.getTime() === todayUtcMidnight.getTime();
+        // This function correctly compares the order date with the server's current date, ignoring time.
+        const now = new Date();
+        return orderDate.getFullYear() === now.getFullYear() &&
+               orderDate.getMonth() === now.getMonth() &&
+               orderDate.getDate() === now.getDate();
     } catch (e) {
+        console.error(`Error parsing date for order ${order.orderNum}:`, order.timeOrdered, e);
         return false;
     }
 };
 
+// --- FIX: Corrected the logic for fetching incoming orders ---
 app.get("/api/list", async (req, res) => {
   try {
     const allOrders = await getSheetData();
     const incomingOrdersToday = allOrders
       .filter(o => {
-          const isToday = (() => {
-            if (!o.timeOrdered) return false;
-            const orderDate = new Date(o.timeOrdered);
-            const now = new Date();
-            return orderDate.getFullYear() === now.getFullYear() &&
-                   orderDate.getMonth() === now.getMonth() &&
-                   orderDate.getDate() === now.getDate();
-          })();
-
+          // These checks ensure we only get unprocessed, uncancelled, current-day orders.
           return (
-            String(o.cancelled).toUpperCase() !== 'TRUE' &&
-            String(o.orderProcessed).toUpperCase() !== 'TRUE' &&
+            !o.cancelled &&
+            !o.orderProcessed &&
             (o.orderUpdateStatus || '').toUpperCase() === 'NONE' &&
-            isToday
+            filterByCurrentDate(o) // Using the robust date filter
           );
         })
       .sort((a, b) => new Date(a.timeOrdered).getTime() - new Date(b.timeOrdered).getTime());
@@ -471,16 +467,13 @@ app.get("/api/order-by-row/:rowIndex", async (req, res) => {
 // REPORTING ENDPOINTS
 // =================================================================================
 
-// --- NEW: Endpoint for "Today's Orders" card ---
+// --- FIX: Endpoint for "Today's Orders" now uses the corrected date filter ---
 app.get('/api/today-stats', async (req, res) => {
     try {
         const allOrders = await getSheetData(true); // Force fetch for real-time data
-        const todayStr = new Date().toISOString().split('T')[0];
-
-        const todayOrders = allOrders.filter(order => {
-            if (!order.timeOrdered) return false;
-            return new Date(order.timeOrdered).toISOString().split('T')[0] === todayStr;
-        });
+        
+        // Filter for orders that match the current date
+        const todayOrders = allOrders.filter(order => filterByCurrentDate(order));
         
         const total = todayOrders.filter(o => !o.cancelled).length;
         const processed = todayOrders.filter(o => !o.cancelled && o.orderProcessed).length;
