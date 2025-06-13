@@ -590,7 +590,7 @@ app.get('/api/hourly-orders', async (req, res) => {
     try {
         const now = new Date();
         const currentHour = now.getHours();
-        const startHour = 8;
+        const startHour = 4;
         
         const hourlyCounts = {};
         for (let h = startHour; h <= 23; h++) {

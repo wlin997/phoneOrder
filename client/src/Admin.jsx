@@ -3,28 +3,50 @@ import NavMenu from './components/NavMenu';
 import ErrorBoundary from './components/ErrorBoundary';
 import.meta.env.VITE_API_URL;
 
+// Helper to generate a range of numbers for dropdowns
+const generateRange = (start, end) => {
+    return Array.from({ length: (end - start + 1) }, (_, i) => start + i);
+};
+
+// Helper to format numbers with a leading zero
+const padZero = (num) => String(num).padStart(2, '0');
+
 export default function Admin() {
+  // State for Printer Settings
   const [printMode, setPrintMode] = useState('LAN');
   const [printerUrl, setPrinterUrl] = useState('');
   const [contentType, setContentType] = useState('text/html');
   const [printerStatus, setPrinterStatus] = useState('Checking...');
+  
+  // State for Application Settings
+  const [appSettings, setAppSettings] = useState({
+    timezone: 'America/New_York',
+    reportStartHour: '8',
+    archiveCronSchedule: '0 0 * * *' // Default to midnight
+  });
+
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
+  // Load both printer and app settings on component mount
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/print-settings`);
-        if (!res.ok) throw new Error(`Failed to fetch settings: ${res.status}`);
-        const data = await res.json();
-        console.log('[Admin.jsx] Loaded settings:', data);
-        setPrintMode(data.mode || 'LAN');
-        setPrinterUrl(data.printerUrl || '');
-        setContentType(data.contentType || 'text/html');
-        localStorage.setItem('printerSettings', JSON.stringify(data));
+        const printRes = await fetch(`${import.meta.env.VITE_API_URL}/api/print-settings`);
+        if (!printRes.ok) throw new Error(`Failed to fetch printer settings: ${printRes.status}`);
+        const printData = await printRes.json();
+        setPrintMode(printData.mode || 'LAN');
+        setPrinterUrl(printData.printerUrl || '');
+        setContentType(printData.contentType || 'text/html');
+
+        const appRes = await fetch(`${import.meta.env.VITE_API_URL}/api/app-settings`);
+        if (!appRes.ok) throw new Error(`Failed to fetch app settings: ${appRes.status}`);
+        const appData = await appRes.json();
+        setAppSettings(appData);
+
       } catch (err) {
         console.error('[Admin.jsx] Error loading settings:', err.message);
-        alert('Failed to load printer settings.');
+        alert('Failed to load some settings.');
       }
     };
     loadSettings();
@@ -37,15 +59,12 @@ export default function Admin() {
         return;
       }
       try {
-        console.log(`[Admin.jsx] Checking printer status for URL: ${printerUrl}`);
         const response = await fetch(`${import.meta.env.VITE_API_URL}/api/printer-status`);
         if (!response.ok) throw new Error(`Status check failed: ${response.status}`);
         const data = await response.json();
-        console.log(`[Admin.jsx] Printer status response:`, data);
         setPrinterStatus(data.available ? 'Online' : `Not Available (${data.error || 'Unknown error'})`);
       } catch (err) {
-        console.error('[Admin.jsx] Error checking printer status:', err.message);
-        setPrinterStatus(`Offline or Unreachable (${err.message})`);
+        setPrinterStatus(`Offline or Unreachable`);
       }
     };
     checkPrinterStatus();
@@ -53,36 +72,33 @@ export default function Admin() {
     return () => clearInterval(intervalId);
   }, [printerUrl]);
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
-        const menuButton = menuRef.current.previousElementSibling;
-        if (menuButton && !menuButton.contains(event.target)) {
-          setIsMenuOpen(false);
-        } else if (!menuButton) {
-          setIsMenuOpen(false);
-        }
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  const handleMenuOpen = () => setIsMenuOpen(prev => !prev);
+  const handleMenuClose = () => setIsMenuOpen(false);
 
-  const handleMenuOpen = () => {
-    setIsMenuOpen(prev => !prev);
+  // Handle changes for simple app settings fields
+  const handleAppSettingsChange = (e) => {
+    const { name, value } = e.target;
+    setAppSettings(prev => ({...prev, [name]: value}));
   };
 
-  const handleMenuClose = () => {
-    setIsMenuOpen(false);
-  };
+  // --- NEW: Handle changes for the cron schedule dropdowns ---
+  const handleCronChange = (e) => {
+    const { name, value } = e.target; // name will be 'hour' or 'minute'
+    const currentCron = appSettings.archiveCronSchedule.split(' ');
+    
+    let newCronString = '';
+    if (name === 'hour') {
+      newCronString = `${currentCron[0]} ${value} * * *`;
+    } else { // minute
+      newCronString = `${value} ${currentCron[1]} * * *`;
+    }
 
-  const handleUrlChange = (e) => {
-    setPrinterUrl(e.target.value);
+    setAppSettings(prev => ({...prev, archiveCronSchedule: newCronString }));
   };
-
-  const handleSaveSettings = async () => {
+  
+  const handleSaveAllSettings = async () => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/print-settings`, {
+      const printRes = await fetch(`${import.meta.env.VITE_API_URL}/api/print-settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -91,35 +107,24 @@ export default function Admin() {
           contentType,
         }),
       });
-      if (!res.ok) throw new Error(`Failed to save settings: ${res.status}`);
-      const data = await res.json();
-      console.log('[Admin.jsx] Saved settings:', data);
-      localStorage.setItem('printerSettings', JSON.stringify(data));
-      alert('Settings saved successfully!');
+      if (!printRes.ok) throw new Error(`Failed to save printer settings: ${printRes.status}`);
+      
+      const appRes = await fetch(`${import.meta.env.VITE_API_URL}/api/app-settings`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(appSettings),
+      });
+      if (!appRes.ok) throw new Error(`Failed to save app settings: ${appRes.status}`);
+
+      alert('All settings saved successfully! Note: Some changes may require a server restart to take effect.');
     } catch (err) {
       console.error('[Admin.jsx] Error saving settings:', err.message);
       alert('Failed to save settings. Check console for details.');
     }
   };
 
-  // Reset printerUrl to default placeholder when printMode changes
-  useEffect(() => {
-    let defaultUrl = '';
-    switch (printMode) {
-      case 'CLOUD':
-        defaultUrl = 'e.g., https://your-id.cloudprnt.net/StarWebPRNT/Print';
-        break;
-      case 'MOCK':
-        defaultUrl = 'e.g., https://n8n.example.com/webhook/endpoint-id';
-        break;
-      case 'LAN':
-        defaultUrl = 'e.g., http://192.168.1.45/StarWebPRNT/Print';
-        break;
-      default:
-        defaultUrl = '';
-    }
-    setPrinterUrl(defaultUrl); // Reset to default placeholder
-  }, [printMode]);
+  // Parse cron schedule for UI display
+  const [cronMinute, cronHour] = appSettings.archiveCronSchedule.split(' ');
 
   return (
     <ErrorBoundary>
@@ -136,93 +141,111 @@ export default function Admin() {
 
         <NavMenu isMenuOpen={isMenuOpen} handleMenuClose={handleMenuClose} />
 
-        <div className="max-w-xl mx-auto p-6 bg-white rounded shadow">
-          <h2 className="text-2xl font-bold mb-4 text-center">Admin Settings</h2>
+        <div className="max-w-xl mx-auto p-6 bg-white rounded-xl shadow-lg">
+          <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">Admin Settings</h2>
 
-          <div className="text-sm text-gray-700 bg-gray-100 p-3 rounded mb-4">
-            <p><b>LAN Mode:</b> Sends the order directly to a printer on your local network using a fixed IP address.</p>
-            <p className="mt-2"><b>CloudPRNT Mode:</b> Stores the order on your server. The printer polls the cloud for jobs via Star CloudPRNT every few seconds.</p>
-            <p className="mt-2"><b>Mock Mode:</b> Sends orders to an n8n webhook for testing or integration.</p>
+          {/* --- Application Settings Section --- */}
+          <div className="mb-8 p-4 border rounded-lg bg-gray-50">
+            <h3 className="text-xl font-semibold mb-4 text-gray-700">Application Configuration</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block mb-2 font-medium text-gray-600">Timezone</label>
+                <select 
+                  name="timezone"
+                  value={appSettings.timezone}
+                  onChange={handleAppSettingsChange}
+                  className="w-full p-2 border rounded bg-white"
+                >
+                  <option value="America/New_York">Eastern Time (ET)</option>
+                  <option value="America/Chicago">Central Time (CT)</option>
+                  <option value="America/Denver">Mountain Time (MT)</option>
+                  <option value="America/Los_Angeles">Pacific Time (PT)</option>
+                  <option value="America/Phoenix">Arizona (No DST)</option>
+                  <option value="America/Anchorage">Alaska Time</option>
+                  <option value="Pacific/Honolulu">Hawaii Time</option>
+                </select>
+                <p className="text-xs text-amber-600 font-semibold mt-1">Note: Timezone changes require a server restart.</p>
+              </div>
+              <div>
+                <label className="block mb-2 font-medium text-gray-600">Report Start Hour</label>
+                <select
+                  name="reportStartHour"
+                  value={appSettings.reportStartHour}
+                  onChange={handleAppSettingsChange}
+                  className="w-full p-2 border rounded bg-white"
+                >
+                  {generateRange(0, 23).map(hour => (
+                    <option key={hour} value={hour}>{padZero(hour)}:00</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">The hour the "Today's Activities" chart begins.</p>
+              </div>
+              <div>
+                <label className="block mb-2 font-medium text-gray-600">Daily Order Archiving Time</label>
+                <div className="flex gap-4">
+                  <select
+                    name="hour"
+                    value={cronHour}
+                    onChange={handleCronChange}
+                    className="w-full p-2 border rounded bg-white"
+                  >
+                    {generateRange(0, 23).map(hour => (
+                      <option key={hour} value={hour}>Hour: {padZero(hour)}</option>
+                    ))}
+                  </select>
+                  <select
+                    name="minute"
+                    value={cronMinute}
+                    onChange={handleCronChange}
+                    className="w-full p-2 border rounded bg-white"
+                  >
+                    {generateRange(0, 59).map(min => (
+                      <option key={min} value={min}>Minute: {padZero(min)}</option>
+                    ))}
+                  </select>
+                </div>
+                {/* --- MODIFIED NOTE --- */}
+                <p className="text-xs text-amber-600 font-semibold mt-1">Note: Changes to the archiving time require a server restart to take effect.</p>
+              </div>
+            </div>
           </div>
+          
+          {/* --- Printer Settings Section --- */}
+          <div className="mb-6 p-4 border rounded-lg bg-gray-50">
+             <h3 className="text-xl font-semibold mb-4 text-gray-700">Printer Configuration</h3>
+            <div className="text-sm text-gray-700 bg-gray-100 p-3 rounded mb-4">
+              <p><b>LAN Mode:</b> Sends the order directly to a printer on your local network.</p>
+              <p className="mt-2"><b>CloudPRNT Mode:</b> The printer polls the server for jobs.</p>
+              <p className="mt-2"><b>Mock Mode:</b> Sends orders to a webhook for testing.</p>
+            </div>
 
-          <label className="block mb-2 font-medium">Select Print Mode:</label>
-          <select
-            value={printMode}
-            onChange={e => setPrintMode(e.target.value)}
-            className="w-full p-2 border rounded mb-6"
-          >
-            <option value="LAN">LAN (Push to IP)</option>
-            <option value="CLOUD">CloudPRNT (Printer Pulls)</option>
-            <option value="MOCK">Mock (n8n Webhook)</option>
-          </select>
-
-          <label className="block mb-2 font-medium">
-            {printMode === 'CLOUD'
-              ? 'CloudPRNT Printer URL:'
-              : printMode === 'MOCK'
-              ? 'n8n Webhook URL:'
-              : 'LAN Printer IP Address:'}
-          </label>
-          <input
-            type="text"
-            value={printerUrl}
-            onChange={handleUrlChange}
-            className="w-full p-2 border rounded mb-6"
-            placeholder={
-              printMode === 'CLOUD'
-                ? 'e.g., https://your-id.cloudprnt.net/StarWebPRNT/Print'
-                : printMode === 'MOCK'
-                ? 'e.g., https://n8n.example.com/webhook/endpoint-id'
-                : 'e.g., http://192.168.1.45/StarWebPRNT/Print'
-            }
-          />
-
-          <div className="mb-4">
-            <button
-              onClick={async () => {
-                if (!printerUrl) {
-                  setPrinterStatus('No URL configured');
-                  alert('Please enter a printer URL.');
-                  return;
-                }
-                try {
-                  console.log(`[Admin.jsx] Manual status check for URL: ${printerUrl}`);
-                  const response = await fetch(`${import.meta.env.VITE_API_URL}/api/printer-status`);
-                  if (!response.ok) throw new Error(`Manual status check failed: ${response.status}`);
-                  const data = await response.json();
-                  console.log(`[Admin.jsx] Manual status response:`, data);
-                  setPrinterStatus(data.available ? 'Online' : `Not Available (${data.error || 'Unknown error'})`);
-                  alert(`Printer Status: ${data.available ? 'Online' : `Not Available (${data.error})`}`);
-                } catch (err) {
-                  console.error('[Admin.jsx] Error during manual status check:', err.message);
-                  setPrinterStatus(`Offline or Unreachable (${err.message})`);
-                  alert(`Failed to check printer status: ${err.message}`);
-                }
-              }}
-              className="w-full bg-gray-200 text-gray-700 py-2 rounded hover:bg-gray-300"
+            <label className="block mb-2 font-medium text-gray-600">Select Print Mode:</label>
+            <select
+              value={printMode}
+              onChange={e => setPrintMode(e.target.value)}
+              className="w-full p-2 border rounded mb-4"
             >
-              Check Printer Status
-            </button>
-            <p className="mt-2 text-sm">
-              Printer Status: <span className={printerStatus === 'Online' ? 'text-green-600' : 'text-red-600'}>{printerStatus}</span>
-            </p>
-          </div>
+              <option value="LAN">LAN (Push to IP)</option>
+              <option value="CLOUD">CloudPRNT (Printer Pulls)</option>
+              <option value="MOCK">Mock (n8n Webhook)</option>
+            </select>
 
-          <label className="block mb-2 font-medium">Print Content Type:</label>
-          <select
-            value={contentType}
-            onChange={e => setContentType(e.target.value)}
-            className="w-full p-2 border rounded mb-6"
-          >
-            <option value="text/plain">Plain Text</option>
-            <option value="text/html">HTML (Styled)</option>
-          </select>
+            <label className="block mb-2 font-medium text-gray-600">
+              {printMode === 'LAN' ? 'Printer IP Address:' : 'Printer/Webhook URL:'}
+            </label>
+            <input
+              type="text"
+              value={printerUrl}
+              onChange={e => setPrinterUrl(e.target.value)}
+              className="w-full p-2 border rounded mb-4"
+            />
+          </div>
 
           <button
-            onClick={handleSaveSettings}
-            className="w-full bg-cyan-400 text-white py-2 rounded hover:bg-cyan-500"
+            onClick={handleSaveAllSettings}
+            className="w-full bg-cyan-500 text-white py-3 rounded-lg hover:bg-cyan-600 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-opacity-50 transition-all font-semibold"
           >
-            Save Settings
+            Save All Settings
           </button>
         </div>
       </div>
