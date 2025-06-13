@@ -18,11 +18,11 @@ const net = require('net');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// --- NEW: File paths for settings ---
+// --- File paths for settings ---
 const appSettingsFilePath = path.join(__dirname, 'appSettings.json');
 const printerSettingsFilePath = path.join(__dirname, 'printerSettings.json');
 
-// --- NEW: Function to load app settings from file or use defaults ---
+// --- Function to load app settings from file or use defaults ---
 const getAppSettings = () => {
   try {
     const data = fs.readFileSync(appSettingsFilePath, 'utf8');
@@ -90,7 +90,10 @@ const COLUMN_HEADERS = {
     ORDER_ITEM_PREFIX: 'Order_item_',
     QTY_PREFIX: 'Qty_',
     MODIFIER_PREFIX: 'modifier_',
-    ORDER_SUMMARY: 'orderSummary'
+    ORDER_SUMMARY: 'orderSummary',
+    // --- NEW: Column headers for KDS ---
+    ORDER_PREP: 'Order_prep',
+    FOOD_PREP_TIME: 'Food_prep_time'
 };
 
 const printHistoryFile = path.join(__dirname, "printHistory.json");
@@ -357,6 +360,9 @@ async function getSheetData(forceFetch = false) {
                     printedTimestamps: getVal(COLUMN_HEADERS.PRINTED_TIMESTAMPS).split(',').filter(Boolean),
                     orderSummary: getVal(COLUMN_HEADERS.ORDER_SUMMARY),
                     rowIndex: index + 2,
+                    // --- MODIFIED: Added KDS fields ---
+                    orderPrepped: getVal(COLUMN_HEADERS.ORDER_PREP).toUpperCase() === 'Y',
+                    foodPrepTime: getVal(COLUMN_HEADERS.FOOD_PREP_TIME),
                     items: []
                 };
                 for (let j = 1; j <= 20; j++) {
@@ -686,7 +692,7 @@ app.get('/api/customer-stats', async (req, res) => {
     }
 });
 
-// --- NEW: Endpoints for App Settings ---
+// --- Settings Endpoints ---
 app.get('/api/app-settings', (req, res) => {
     res.json(appSettings);
 });
@@ -862,6 +868,93 @@ app.get('/api/printer-status', async (req, res) => {
         res.status(printerCheck.available ? 200 : 503).json({ ...printerCheck, mode: settings.mode });
     } catch (err) {
         res.status(500).json({ available: false, error: 'Failed to check printer status: ' + err.message });
+    }
+});
+
+// =================================================================================
+// --- NEW: KDS API ENDPOINTS ---
+// =================================================================================
+
+// Endpoint to get active kitchen orders
+app.get("/api/kds/active-orders", async (req, res) => {
+    try {
+        const allOrders = await getSheetData(true); // Force fetch for real-time data
+        const activeKitchenOrders = allOrders
+            .filter(o => {
+                return o.orderProcessed && // Must be processed/fired
+                       !o.cancelled &&     // Must not be cancelled
+                       !o.orderPrepped;    // Must not be prepped yet
+            })
+            .sort((a, b) => new Date(a.timeOrdered).getTime() - new Date(b.timeOrdered).getTime()); // Ascending time order
+
+        res.json(activeKitchenOrders);
+    } catch (err) {
+        console.error("[KDS API] Failed to fetch active orders:", err);
+        res.status(500).json({ error: "Failed to fetch active kitchen orders", details: err.message });
+    }
+});
+
+// Endpoint to get recently completed kitchen orders
+app.get("/api/kds/prepped-orders", async (req, res) => {
+    try {
+        const allOrders = await getSheetData(true); // Force fetch for real-time data
+        const preppedOrders = allOrders
+            .filter(o => o.orderPrepped && !o.cancelled)
+            .sort((a, b) => new Date(b.timeOrdered).getTime() - new Date(a.timeOrdered).getTime()) // Descending time order
+            .slice(0, 20); // Limit to the last 20 for performance
+
+        res.json(preppedOrders);
+    } catch (err) {
+        console.error("[KDS API] Failed to fetch prepped orders:", err);
+        res.status(500).json({ error: "Failed to fetch prepped orders", details: err.message });
+    }
+});
+
+// Endpoint to mark an order as prepped and record the time
+app.post("/api/kds/prep-order/:rowIndex", async (req, res) => {
+    const { rowIndex } = req.params;
+    const { prepTime } = req.body; // e.g., "05:30"
+
+    if (!rowIndex || prepTime === undefined) {
+        return res.status(400).json({ error: "Missing rowIndex or prepTime in request" });
+    }
+
+    try {
+        const headerResponse = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${SHEET_TAB}!1:1` });
+        const header = headerResponse.data.values[0];
+
+        const orderPrepColIndex = header.indexOf(COLUMN_HEADERS.ORDER_PREP);
+        const prepTimeColIndex = header.indexOf(COLUMN_HEADERS.FOOD_PREP_TIME);
+
+        if (orderPrepColIndex === -1 || prepTimeColIndex === -1) {
+            return res.status(500).json({ error: "Could not find 'Order_prep' or 'Food_prep_time' columns in the sheet." });
+        }
+        
+        const orderPrepColLetter = columnToLetter(orderPrepColIndex + 1);
+        const prepTimeColLetter = columnToLetter(prepTimeColIndex + 1);
+
+        const updates = [{
+            range: `${SHEET_TAB}!${orderPrepColLetter}${rowIndex}`,
+            values: [['Y']]
+        }, {
+            range: `${SHEET_TAB}!${prepTimeColLetter}${rowIndex}`,
+            values: [[prepTime]]
+        }];
+
+        await sheets.spreadsheets.values.batchUpdate({
+            spreadsheetId: SHEET_ID,
+            resource: {
+                data: updates,
+                valueInputOption: "USER_ENTERED"
+            }
+        });
+
+        invalidateSheetDataCache();
+        res.json({ success: true, message: `Order at row ${rowIndex} marked as prepped.` });
+
+    } catch (err) {
+        console.error(`[KDS API] Failed to update order at row ${rowIndex}:`, err);
+        res.status(500).json({ error: "Failed to update order in Google Sheet", details: err.message });
     }
 });
 

@@ -1,6 +1,5 @@
-// This line is no longer strictly necessary if the TZ environment variable
-// is set in the Render dashboard, but it's good practice to keep it
-// for local development consistency.
+// This line is kept for local development consistency.
+// The primary setting should be the TZ variable in your Render dashboard.
 process.env.TZ = 'America/New_York';
 
 const axios = require('axios');
@@ -14,10 +13,34 @@ const { v4: uuidv4 } = require("uuid");
 const cron = require('node-cron');
 const http = require('http');
 const https = require('https');
-const net = require('net'); // For LAN printing
+const net = require('net');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// --- NEW: File paths for settings ---
+const appSettingsFilePath = path.join(__dirname, 'appSettings.json');
+const printerSettingsFilePath = path.join(__dirname, 'printerSettings.json');
+
+// --- NEW: Function to load app settings from file or use defaults ---
+const getAppSettings = () => {
+  try {
+    const data = fs.readFileSync(appSettingsFilePath, 'utf8');
+    return JSON.parse(data);
+  } catch (err) {
+    // If file doesn't exist or is invalid, return defaults
+    return {
+      timezone: 'America/New_York',
+      reportStartHour: 8,
+      archiveCronSchedule: '0 2 * * *' // Default to 2 AM
+    };
+  }
+};
+
+// --- MODIFIED: Load settings on startup ---
+let appSettings = getAppSettings();
+process.env.TZ = appSettings.timezone;
+
 
 const allowedOrigins = [
   'http://localhost:3000',
@@ -31,7 +54,6 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-    console.log('>>>>> INCOMING REQUEST ORIGIN:', origin);
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -46,7 +68,6 @@ const SERVICE_ACCOUNT_FILE = path.join(__dirname, process.env.GOOGLE_APPLICATION
 const SHEET_ID = '1jhfeNgtIsnZZya8R91dPoMmXdbAUT_0wtcCq_022MGE';
 const SHEET_TAB = 'orderItems';
 const ORDER_HISTORY_TAB = 'orderHistory';
-const settingsFilePath = path.join(__dirname, 'printerSettings.json');
 
 const COLUMN_HEADERS = {
     CATEGORY: 'Category',
@@ -80,7 +101,6 @@ let cloudPrintJobs = [];
 let sheetDataCache = {
     data: [],
     lastFetchTime: 0,
-    fetchInterval: 10000,
     isFetching: false,
     fetchPromise: null
 };
@@ -394,11 +414,8 @@ async function archiveOrders() {
 
 app.get("/", (req, res) => res.send("✅ Backend server is alive"));
 
-const filterByCurrentDate = (order) => {
-    // --- START DEBUG LINES ---
-    console.log('--- Checking Order ---');
+const isTodayFilter = (order) => {
     if (!order || !order.timeOrdered) {
-        console.log('[DEBUG] Order or order timestamp is missing. Skipping.');
         return false;
     }
     try {
@@ -407,35 +424,23 @@ const filterByCurrentDate = (order) => {
         const isMatch = orderDate.getFullYear() === now.getFullYear() &&
                         orderDate.getMonth() === now.getMonth() &&
                         orderDate.getDate() === now.getDate();
-        
-        console.log(`[DEBUG] Server's Current Date: ${now.toString()}`);
-        console.log(`[DEBUG] Order Timestamp: ${order.timeOrdered}`);
-        console.log(`[DEBUG] Parsed Order Date: ${orderDate.toString()}`);
-        console.log(`[DEBUG] Server Date (Day/Month/Year): ${now.getDate()}/${now.getMonth()}/${now.getFullYear()}`);
-        console.log(`[DEBUG] Order Date (Day/Month/Year): ${orderDate.getDate()}/${orderDate.getMonth()}/${orderDate.getFullYear()}`);
-        console.log(`[DEBUG] Is it today? ${isMatch}`);
-        console.log('--------------------');
-        
         return isMatch;
     } catch (e) {
-        console.error(`[DEBUG] Error parsing date for order: ${order.orderNum}`, e);
+        console.error(`Error parsing date for order: ${order.orderNum}`, e);
         return false;
     }
-    // --- END DEBUG LINES ---
 };
 
 app.get("/api/list", async (req, res) => {
   try {
     const allOrders = await getSheetData();
-    // Log server time once per request to see what the server thinks "now" is.
-    console.log(`\n\n--- New /api/list request at ${new Date()} ---`);
     const incomingOrdersToday = allOrders
       .filter(o => {
           return (
             !o.cancelled &&
             !o.orderProcessed &&
             (o.orderUpdateStatus || '').toUpperCase() === 'NONE' &&
-            filterByCurrentDate(o)
+            isTodayFilter(o)
           );
         })
       .sort((a, b) => new Date(a.timeOrdered).getTime() - new Date(b.timeOrdered).getTime());
@@ -450,7 +455,7 @@ app.get("/api/updating", async (req, res) => {
     try {
         const allOrders = await getSheetData();
         const updatingOrdersToday = allOrders
-            .filter(o => !o.cancelled && !o.orderProcessed && o.orderUpdateStatus === 'ChkRecExist' && filterByCurrentDate(o))
+            .filter(o => !o.cancelled && !o.orderProcessed && o.orderUpdateStatus === 'ChkRecExist' && isTodayFilter(o))
             .sort((a, b) => new Date(b.timeOrdered).getTime() - new Date(a.timeOrdered).getTime());
         res.json(updatingOrdersToday);
     } catch (err) {
@@ -483,13 +488,13 @@ app.get("/api/order-by-row/:rowIndex", async (req, res) => {
 });
 
 // =================================================================================
-// REPORTING ENDPOINTS
+// REPORTING AND SETTINGS ENDPOINTS
 // =================================================================================
 
 app.get('/api/today-stats', async (req, res) => {
     try {
         const allOrders = await getSheetData(true);
-        const todayOrders = allOrders.filter(order => filterByCurrentDate(order));
+        const todayOrders = allOrders.filter(order => isTodayFilter(order));
         
         const total = todayOrders.filter(o => !o.cancelled).length;
         const processed = todayOrders.filter(o => !o.cancelled && o.orderProcessed).length;
@@ -590,7 +595,7 @@ app.get('/api/hourly-orders', async (req, res) => {
     try {
         const now = new Date();
         const currentHour = now.getHours();
-        const startHour = 4;
+        const startHour = parseInt(appSettings.reportStartHour, 10) || 4;
         
         const hourlyCounts = {};
         for (let h = startHour; h <= 23; h++) {
@@ -599,15 +604,11 @@ app.get('/api/hourly-orders', async (req, res) => {
         }
 
         const allOrders = await getSheetData();
-        const todayOrders = allOrders.filter(order => filterByCurrentDate(order));
+        const todayOrders = allOrders.filter(order => isTodayFilter(order));
 
         todayOrders.forEach(order => {
             if (order.timeOrdered) {
-                const orderHour = new Date(
-                  new Date(order.timeOrdered).toLocaleString("en-US", {
-                    timeZone: "America/New_York",
-                  })
-                ).getHours();
+                const orderHour = new Date(order.timeOrdered).getHours();
                 const hourLabel = orderHour < 12 ? `${orderHour === 0 ? 12 : orderHour} AM` : `${orderHour === 12 ? 12 : orderHour - 12} PM`;
                 if (hourlyCounts.hasOwnProperty(hourLabel)) {
                     hourlyCounts[hourLabel]++;
@@ -685,6 +686,43 @@ app.get('/api/customer-stats', async (req, res) => {
     }
 });
 
+// --- NEW: Endpoints for App Settings ---
+app.get('/api/app-settings', (req, res) => {
+    res.json(appSettings);
+});
+
+app.post('/api/app-settings', async (req, res) => {
+    try {
+        await fsp.writeFile(appSettingsFilePath, JSON.stringify(req.body, null, 2));
+        appSettings = req.body;
+        // Re-schedule cron job if it has changed
+        if (cronJob) cronJob.stop();
+        startCronJob();
+        res.json({ success: true, message: 'App settings saved.' });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to save app settings: ' + err.message });
+    }
+});
+
+app.get('/api/print-settings', async (req, res) => {
+    try {
+        const data = await fsp.readFile(printerSettingsFilePath, 'utf8');
+        res.json(JSON.parse(data));
+    } catch (err) {
+        res.status(404).json({ error: 'Printer settings not found.' });
+    }
+});
+
+app.post('/api/print-settings', async (req, res) => {
+    try {
+        await fsp.writeFile(printerSettingsFilePath, JSON.stringify(req.body, null, 2));
+        res.json(req.body);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to save printer settings: ' + err.message });
+    }
+});
+
+
 // =================================================================================
 // MAIN PRINTING AND SETTINGS ENDPOINTS
 // =================================================================================
@@ -697,7 +735,7 @@ app.post("/api/fire-order", async (req, res) => {
     try {
         let printerSettings;
         try {
-            const data = await fsp.readFile(settingsFilePath, 'utf8');
+            const data = await fsp.readFile(printerSettingsFilePath, 'utf8');
             printerSettings = JSON.parse(data);
         } catch (err) {
             return res.status(400).json({ error: "Printer settings not configured." });
@@ -815,7 +853,7 @@ app.get('/api/cloudprnt-content/:jobId', (req, res) => {
 
 app.get('/api/printer-status', async (req, res) => {
     try {
-        const data = await fsp.readFile(settingsFilePath, { encoding: 'utf8' });
+        const data = await fsp.readFile(printerSettingsFilePath, 'utf8');
         const settings = JSON.parse(data);
         if (!settings.printerUrl) {
             return res.status(400).json({ available: false, mode: settings.mode, error: 'No printer URL configured' });
@@ -827,27 +865,22 @@ app.get('/api/printer-status', async (req, res) => {
     }
 });
 
-app.get('/api/print-settings', async (req, res) => {
-    try {
-        const data = await fsp.readFile(settingsFilePath, 'utf8');
-        res.json(JSON.parse(data));
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to load printer settings: ' + err.message });
-    }
-});
-
-app.post('/api/print-settings', async (req, res) => {
-    try {
-        await fsp.writeFile(settingsFilePath, JSON.stringify(req.body, null, 2));
-        res.json(req.body);
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to save printer settings: ' + err.message });
-    }
-});
-
 // =================================================================================
 // SERVER INITIALIZATION
 // =================================================================================
+let cronJob;
+
+const startCronJob = () => {
+    if (cronJob) {
+        cronJob.stop();
+    }
+    cronJob = cron.schedule(appSettings.archiveCronSchedule, archiveOrders, {
+        scheduled: true,
+        timezone: appSettings.timezone
+    });
+    console.log(`[Cron Job] Scheduled to run at: ${appSettings.archiveCronSchedule} in timezone ${appSettings.timezone}`);
+}
+
 initializeGoogleClients().then(async () => {
     await ensurePrintHistory();
     await loadPrintHistory();
@@ -856,7 +889,9 @@ initializeGoogleClients().then(async () => {
     } catch (err) {
         console.error("Initial sheet data fetch failed:", err.message);
     }
-    cron.schedule('16 0 * * *', archiveOrders, { scheduled: true, timezone: "America/New_York" });
+    
+    startCronJob();
+    
     app.listen(PORT, () => {
         console.log(`🚀 Server running at http://localhost:${PORT}`);
         if (process.env.RENDER_URL) {
