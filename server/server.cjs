@@ -390,23 +390,40 @@ async function archiveOrders() {
 app.get("/", (req, res) => res.send("✅ Backend server is alive"));
 
 const filterByCurrentDate = (order) => {
-    if (!order.timeOrdered) return false;
-    try {
-        const orderDate = new Date(order.timeOrdered);
-        if (isNaN(orderDate.getTime())) return false;
-        const now = new Date();
-        return orderDate.getFullYear() === now.getFullYear() &&
-               orderDate.getMonth() === now.getMonth() &&
-               orderDate.getDate() === now.getDate();
-    } catch (e) {
-        console.error(`Error parsing date for order ${order.orderNum}:`, order.timeOrdered, e);
+    // --- START DEBUG LINES ---
+    console.log('--- Checking Order ---');
+    if (!order || !order.timeOrdered) {
+        console.log('[DEBUG] Order or order timestamp is missing. Skipping.');
         return false;
     }
+    try {
+        const now = new Date();
+        const orderDate = new Date(order.timeOrdered);
+        const isMatch = orderDate.getFullYear() === now.getFullYear() &&
+                        orderDate.getMonth() === now.getMonth() &&
+                        orderDate.getDate() === now.getDate();
+        
+        console.log(`[DEBUG] Server's Current Date: ${now.toString()}`);
+        console.log(`[DEBUG] Order Timestamp: ${order.timeOrdered}`);
+        console.log(`[DEBUG] Parsed Order Date: ${orderDate.toString()}`);
+        console.log(`[DEBUG] Server Date (Day/Month/Year): ${now.getDate()}/${now.getMonth()}/${now.getFullYear()}`);
+        console.log(`[DEBUG] Order Date (Day/Month/Year): ${orderDate.getDate()}/${orderDate.getMonth()}/${orderDate.getFullYear()}`);
+        console.log(`[DEBUG] Is it today? ${isMatch}`);
+        console.log('--------------------');
+        
+        return isMatch;
+    } catch (e) {
+        console.error(`[DEBUG] Error parsing date for order: ${order.orderNum}`, e);
+        return false;
+    }
+    // --- END DEBUG LINES ---
 };
 
 app.get("/api/list", async (req, res) => {
   try {
     const allOrders = await getSheetData();
+    // Log server time once per request to see what the server thinks "now" is.
+    console.log(`\n\n--- New /api/list request at ${new Date()} ---`);
     const incomingOrdersToday = allOrders
       .filter(o => {
           return (
