@@ -33,20 +33,25 @@ export default function Admin() {
     const loadSettings = async () => {
       try {
         const printRes = await fetch(`${import.meta.env.VITE_API_URL}/api/print-settings`);
-        if (!printRes.ok) throw new Error(`Failed to fetch printer settings: ${printRes.status}`);
-        const printData = await printRes.json();
-        setPrintMode(printData.mode || 'LAN');
-        setPrinterUrl(printData.printerUrl || '');
-        setContentType(printData.contentType || 'text/html');
+        if (printRes.ok) {
+            const printData = await printRes.json();
+            setPrintMode(printData.mode || 'LAN');
+            setPrinterUrl(printData.printerUrl || '');
+            setContentType(printData.contentType || 'text/html');
+        } else {
+            console.error(`Failed to fetch printer settings: ${printRes.status}`);
+        }
 
         const appRes = await fetch(`${import.meta.env.VITE_API_URL}/api/app-settings`);
-        if (!appRes.ok) throw new Error(`Failed to fetch app settings: ${appRes.status}`);
-        const appData = await appRes.json();
-        setAppSettings(appData);
+        if (appRes.ok) {
+            const appData = await appRes.json();
+            setAppSettings(appData);
+        } else {
+             console.error(`Failed to fetch app settings: ${appRes.status}`);
+        }
 
       } catch (err) {
-        console.error('[Admin.jsx] Error loading settings:', err.message);
-        alert('Failed to load some settings.');
+        console.error('[Admin.jsx] Could not load settings, using defaults. This is expected on first run.', err.message);
       }
     };
     loadSettings();
@@ -71,6 +76,11 @@ export default function Admin() {
     const intervalId = setInterval(checkPrinterStatus, 60000);
     return () => clearInterval(intervalId);
   }, [printerUrl]);
+  
+  // --- FIX: Re-added the logic to clear the printerUrl when changing modes ---
+  useEffect(() => {
+    setPrinterUrl('');
+  }, [printMode]);
 
   const handleMenuOpen = () => setIsMenuOpen(prev => !prev);
   const handleMenuClose = () => setIsMenuOpen(false);
@@ -81,9 +91,8 @@ export default function Admin() {
     setAppSettings(prev => ({...prev, [name]: value}));
   };
 
-  // --- NEW: Handle changes for the cron schedule dropdowns ---
   const handleCronChange = (e) => {
-    const { name, value } = e.target; // name will be 'hour' or 'minute'
+    const { name, value } = e.target;
     const currentCron = appSettings.archiveCronSchedule.split(' ');
     
     let newCronString = '';
@@ -123,7 +132,6 @@ export default function Admin() {
     }
   };
 
-  // Parse cron schedule for UI display
   const [cronMinute, cronHour] = appSettings.archiveCronSchedule.split(' ');
 
   return (
@@ -204,7 +212,6 @@ export default function Admin() {
                     ))}
                   </select>
                 </div>
-                {/* --- MODIFIED NOTE --- */}
                 <p className="text-xs text-amber-600 font-semibold mt-1">Note: Changes to the archiving time require a server restart to take effect.</p>
               </div>
             </div>
@@ -238,6 +245,14 @@ export default function Admin() {
               value={printerUrl}
               onChange={e => setPrinterUrl(e.target.value)}
               className="w-full p-2 border rounded mb-4"
+              // --- FIX: Added the dynamic placeholder back in ---
+              placeholder={
+                printMode === 'CLOUD'
+                  ? 'e.g., https://your-id.cloudprnt.net/StarWebPRNT/Print'
+                  : printMode === 'MOCK'
+                  ? 'e.g., https://n8n.example.com/webhook/endpoint-id'
+                  : 'e.g., 192.168.1.45'
+              }
             />
           </div>
 
