@@ -655,6 +655,7 @@ app.get('/api/customer-stats', async (req, res) => {
             }
             customerData[phone].count++;
             customerData[phone].name = order[COLUMN_HEADERS.CALLER_NAME]; 
+        }); // --- SYNTAX FIX: Added the missing closing brace and parenthesis for the forEach loop.
 
         const totalOrders = filteredOrders.length;
         const repeatCustomers = Object.values(customerData).filter(data => data.count > 1).length;
