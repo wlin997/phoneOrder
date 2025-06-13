@@ -586,8 +586,11 @@ app.get('/api/popular-items', async (req, res) => {
 
 app.get('/api/hourly-orders', async (req, res) => {
     try {
-        const now = new Date();
-        const currentHour = now.getHours();
+        // --- FIX: Determine the current hour in the correct timezone ---
+        const timeZone = 'America/New_York';
+        const nowInNY = new Date(new Date().toLocaleString('en-US', { timeZone }));
+        const currentHour = nowInNY.getHours(); // This will be the hour in NY (0-23)
+
         const startHour = 8;
         
         const hourlyCounts = {};
