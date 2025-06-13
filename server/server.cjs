@@ -1,3 +1,8 @@
+// This line is no longer strictly necessary if the TZ environment variable
+// is set in the Render dashboard, but it's good practice to keep it
+// for local development consistency.
+process.env.TZ = 'America/New_York';
+
 const axios = require('axios');
 const express = require("express");
 const { google } = require("googleapis");
