@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import NavMenu from './components/NavMenu';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useSwipeable } from 'react-swipeable';
-import.meta.env.VITE_API_URL;
 
 // --- Timer Hook ---
 const useTimer = () => {
@@ -92,16 +91,16 @@ const OrderDetailsModal = ({ order, onClose, onPrep }) => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
                 <div className="p-4 border-b flex justify-between items-center">
-                    <h2 className="text-xl font-bold">Order #{order.orderNum}</h2>
+                    <h2 className="text-xl font-bold text-gray-800">Order #{order.orderNum}</h2>
                     <div className="text-2xl font-mono font-bold text-red-500">{formattedTime}</div>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-800">&times;</button>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-800 text-3xl leading-none">&times;</button>
                 </div>
                 <div className="p-4 max-h-64 overflow-y-auto">
-                    <h4 className="font-semibold mb-2">Items:</h4>
+                    <h4 className="font-semibold mb-2 text-gray-700">Items:</h4>
                     <ul>
                         {order.items.map((item, index) => (
                             <li key={index} className="mb-2 p-2 bg-gray-50 rounded">
-                                <span className="font-bold">{item.qty}x {item.item}</span>
+                                <span className="font-bold text-gray-800">{item.qty}x {item.item}</span>
                                 {item.modifier && <p className="text-sm text-red-600 pl-4">Mod: {item.modifier}</p>}
                             </li>
                         ))}
@@ -109,7 +108,7 @@ const OrderDetailsModal = ({ order, onClose, onPrep }) => {
                 </div>
                 <div className="p-4 bg-gray-100 rounded-b-xl flex items-center justify-center">
                     <label htmlFor="prep-toggle" className="flex items-center cursor-pointer">
-                        <span className="mr-3 text-lg font-semibold">Mark as Prepped</span>
+                        <span className="mr-3 text-lg font-semibold text-gray-700">Mark as Prepped</span>
                         <div className="relative">
                             <input id="prep-toggle" type="checkbox" className="sr-only" onChange={handlePrep} />
                             <div className="block bg-gray-600 w-14 h-8 rounded-full"></div>

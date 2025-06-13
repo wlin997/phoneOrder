@@ -360,7 +360,6 @@ async function getSheetData(forceFetch = false) {
                     printedTimestamps: getVal(COLUMN_HEADERS.PRINTED_TIMESTAMPS).split(',').filter(Boolean),
                     orderSummary: getVal(COLUMN_HEADERS.ORDER_SUMMARY),
                     rowIndex: index + 2,
-                    // --- MODIFIED: Added KDS fields ---
                     orderPrepped: getVal(COLUMN_HEADERS.ORDER_PREP).toUpperCase() === 'Y',
                     foodPrepTime: getVal(COLUMN_HEADERS.FOOD_PREP_TIME),
                     items: []
@@ -871,11 +870,7 @@ app.get('/api/printer-status', async (req, res) => {
     }
 });
 
-// =================================================================================
 // --- NEW: KDS API ENDPOINTS ---
-// =================================================================================
-
-// Endpoint to get active kitchen orders
 app.get("/api/kds/active-orders", async (req, res) => {
     try {
         const allOrders = await getSheetData(true); // Force fetch for real-time data
@@ -894,7 +889,6 @@ app.get("/api/kds/active-orders", async (req, res) => {
     }
 });
 
-// Endpoint to get recently completed kitchen orders
 app.get("/api/kds/prepped-orders", async (req, res) => {
     try {
         const allOrders = await getSheetData(true); // Force fetch for real-time data
@@ -910,7 +904,6 @@ app.get("/api/kds/prepped-orders", async (req, res) => {
     }
 });
 
-// Endpoint to mark an order as prepped and record the time
 app.post("/api/kds/prep-order/:rowIndex", async (req, res) => {
     const { rowIndex } = req.params;
     const { prepTime } = req.body; // e.g., "05:30"
@@ -957,6 +950,7 @@ app.post("/api/kds/prep-order/:rowIndex", async (req, res) => {
         res.status(500).json({ error: "Failed to update order in Google Sheet", details: err.message });
     }
 });
+
 
 // =================================================================================
 // SERVER INITIALIZATION
