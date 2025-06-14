@@ -5,7 +5,7 @@ import Admin from './Admin.jsx';
 import App from './App.jsx';
 import Report from './Report.jsx'; // <-- make sure this exists
 import './index.css';
-import KDS from './Kds.jsx';
+import KDS from './KdsComponent.jsx'; 
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <BrowserRouter>
