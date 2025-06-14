@@ -6,7 +6,7 @@ import NavMenu from './components/NavMenu';
 import ErrorBoundary from './components/ErrorBoundary';
 import axios from 'axios';
 import.meta.env.VITE_API_URL;
-import KDS from './KDS'; // Or the correct path to your KDS.jsx file
+import KDS from './Kds'; // Or the correct path to your KDS.jsx file
 
 const MAX_PRINTED_ORDERS = 1000;
 
