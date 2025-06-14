@@ -4,8 +4,9 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { useSwipeable } from 'react-swipeable';
 
 // --- Timer Hook ---
-const useTimer = () => {
-    const [elapsedTime, setElapsedTime] = useState(0);
+// REVISION #5 & #6: The hook now accepts an initialElapsedTime to start counting from.
+const useTimer = (initialElapsedTime = 0) => {
+    const [elapsedTime, setElapsedTime] = useState(initialElapsedTime);
     const intervalRef = useRef(null);
 
     const start = useCallback(() => {
@@ -40,14 +41,16 @@ const useTimer = () => {
 
 // --- Order Card Component ---
 const OrderCard = ({ order, onSwipe }) => {
-    const { formattedTime, start } = useTimer();
+    // REVISION #5 & #6: Get elapsedTime from the hook to pass it on swipe.
+    const { elapsedTime, formattedTime, start } = useTimer();
     
     useEffect(() => {
         start();
     }, [start]);
 
     const handlers = useSwipeable({
-        onSwiped: () => onSwipe(order),
+        // REVISION #5 & #6: Pass both the order and the current elapsedTime on swipe.
+        onSwiped: () => onSwipe(order, elapsedTime),
         preventScrollOnSwipe: true,
         trackMouse: true,
     });
@@ -73,10 +76,12 @@ const OrderCard = ({ order, onSwipe }) => {
 };
 
 // --- Order Details Modal Component ---
-const OrderDetailsModal = ({ order, onClose, onPrep }) => {
+// REVISION #5 & #6: Accept an 'initialTime' prop.
+const OrderDetailsModal = ({ order, onClose, onPrep, initialTime }) => {
     if (!order) return null;
 
-    const { formattedTime, start, stop } = useTimer();
+    // REVISION #5 & #6: Initialize the timer with the initialTime from the card.
+    const { formattedTime, start, stop } = useTimer(initialTime);
 
     useEffect(() => {
         start();
@@ -95,7 +100,8 @@ const OrderDetailsModal = ({ order, onClose, onPrep }) => {
                     <div className="text-2xl font-mono font-bold text-red-500">{formattedTime}</div>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-800 text-3xl leading-none">&times;</button>
                 </div>
-                <div className="p-4 max-h-64 overflow-y-auto">
+                {/* REVISION #4: Dialogue box is now longer (max-h-96). */}
+                <div className="p-4 max-h-96 overflow-y-auto">
                     <h4 className="font-semibold mb-2 text-gray-700">Items:</h4>
                     <ul>
                         {order.items.map((item, index) => (
@@ -128,6 +134,8 @@ export default function KDS() {
     const [preppedOrders, setPreppedOrders] = useState([]);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    // REVISION #5 & #6: Add state to hold the initial time for the modal.
+    const [initialModalTime, setInitialModalTime] = useState(0);
     
     const fetchData = useCallback(async () => {
         try {
@@ -156,12 +164,15 @@ export default function KDS() {
     const handleMenuOpen = () => setIsMenuOpen(true);
     const handleMenuClose = () => setIsMenuOpen(false);
 
-    const handleSwipe = (order) => {
+    // REVISION #5 & #6: handleSwipe now accepts the card's elapsed time.
+    const handleSwipe = (order, time) => {
         setSelectedOrder(order);
+        setInitialModalTime(time);
     };
     
     const handleCloseModal = () => {
         setSelectedOrder(null);
+        setInitialModalTime(0);
     };
 
     const handlePrepOrder = async (order, prepTime) => {
@@ -173,7 +184,6 @@ export default function KDS() {
             });
             if (!res.ok) throw new Error("Failed to mark order as prepped");
             
-            // Optimistically update UI
             setActiveOrders(prev => prev.filter(o => o.id !== order.id));
             setPreppedOrders(prev => [order, ...prev]);
             setSelectedOrder(null);
@@ -186,31 +196,33 @@ export default function KDS() {
     
     return (
         <ErrorBoundary>
-            <div className="min-h-screen bg-gray-800 text-white font-sans flex">
+            {/* REVISION #1 & #2: Switched to light theme and reversed column order. */}
+            <div className="min-h-screen bg-gray-100 text-gray-800 font-sans flex flex-row-reverse">
                 <button
                     onClick={handleMenuOpen}
-                    className="fixed top-4 right-4 z-50 text-gray-200 hover:text-white focus:outline-none p-2 bg-gray-700 rounded-full shadow-md"
+                    className="fixed top-4 right-4 z-50 text-gray-600 hover:text-gray-800 focus:outline-none p-2 bg-white rounded-full shadow-md"
                     aria-label="Open menu"
                 >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
                 </button>
                 <NavMenu isMenuOpen={isMenuOpen} handleMenuClose={handleMenuClose} />
                 
-                {/* Left Panel: Completed Orders */}
-                <div className="w-1/4 bg-gray-900 p-4 border-r border-gray-700 flex flex-col">
+                {/* Right Panel (Previously Left): Completed Orders */}
+                <div className="w-1/4 bg-white p-4 border-l border-gray-200 flex flex-col">
                     <h2 className="text-xl font-bold mb-4 text-center">Recently Prepped</h2>
                     <div className="overflow-y-auto flex-grow">
                         {preppedOrders.length === 0 && <p className="text-center text-gray-500 mt-8">No orders prepped yet.</p>}
                         {preppedOrders.map(order => (
-                             <div key={order.id} className="bg-green-800 bg-opacity-50 rounded-lg p-3 mb-2">
-                                <p className="font-bold">#{order.orderNum}</p>
-                                <p className="text-sm text-gray-300">{order.callerName}</p>
+                             // REVISION #3: Changed card color to gray and adjusted text.
+                             <div key={order.id} className="bg-gray-200 rounded-lg p-3 mb-2 text-gray-700">
+                                <p className="font-bold text-gray-800">#{order.orderNum}</p>
+                                <p className="text-sm text-gray-600">{order.callerName}</p>
                             </div>
                         ))}
                     </div>
                 </div>
 
-                {/* Right Panel: Active Orders */}
+                {/* Left Panel (Previously Right): Active Orders */}
                 <div className="w-3/4 p-6 overflow-y-auto">
                     <h2 className="text-3xl font-bold mb-6 text-center">Active Orders</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -221,7 +233,8 @@ export default function KDS() {
                     </div>
                 </div>
 
-                <OrderDetailsModal order={selectedOrder} onClose={handleCloseModal} onPrep={handlePrepOrder} />
+                {/* REVISION #5 & #6: Pass the initialModalTime to the modal. */}
+                <OrderDetailsModal order={selectedOrder} onClose={handleCloseModal} onPrep={handlePrepOrder} initialTime={initialModalTime} />
             </div>
             <style>{`
                 #prep-toggle:checked ~ .dot {
