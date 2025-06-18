@@ -87,7 +87,7 @@ function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
                 <p><strong>Phone:</strong> {order.callerPhone}</p>
                 <p><strong>Email:</strong> {order.email}</p>
                 <p><strong>Address:</strong> {order.callerAddress}, {order.callerCity}, {order.callerState} {order.callerZip}</p>
-                {order.utensil && <p><strong>Utensils:</strong> {order.utensil}</p>}
+                {order.utensil && <p className="mt-3"><strong>Utensils:</strong> {order.utensil}</p>}
             </div>
 
             <h5 className="font-semibold text-lg mb-2">Order Items:</h5>
@@ -138,7 +138,6 @@ function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
         </div>
     );
 }
-
 function App() {
     console.log('App component initializing');
     const [incomingOrders, setIncomingOrders] = useState([]);

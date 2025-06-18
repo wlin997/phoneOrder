@@ -82,8 +82,7 @@ const COLUMN_HEADERS = {
     PRINTED_TIMESTAMPS: 'Printed_Timestamps',
     ORDER_ITEM_PREFIX: 'Order_item_',
     QTY_PREFIX: 'Qty_',
-  
-  MODIFIER_PREFIX: 'modifier_',
+    MODIFIER_PREFIX: 'modifier_',
     ORDER_SUMMARY: 'orderSummary',
     TOTAL_COST: 'Total_cost',
     UTENSIL: 'Utensil',
