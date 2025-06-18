@@ -138,6 +138,12 @@ const firedAt = new Date().toLocaleString('en-US', { hour: '2-digit', minute: '2
     // Per example: "Utensils: 3 sets" then "Order Items:" (label is "ITEMS:")
     const utensilLine = order.utensil ? `Utensils:     ${order.utensil}\n\n` : '';
 
+    // --- NEW DEBUG LINES ---
+    console.log("[Debug] Raw order.utensil value:", order.utensil);
+    console.log("[Debug] Constructed utensilLine:", utensilLine);
+    // --- END DEBUG LINES ---
+
+
     // Per example: separator, then "Total: ${{Total_cost}}"
     // This will be inserted after the item separator.
     const totalLine = order.totalCost ? `Total:        $${order.totalCost}\n` : '';
@@ -155,8 +161,7 @@ Status:       ${order.orderUpdateStatus ||
 --------------------------------
 Caller:  ${order.callerName || 'N/A'}
 Phone:   ${order.callerPhone || 'N/A'}
-Email:   ${order.email ||
-'N/A'}
+Email:   ${order.email ||'N/A'}
 Address: ${[order.callerAddress, order.callerCity, order.callerState, order.callerZip].filter(Boolean).join(', ') || 'N/A'}
 --------------------------------
 ${utensilLine}ITEMS:
