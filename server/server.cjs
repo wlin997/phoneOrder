@@ -183,8 +183,7 @@ function printViaLan(printerIp, payload) {
         client.on('error', (err) => {
             console.error('[LAN] Printer connection error:', err);
             client.destroy();
-            reject({ error: "Failed to 
-connect to LAN printer", details: err.message });
+            reject({ error: "Failed to connect to LAN printer", details: err.message });
         });
         client.on('timeout', () => {
             console.error(`[LAN] Connection to ${printerIp}:${port} timed out.`);
@@ -207,8 +206,7 @@ async function testPrinterConnectivity(printerUrl, mode = 'LAN') {
             client.on('error', (err) => resolve({ available: false, error: `LAN printer error: ${err.message}` }));
             client.on('timeout', () => {
                 client.destroy();
-                resolve({ available: false, error: 'Connection to 
-LAN printer timed out.' });
+                resolve({ available: false, error: 'Connection to LAN printer timed out.' });
             });
         });
 }
