@@ -1,0 +1,35 @@
+Proposal: KDS Page (Kitchen Display System)
+
+We are going to create a new page called KDS.
+
+Purpose:
+This page is designed to help the kitchen staff view items that have been fired to the kitchen. It will pull all records from the "orderItems" tab of the "customer order" Google Sheet where:
+	•	"Order_Processed" is marked 'Y'
+	•	"Cancelled" is marked 'FALSE'
+
+Screen Layout:
+	•	Right Panel (Main Panel):
+Displays all active orders as cards (with live counters).
+	•	Left Panel: Shows a list of completed/prepped orders.
+
+The right panel will display these orders as cards, sorted in ascending order of time. Each card will show:
+	•	Customer name
+	•	Customer phone number
+	•	A live counter (timer) that starts when the order is shown
+
+When the user swipes on a card, it will open a dialog box displaying the order details. The counter will also continue running at the top of the dialog.
+
+Once the cook has finished preparing the order, they will toggle the “Order Prepped” switch. When this happens:
+	•	The system will update the Order_prep field in the Google Sheet to 'Y'
+	•	It will save the current timer value (converted into minutes and seconds) to the food_prep_time field
+	•	The counter will stop
+	•	The card will be removed from the screen. The prepped order will be move to the right panel.
+
+If the user decides not to mark the order as prepped, they can click the “X” to close the dialog and return to the order card list.
+
+Now, we will follow the same design layout language as App.jsx and navigation bar. 
+
+Let me know if you need any clarifying question before you proceed.
+
+⸻
+

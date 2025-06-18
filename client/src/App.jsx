@@ -87,6 +87,7 @@ function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
                 <p><strong>Phone:</strong> {order.callerPhone}</p>
                 <p><strong>Email:</strong> {order.email}</p>
                 <p><strong>Address:</strong> {order.callerAddress}, {order.callerCity}, {order.callerState} {order.callerZip}</p>
+                {order.utensil && <p><strong>Utensils:</strong> {order.utensil}</p>}
             </div>
 
             <h5 className="font-semibold text-lg mb-2">Order Items:</h5>
@@ -105,6 +106,12 @@ function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
                 </ul>
             ) : (
                 <p className="text-gray-500 mb-4">No items listed.</p>
+            )}
+
+            {order.totalCost && (
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                    <p className="text-lg font-semibold">Total Cost: <span className="font-bold text-gray-800">${order.totalCost}</span></p>
+                </div>
             )}
 
             {order.orderSummary && (
