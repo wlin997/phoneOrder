@@ -659,7 +659,7 @@ finalHourlyCounts[hourLabel] = hourlyCounts[hourLabel];
 }
 });
 
-app.get('/api/customer-stats', async (req, res) => {
+c, async (req, res) => {
     try {
         const { range } = req.query;
         const days = range === 'YTD' ? 

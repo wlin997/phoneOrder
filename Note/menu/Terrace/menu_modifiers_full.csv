@@ -1,0 +1,986 @@
+modifier_id,item_id,modifier_name,modifier_type,price_delta
+1,103,Add two eggs any style,addon,3.00
+2,104,Salsa Verde,choice,0.00
+3,104,Salsa Roja,choice,0.00
+4,108,Salsa Verde,choice,0.00
+5,108,Salsa Roja,choice,0.00
+6,111,Ham,choice,0.00
+7,111,Bacon,choice,0.00
+8,111,Chorizo,choice,0.00
+9,111,Sausage,choice,0.00
+10,111,Add home fries,addon,4.00
+11,111,Add steak fries,addon,4.00
+12,111,Add hash browns,addon,4.00
+13,113,Cheese,choice,0.00
+14,113,Shredded Chicken in Chipotle,choice,0.00
+15,113,Add Combo Rice & Beans,addon,5.00
+16,114,Pollo,choice,0.00
+17,114,Tinga,choice,0.00
+18,114,Carne Asada,choice,0.00
+19,114,Al Pastor,choice,0.00
+20,114,Carnitas,choice,0.00
+21,116,Chicken,choice,0.00
+22,116,Pork,choice,0.00
+23,118,Grilled Chicken,choice,0.00
+24,118,Roast Beef,choice,0.00
+25,118,Vegetarian,choice,0.00
+26,118,Homemade Chorizo,choice,0.00
+27,118,Al Pastor,choice,0.00
+28,118,Carnitas,choice,0.00
+29,118,Salsa Verde,choice,0.00
+30,118,Shrimp Burrito,addon,3.00
+31,118,Steak Burrito,addon,3.00
+32,118,Fish Burrito,addon,3.00
+33,119,Carnitas,choice,0.00
+34,119,Al Pastor,choice,0.00
+35,119,Pollo,choice,0.00
+36,119,Homemade Chorizo,choice,0.00
+37,119,Tinga,choice,0.00
+38,119,Shrimp,addon,3.00
+39,119,Steak,addon,3.00
+40,119,Fish,addon,3.00
+41,120,Carnitas,choice,0.00
+42,120,Al Pastor,choice,0.00
+43,120,Pollo,choice,0.00
+44,120,Chorizo,choice,0.00
+45,120,Tinga,choice,0.00
+46,120,Add Combo Rice & Beans,addon,5.00
+47,120,Fish Taco,addon,3.00
+48,120,Steak Taco,addon,3.00
+49,120,Shrimp Taco,addon,3.00
+50,121,Milaneza de Pollo,choice,0.00
+51,121,"Pollo a la Parilla",choice,0.00
+52,121,Al Pastor,choice,0.00
+53,121,Carne Asada,choice,0.00
+54,121,Tinga,choice,0.00
+55,121,Carnitas,choice,0.00
+56,121,Add onion rings,addon,4.75
+57,121,Add waffle fries,addon,4.75
+58,121,Add sweet potato fries,addon,4.75
+59,121,"Add combo rice and homemade black beans",addon,4.75
+60,201,Add Steak,addon,10.45
+61,201,Add Grilled Chicken,addon,7.00
+62,201,Add Al Pastor,addon,7.00
+63,201,Add Carnitas,addon,7.00
+64,201,Add Shrimp,addon,10.45
+65,208,Grilled Chicken,choice,0.00
+66,208,Tinga,choice,0.00
+67,208,Chorizo,choice,0.00
+68,208,Al Pastor,choice,0.00
+69,208,Vegetarian,choice,0.00
+70,208,Shrimp,addon,1.50
+71,208,Steak,addon,1.50
+72,209,Add Chicken,addon,7.00
+73,209,"Add Sauteed Vegetables",addon,7.00
+74,209,Add Tinga,addon,7.00
+75,209,Add Homemade Chorizo,addon,7.00
+76,209,Add Al Pastor,addon,7.00
+77,209,Add Shrimp,addon,10.45
+78,209,Add Steak,addon,10.45
+79,210,Salsa Verde,choice,0.00
+80,210,Salsa Roja,choice,0.00
+81,212,Grilled Chicken,choice,0.00
+82,212,Vegetarian,choice,0.00
+83,212,Shrimp,addon,4.00
+84,212,Steak,addon,4.00
+85,212,"Combo: Steak, Chicken & Shrimp",addon,12.00
+86,213,Steak,choice,0.00
+87,213,Shrimp,choice,0.00
+88,214,Grilled,choice,0.00
+89,214,Breaded,choice,0.00
+90,216,Pineapple,choice,0.00
+91,216,Melon,choice,0.00
+92,217,Fruit Punch,choice,0.00
+93,217,Tamarind,choice,0.00
+94,217,Grapefruit,choice,0.00
+95,217,Lime,choice,0.00
+96,301,with Bacon,addon,3.25
+97,301,with Ham,addon,3.25
+98,301,with Patties Sausage,addon,3.25
+99,301,with Canadian Bacon,addon,4.00
+100,301,with Turkey Bacon,addon,4.00
+101,301,with Turkey Sausage,addon,4.00
+102,301,with Link Pork,addon,4.00
+103,301,with Avocado,addon,4.00
+104,303,Mozzarella,choice,0.00
+105,303,Cheddar,choice,0.00
+106,303,Swiss,choice,0.00
+107,303,American,choice,0.00
+108,333,Bacon,choice,0.00
+109,333,Ham,choice,0.00
+110,333,Sausage,choice,0.00
+111,344,Add Seasonal Fruit,addon,2.00
+112,401,Bacon,choice,0.00
+113,401,Ham,choice,0.00
+114,401,Sausage,choice,0.00
+115,401,Add home fries,addon,4.00
+116,401,Add steak fries,addon,4.00
+117,401,Add hash browns,addon,4.00
+118,401,Add onion rings,addon,4.75
+119,401,Add waffle fries,addon,4.75
+120,401,Add sweet potato fries,addon,4.75
+121,402,Add home fries,addon,4.00
+122,402,Add steak fries,addon,4.00
+123,402,Add hash browns,addon,4.00
+124,402,Add onion rings,addon,4.75
+125,402,Add waffle fries,addon,4.75
+126,402,Add sweet potato fries,addon,4.75
+127,403,Add home fries,addon,4.00
+128,403,Add steak fries,addon,4.00
+129,403,Add hash browns,addon,4.00
+130,403,Add onion rings,addon,4.75
+131,403,Add waffle fries,addon,4.75
+132,403,Add sweet potato fries,addon,4.75
+133,404,Add home fries,addon,4.00
+134,404,Add steak fries,addon,4.00
+135,404,Add hash browns,addon,4.00
+136,404,Add onion rings,addon,4.75
+137,404,Add waffle fries,addon,4.75
+138,404,Add sweet potato fries,addon,4.75
+139,405,Add home fries,addon,4.00
+140,405,Add steak fries,addon,4.00
+141,405,Add hash browns,addon,4.00
+142,405,Add onion rings,addon,4.75
+143,405,Add waffle fries,addon,4.75
+144,405,Add sweet potato fries,addon,4.75
+145,406,Add home fries,addon,4.00
+146,406,Add steak fries,addon,4.00
+147,406,Add hash browns,addon,4.00
+148,406,Add onion rings,addon,4.75
+149,406,Add waffle fries,addon,4.75
+150,406,Add sweet potato fries,addon,4.75
+151,407,Add home fries,addon,4.25
+152,407,Add hash browns,addon,4.25
+153,407,Add steak fries,addon,4.25
+154,407,Add onion rings,addon,5.00
+155,407,Add waffle fries,addon,5.00
+156,407,Add sweet potato fries,addon,5.00
+157,408,Add home fries,addon,4.25
+158,408,Add hash browns,addon,4.25
+159,408,Add steak fries,addon,4.25
+160,408,Add onion rings,addon,5.00
+161,408,Add waffle fries,addon,5.00
+162,408,Add sweet potato fries,addon,5.00
+163,409,Add home fries,addon,4.25
+164,409,Add hash browns,addon,4.25
+165,409,Add steak fries,addon,4.25
+166,409,Add onion rings,addon,5.00
+167,409,Add waffle fries,addon,5.00
+168,409,Add sweet potato fries,addon,5.00
+169,410,with Ham,addon,2.55
+170,410,with Bacon,addon,2.55
+171,410,with Sausage,addon,2.55
+172,410,with Pastrami,addon,3.55
+173,410,with Turkey Bacon,addon,3.55
+174,410,on Bagel,addon,1.00
+175,410,on English muffin,addon,1.00
+176,410,Extra egg,addon,1.00
+177,410,Extra cheese,addon,1.00
+178,410,Add home fries,addon,4.00
+179,410,Add steak fries,addon,4.00
+180,410,Add hash browns,addon,4.00
+181,410,Add onion rings,addon,4.75
+182,410,Add waffle fries,addon,4.75
+183,410,Add sweet potato fries,addon,4.75
+184,412,Sesame Bagel,choice,0.00
+185,412,Everything Bagel,choice,0.00
+186,412,Plain Bagel,choice,0.00
+187,413,Cream Cheese,choice,0.00
+188,413,Peanut Butter,choice,0.00
+189,413,Nutella,choice,0.00
+190,417,Blueberry,choice,0.00
+191,417,Corn,choice,0.00
+192,417,Chocolate Chip,choice,0.00
+193,423,Flavored,addon,0.50
+194,426,Flavored,addon,0.50
+195,418,"Add Bailey's shot",addon,6.50
+196,418,"Add Kahlua shot",addon,6.50
+197,419,"Add Bailey's shot",addon,6.50
+198,419,"Add Kahlua shot",addon,6.50
+199,420,"Add Bailey's shot",addon,6.50
+200,420,"Add Kahlua shot",addon,6.50
+201,421,"Add Bailey's shot",addon,6.50
+202,421,"Add Kahlua shot",addon,6.50
+203,422,"Add Bailey's shot",addon,6.50
+204,422,"Add Kahlua shot",addon,6.50
+205,423,"Add Bailey's shot",addon,6.50
+206,423,"Add Kahlua shot",addon,6.50
+207,424,"Add Bailey's shot",addon,6.50
+208,424,"Add Kahlua shot",addon,6.50
+209,425,"Add Bailey's shot",addon,6.50
+210,425,"Add Kahlua shot",addon,6.50
+211,426,"Add Bailey's shot",addon,6.50
+212,426,"Add Kahlua shot",addon,6.50
+213,427,"Add Bailey's shot",addon,6.50
+214,427,"Add Kahlua shot",addon,6.50
+215,428,"Add Bailey's shot",addon,6.50
+216,428,"Add Kahlua shot",addon,6.50
+217,501,with Bacon,addon,3.50
+218,501,with Ham,addon,3.50
+219,501,with Link Sausage,addon,3.50
+220,501,with Turkey Bacon,addon,4.25
+221,501,with Turkey Sausage,addon,4.25
+222,501,with Beef Sausage,addon,4.25
+223,501,with Two Eggs,addon,3.00
+224,501,"with Two Eggs, Bacon, Ham or Sausage",addon,6.50
+225,501,with Strawberries,addon,3.00
+226,501,with Blueberries,addon,3.00
+227,501,with Banana,addon,3.00
+228,501,with Walnuts,addon,3.00
+229,501,with Chocolate Chips,addon,3.00
+230,501,with Ice Cream,addon,3.00
+231,501,with Nutella,addon,3.00
+232,501,with Peanut Butter,addon,3.00
+233,501,Vermont Grade A Maple Syrup,addon,3.50
+234,507,Add home fries,addon,4.25
+235,507,Add homemade hash browns,addon,4.25
+236,508,Blueberries,choice,0.00
+237,508,Chocolate Chips,choice,0.00
+238,512,Pancakes,choice,0.00
+239,512,French Toast,choice,0.00
+240,516,Add chipotle hollandaise sauce,addon,1.50
+241,516,Substitute waffle fries,addon,2.25
+242,516,Substitute sweet potato fries,addon,2.25
+243,516,Substitute onion rings,addon,2.25
+244,517,Add chipotle hollandaise sauce,addon,1.50
+245,517,Substitute waffle fries,addon,2.25
+246,517,Substitute sweet potato fries,addon,2.25
+247,517,Substitute onion rings,addon,2.25
+248,518,Add chipotle hollandaise sauce,addon,1.50
+249,518,Substitute waffle fries,addon,2.25
+250,518,Substitute sweet potato fries,addon,2.25
+251,518,Substitute onion rings,addon,2.25
+252,519,Add chipotle hollandaise sauce,addon,1.50
+253,519,Substitute waffle fries,addon,2.25
+254,519,Substitute sweet potato fries,addon,2.25
+255,519,Substitute onion rings,addon,2.25
+256,520,Add chipotle hollandaise sauce,addon,1.50
+257,520,Substitute waffle fries,addon,2.25
+258,520,Substitute sweet potato fries,addon,2.25
+259,520,Substitute onion rings,addon,2.25
+260,521,Add chipotle hollandaise sauce,addon,1.50
+261,521,Substitute waffle fries,addon,2.25
+262,521,Substitute sweet potato fries,addon,2.25
+263,521,Substitute onion rings,addon,2.25
+264,522,Add chipotle hollandaise sauce,addon,1.50
+265,522,Substitute waffle fries,addon,2.25
+266,522,Substitute sweet potato fries,addon,2.25
+267,522,Substitute onion rings,addon,2.25
+268,604,"Topped with chopped bacon, onions, cheddar cheese",choice,0.00
+269,604,"Topped with broccoli, cheddar cheese",choice,0.00
+270,611,with Rice,addon,3.00
+271,611,with Tortilla Chips,addon,3.00
+272,612,Salsa Red,choice,0.00
+273,612,Salsa Green,choice,0.00
+274,614,BBQ,choice,0.00
+275,614,Buffalo,choice,0.00
+276,615,Grilled,choice,0.00
+277,615,Breaded,choice,0.00
+278,615,Add Cheese,addon,1.75
+279,615,Substitute Sweet Potato Fries,addon,2.25
+280,615,Substitute Spicy Waffle Fries,addon,2.25
+281,615,Substitute Baked Potato,addon,2.25
+282,615,Substitute Onion Rings,addon,2.25
+283,615,Substitute Salad,addon,2.25
+284,616,Grilled,choice,0.00
+285,616,Breaded,choice,0.00
+286,618,Grilled,choice,0.00
+287,618,Breaded,choice,0.00
+288,619,Grilled,choice,0.00
+289,619,Breaded,choice,0.00
+290,620,Grilled,choice,0.00
+291,620,Breaded,choice,0.00
+292,621,Grilled,choice,0.00
+293,621,Breaded,choice,0.00
+294,623,Grilled,choice,0.00
+295,623,Breaded,choice,0.00
+296,625,Grilled,choice,0.00
+297,625,Breaded,choice,0.00
+298,627,Grilled,choice,0.00
+299,627,Breaded,choice,0.00
+300,628,On Roll,choice,0.00
+301,628,On Rye,choice,0.00
+302,628,On White,choice,0.00
+303,628,On Whole Wheat,choice,0.00
+304,628,On Multigrain,choice,0.00
+305,628,Add Cheese,addon,2.00
+306,629,On Roll,choice,0.00
+307,629,On Rye,choice,0.00
+308,629,On White,choice,0.00
+309,629,On Whole Wheat,choice,0.00
+310,629,On Multigrain,choice,0.00
+311,630,On Roll,choice,0.00
+312,630,On Rye,choice,0.00
+313,630,On White,choice,0.00
+314,630,On Whole Wheat,choice,0.00
+315,630,On Multigrain,choice,0.00
+316,630,Add Cheese,addon,2.00
+317,631,On Roll,choice,0.00
+318,631,On Rye,choice,0.00
+319,631,On White,choice,0.00
+320,631,On Whole Wheat,choice,0.00
+321,631,On Multigrain,choice,0.00
+322,631,Add Cheese,addon,2.00
+323,632,On Roll,choice,0.00
+324,632,On Rye,choice,0.00
+325,632,On White,choice,0.00
+326,632,On Whole Wheat,choice,0.00
+327,632,On Multigrain,choice,0.00
+328,632,Add Cheese,addon,2.00
+329,633,On Roll,choice,0.00
+330,633,On Rye,choice,0.00
+331,633,On White,choice,0.00
+332,633,On Whole Wheat,choice,0.00
+333,633,On Multigrain,choice,0.00
+334,633,Add Cheese,addon,2.00
+335,634,On Roll,choice,0.00
+336,634,On Rye,choice,0.00
+337,634,On White,choice,0.00
+338,634,On Whole Wheat,choice,0.00
+339,634,On Multigrain,choice,0.00
+340,634,Add Cheese,addon,2.00
+341,635,On Roll,choice,0.00
+342,635,On Rye,choice,0.00
+343,635,On White,choice,0.00
+344,635,On Whole Wheat,choice,0.00
+345,635,On Multigrain,choice,0.00
+346,635,Add Cheese,addon,2.00
+347,636,On Rye,choice,0.00
+348,636,On White,choice,0.00
+349,636,On Whole Wheat,choice,0.00
+350,636,On Multigrain,choice,0.00
+351,637,On Rye,choice,0.00
+352,637,On White,choice,0.00
+353,637,On Whole Wheat,choice,0.00
+354,637,On Multigrain,choice,0.00
+355,638,On Rye,choice,0.00
+356,638,On White,choice,0.00
+357,638,On Whole Wheat,choice,0.00
+358,638,On Multigrain,choice,0.00
+359,639,On Rye,choice,0.00
+360,639,On White,choice,0.00
+361,639,On Whole Wheat,choice,0.00
+362,639,On Multigrain,choice,0.00
+363,701,"Cheddar Cheese",choice,0.00
+364,701,"Mozzarella Cheese",choice,0.00
+365,701,"American Cheese",choice,0.00
+366,701,"Swiss Cheese",choice,0.00
+367,701,"Whole Wheat Bread",choice,0.00
+368,701,"White Bread",choice,0.00
+369,701,"Rye Bread",choice,0.00
+370,701,"Multigrain Bread",choice,0.00
+371,701,with Tomato,addon,1.00
+372,701,with Bacon,addon,2.75
+373,701,with Ham,addon,2.75
+374,701,"with Bacon & Tomato",addon,2.75
+375,701,"with Ham & Tomato",addon,2.75
+376,701,"with Pesto & Grilled Tomatoes",addon,2.25
+377,701,"with Pulled Pork & Avocado",addon,4.75
+378,701,"with Avocado & Tomato",addon,4.00
+379,701,"with Fresh Turkey & Tomato",addon,4.00
+380,707,Chicken,choice,0.00
+381,707,Pork,choice,0.00
+382,708,"Make Deluxe (Steak Fries, L, T)",addon,3.00
+383,710,Potato Salad,choice,0.00
+384,710,Steak Fries,choice,0.00
+385,702,Substitute Waffle Fries,addon,2.25
+386,703,Substitute Waffle Fries,addon,2.25
+387,704,Substitute Waffle Fries,addon,2.25
+388,705,Substitute Waffle Fries,addon,2.25
+389,706,Substitute Waffle Fries,addon,2.25
+390,707,Substitute Waffle Fries,addon,2.25
+391,708,Substitute Waffle Fries,addon,2.25
+392,709,Substitute Waffle Fries,addon,2.25
+393,710,Substitute Waffle Fries,addon,2.25
+394,711,Substitute Waffle Fries,addon,2.25
+395,702,Substitute Onion Rings,addon,2.25
+396,703,Substitute Onion Rings,addon,2.25
+397,704,Substitute Onion Rings,addon,2.25
+398,705,Substitute Onion Rings,addon,2.25
+399,706,Substitute Onion Rings,addon,2.25
+400,707,Substitute Onion Rings,addon,2.25
+401,708,Substitute Onion Rings,addon,2.25
+402,709,Substitute Onion Rings,addon,2.25
+403,710,Substitute Onion Rings,addon,2.25
+404,711,Substitute Onion Rings,addon,2.25
+405,702,Substitute Sweet Potato Fries,addon,2.25
+406,703,Substitute Sweet Potato Fries,addon,2.25
+407,704,Substitute Sweet Potato Fries,addon,2.25
+408,705,Substitute Sweet Potato Fries,addon,2.25
+409,706,Substitute Sweet Potato Fries,addon,2.25
+410,707,Substitute Sweet Potato Fries,addon,2.25
+411,708,Substitute Sweet Potato Fries,addon,2.25
+412,709,Substitute Sweet Potato Fries,addon,2.25
+413,710,Substitute Sweet Potato Fries,addon,2.25
+414,711,Substitute Sweet Potato Fries,addon,2.25
+415,712,"3 Corn Tortillas",choice,0.00
+416,712,Flour Tortillas,choice,0.00
+417,717,"4 Corn Tortillas",choice,0.00
+418,717,Flour Tortillas,choice,0.00
+419,720,Homemade Chili Topping,addon,3.50
+420,720,Guacamole Topping,addon,3.50
+421,720,Sauerkraut Topping,addon,3.50
+422,720,"Pico de Gallo Topping",addon,3.50
+423,720,Cheddar Cheese Topping,addon,3.50
+424,722,Add Avocado,addon,4.00
+425,722,Add Cheese,addon,2.00
+426,722,Substitute Onion Rings,addon,2.75
+427,722,Substitute Sweet Potato Fries,addon,2.75
+428,722,Substitute Spicy Waffle Fries,addon,2.75
+429,723,Add Avocado,addon,4.00
+430,723,Add Cheese,addon,2.00
+431,723,Substitute Onion Rings,addon,2.75
+432,723,Substitute Sweet Potato Fries,addon,2.75
+433,723,Substitute Spicy Waffle Fries,addon,2.75
+434,801,Make Deluxe,addon,3.50
+435,802,Make Deluxe,addon,3.50
+436,803,Make Deluxe,addon,3.50
+437,804,Make Deluxe,addon,3.50
+438,805,Make Deluxe,addon,3.50
+439,806,Make Deluxe,addon,3.50
+440,807,Make Deluxe,addon,3.50
+441,808,Make Deluxe,addon,3.50
+442,809,Make Deluxe,addon,3.50
+443,810,Make Deluxe,addon,3.50
+444,811,Make Deluxe,addon,3.50
+445,812,Make Deluxe,addon,3.50
+446,813,Make Deluxe,addon,3.50
+447,814,Make Deluxe,addon,3.50
+448,815,Make Deluxe,addon,3.50
+449,816,Make Deluxe,addon,3.50
+450,817,Make Deluxe,addon,3.50
+451,818,Make Deluxe,addon,3.50
+452,819,Make Deluxe,addon,3.50
+453,820,Make Deluxe,addon,3.50
+454,821,Make Deluxe,addon,3.50
+455,822,Make Deluxe,addon,3.50
+456,823,Make Deluxe,addon,3.55
+457,824,Make Deluxe,addon,3.50
+458,825,Make Deluxe,addon,3.50
+459,801,Add Bacon,addon,3.00
+460,802,Add Bacon,addon,3.00
+461,803,Add Bacon,addon,3.00
+462,804,Add Bacon,addon,3.00
+463,805,Add Bacon,addon,3.00
+464,806,Add Bacon,addon,3.00
+465,807,Add Bacon,addon,3.00
+466,808,Add Bacon,addon,3.00
+467,809,Add Bacon,addon,3.00
+468,810,Add Bacon,addon,3.00
+469,811,Add Bacon,addon,3.00
+470,812,Add Bacon,addon,3.00
+471,813,Add Bacon,addon,3.00
+472,814,Add Bacon,addon,3.00
+473,815,Add Bacon,addon,3.00
+474,816,Add Bacon,addon,3.00
+475,817,Add Bacon,addon,3.00
+476,818,Add Bacon,addon,3.00
+477,819,Add Bacon,addon,3.00
+478,820,Add Bacon,addon,3.00
+479,821,Add Bacon,addon,3.00
+480,822,Add Bacon,addon,3.00
+481,823,Add Bacon,addon,3.00
+482,824,Add Bacon,addon,3.00
+483,825,Add Bacon,addon,3.00
+484,801,Add Cheese,addon,1.75
+485,802,Add Cheese,addon,1.75
+486,803,Add Cheese,addon,1.75
+487,804,Add Cheese,addon,1.75
+488,805,Add Cheese,addon,1.75
+489,806,Add Cheese,addon,1.75
+490,807,Add Cheese,addon,1.75
+491,808,Add Cheese,addon,1.75
+492,809,Add Cheese,addon,1.75
+493,810,Add Cheese,addon,1.75
+494,811,Add Cheese,addon,1.75
+495,812,Add Cheese,addon,1.75
+496,813,Add Cheese,addon,1.75
+497,814,Add Cheese,addon,1.75
+498,815,Add Cheese,addon,1.75
+499,816,Add Cheese,addon,1.75
+500,817,Add Cheese,addon,1.75
+501,818,Add Cheese,addon,1.75
+502,819,Add Cheese,addon,1.75
+503,820,Add Cheese,addon,1.75
+504,821,Add Cheese,addon,1.75
+505,822,Add Cheese,addon,1.75
+506,823,Add Cheese,addon,1.75
+507,824,Add Cheese,addon,1.75
+508,825,Add Cheese,addon,1.75
+509,801,Add Fresh Mushroom,addon,1.75
+510,802,Add Fresh Mushroom,addon,1.75
+511,803,Add Fresh Mushroom,addon,1.75
+512,804,Add Fresh Mushroom,addon,1.75
+513,805,Add Fresh Mushroom,addon,1.75
+514,806,Add Fresh Mushroom,addon,1.75
+515,807,Add Fresh Mushroom,addon,1.75
+516,808,Add Fresh Mushroom,addon,1.75
+517,809,Add Fresh Mushroom,addon,1.75
+518,810,Add Fresh Mushroom,addon,1.75
+519,811,Add Fresh Mushroom,addon,1.75
+520,812,Add Fresh Mushroom,addon,1.75
+521,813,Add Fresh Mushroom,addon,1.75
+522,814,Add Fresh Mushroom,addon,1.75
+523,815,Add Fresh Mushroom,addon,1.75
+524,816,Add Fresh Mushroom,addon,1.75
+525,817,Add Fresh Mushroom,addon,1.75
+526,818,Add Fresh Mushroom,addon,1.75
+527,819,Add Fresh Mushroom,addon,1.75
+528,820,Add Fresh Mushroom,addon,1.75
+529,821,Add Fresh Mushroom,addon,1.75
+530,822,Add Fresh Mushroom,addon,1.75
+531,823,Add Fresh Mushroom,addon,1.75
+532,824,Add Fresh Mushroom,addon,1.75
+533,825,Add Fresh Mushroom,addon,1.75
+534,801,Add Avocado,addon,4.00
+535,802,Add Avocado,addon,4.00
+536,803,Add Avocado,addon,4.00
+537,804,Add Avocado,addon,4.00
+538,805,Add Avocado,addon,4.00
+539,806,Add Avocado,addon,4.00
+540,807,Add Avocado,addon,4.00
+541,808,Add Avocado,addon,4.00
+542,809,Add Avocado,addon,4.00
+543,810,Add Avocado,addon,4.00
+544,811,Add Avocado,addon,4.00
+545,812,Add Avocado,addon,4.00
+546,813,Add Avocado,addon,4.00
+547,814,Add Avocado,addon,4.00
+548,815,Add Avocado,addon,4.00
+549,816,Add Avocado,addon,4.00
+550,817,Add Avocado,addon,4.00
+551,818,Add Avocado,addon,4.00
+552,819,Add Avocado,addon,4.00
+553,820,Add Avocado,addon,4.00
+554,821,Add Avocado,addon,4.00
+555,822,Add Avocado,addon,4.00
+556,823,Add Avocado,addon,4.00
+557,824,Add Avocado,addon,4.00
+558,825,Add Avocado,addon,4.00
+559,801,"Add Lettuce & Tomato",addon,1.50
+560,802,"Add Lettuce & Tomato",addon,1.50
+561,803,"Add Lettuce & Tomato",addon,1.50
+562,804,"Add Lettuce & Tomato",addon,1.50
+563,805,"Add Lettuce & Tomato",addon,1.50
+564,806,"Add Lettuce & Tomato",addon,1.50
+565,807,"Add Lettuce & Tomato",addon,1.50
+566,808,"Add Lettuce & Tomato",addon,1.50
+567,809,"Add Lettuce & Tomato",addon,1.50
+568,810,"Add Lettuce & Tomato",addon,1.50
+569,811,"Add Lettuce & Tomato",addon,1.50
+570,812,"Add Lettuce & Tomato",addon,1.50
+571,813,"Add Lettuce & Tomato",addon,1.50
+572,814,"Add Lettuce & Tomato",addon,1.50
+573,815,"Add Lettuce & Tomato",addon,1.50
+574,816,"Add Lettuce & Tomato",addon,1.50
+575,817,"Add Lettuce & Tomato",addon,1.50
+576,818,"Add Lettuce & Tomato",addon,1.50
+577,819,"Add Lettuce & Tomato",addon,1.50
+578,820,"Add Lettuce & Tomato",addon,1.50
+579,821,"Add Lettuce & Tomato",addon,1.50
+580,822,"Add Lettuce & Tomato",addon,1.50
+581,823,"Add Lettuce & Tomato",addon,1.50
+582,824,"Add Lettuce & Tomato",addon,1.50
+583,825,"Add Lettuce & Tomato",addon,1.50
+584,801,Substitute Baked Potato,addon,2.25
+585,801,Substitute Onion Rings,addon,2.25
+586,801,Substitute Sweet Potato Fries,addon,2.25
+587,801,Substitute Spicy Waffle Fries,addon,2.25
+588,801,Substitute Salad,addon,2.25
+589,802,Substitute Baked Potato,addon,2.25
+590,802,Substitute Onion Rings,addon,2.25
+591,802,Substitute Sweet Potato Fries,addon,2.25
+592,802,Substitute Spicy Waffle Fries,addon,2.25
+593,802,Substitute Salad,addon,2.25
+594,803,Substitute Baked Potato,addon,2.25
+595,803,Substitute Onion Rings,addon,2.25
+596,803,Substitute Sweet Potato Fries,addon,2.25
+597,803,Substitute Spicy Waffle Fries,addon,2.25
+598,803,Substitute Salad,addon,2.25
+599,804,Substitute Baked Potato,addon,2.25
+600,804,Substitute Onion Rings,addon,2.25
+601,804,Substitute Sweet Potato Fries,addon,2.25
+602,804,Substitute Spicy Waffle Fries,addon,2.25
+603,804,Substitute Salad,addon,2.25
+604,805,Substitute Baked Potato,addon,2.25
+605,805,Substitute Onion Rings,addon,2.25
+606,805,Substitute Sweet Potato Fries,addon,2.25
+607,805,Substitute Spicy Waffle Fries,addon,2.25
+608,805,Substitute Salad,addon,2.25
+609,806,Substitute Baked Potato,addon,2.25
+610,806,Substitute Onion Rings,addon,2.25
+611,806,Substitute Sweet Potato Fries,addon,2.25
+612,806,Substitute Spicy Waffle Fries,addon,2.25
+613,806,Substitute Salad,addon,2.25
+614,807,Substitute Baked Potato,addon,2.25
+615,807,Substitute Onion Rings,addon,2.25
+616,807,Substitute Sweet Potato Fries,addon,2.25
+617,807,Substitute Spicy Waffle Fries,addon,2.25
+618,807,Substitute Salad,addon,2.25
+619,808,Substitute Baked Potato,addon,2.25
+620,808,Substitute Onion Rings,addon,2.25
+621,808,Substitute Sweet Potato Fries,addon,2.25
+622,808,Substitute Spicy Waffle Fries,addon,2.25
+623,808,Substitute Salad,addon,2.25
+624,809,Substitute Baked Potato,addon,2.25
+625,809,Substitute Onion Rings,addon,2.25
+626,809,Substitute Sweet Potato Fries,addon,2.25
+627,809,Substitute Spicy Waffle Fries,addon,2.25
+628,809,Substitute Salad,addon,2.25
+629,810,Substitute Baked Potato,addon,2.25
+630,810,Substitute Onion Rings,addon,2.25
+631,810,Substitute Sweet Potato Fries,addon,2.25
+632,810,Substitute Spicy Waffle Fries,addon,2.25
+633,810,Substitute Salad,addon,2.25
+634,811,Substitute Baked Potato,addon,2.25
+635,811,Substitute Onion Rings,addon,2.25
+636,811,Substitute Sweet Potato Fries,addon,2.25
+637,811,Substitute Spicy Waffle Fries,addon,2.25
+638,811,Substitute Salad,addon,2.25
+639,812,Substitute Baked Potato,addon,2.25
+640,812,Substitute Onion Rings,addon,2.25
+641,812,Substitute Sweet Potato Fries,addon,2.25
+642,812,Substitute Spicy Waffle Fries,addon,2.25
+643,812,Substitute Salad,addon,2.25
+644,813,Substitute Baked Potato,addon,2.25
+645,813,Substitute Onion Rings,addon,2.25
+646,813,Substitute Sweet Potato Fries,addon,2.25
+647,813,Substitute Spicy Waffle Fries,addon,2.25
+648,813,Substitute Salad,addon,2.25
+649,814,Substitute Baked Potato,addon,2.25
+650,814,Substitute Onion Rings,addon,2.25
+651,814,Substitute Sweet Potato Fries,addon,2.25
+652,814,Substitute Spicy Waffle Fries,addon,2.25
+653,814,Substitute Salad,addon,2.25
+654,815,Substitute Baked Potato,addon,2.25
+655,815,Substitute Onion Rings,addon,2.25
+656,815,Substitute Sweet Potato Fries,addon,2.25
+657,815,Substitute Spicy Waffle Fries,addon,2.25
+658,815,Substitute Salad,addon,2.25
+659,816,Substitute Baked Potato,addon,2.25
+660,816,Substitute Onion Rings,addon,2.25
+661,816,Substitute Sweet Potato Fries,addon,2.25
+662,816,Substitute Spicy Waffle Fries,addon,2.25
+663,816,Substitute Salad,addon,2.25
+664,817,Substitute Baked Potato,addon,2.25
+665,817,Substitute Onion Rings,addon,2.25
+666,817,Substitute Sweet Potato Fries,addon,2.25
+667,817,Substitute Spicy Waffle Fries,addon,2.25
+668,817,Substitute Salad,addon,2.25
+669,818,Substitute Baked Potato,addon,2.25
+670,818,Substitute Onion Rings,addon,2.25
+671,818,Substitute Sweet Potato Fries,addon,2.25
+672,818,Substitute Spicy Waffle Fries,addon,2.25
+673,818,Substitute Salad,addon,2.25
+674,819,Substitute Baked Potato,addon,2.25
+675,819,Substitute Onion Rings,addon,2.25
+676,819,Substitute Sweet Potato Fries,addon,2.25
+677,819,Substitute Spicy Waffle Fries,addon,2.25
+678,819,Substitute Salad,addon,2.25
+679,820,Substitute Baked Potato,addon,2.25
+680,820,Substitute Onion Rings,addon,2.25
+681,820,Substitute Sweet Potato Fries,addon,2.25
+682,820,Substitute Spicy Waffle Fries,addon,2.25
+683,820,Substitute Salad,addon,2.25
+684,821,Substitute Baked Potato,addon,2.25
+685,821,Substitute Onion Rings,addon,2.25
+686,821,Substitute Sweet Potato Fries,addon,2.25
+687,821,Substitute Spicy Waffle Fries,addon,2.25
+688,821,Substitute Salad,addon,2.25
+689,822,Substitute Baked Potato,addon,2.25
+690,822,Substitute Onion Rings,addon,2.25
+691,822,Substitute Sweet Potato Fries,addon,2.25
+692,822,Substitute Spicy Waffle Fries,addon,2.25
+693,822,Substitute Salad,addon,2.25
+694,823,Substitute Baked Potato,addon,2.25
+695,823,Substitute Onion Rings,addon,2.25
+696,823,Substitute Sweet Potato Fries,addon,2.25
+697,823,Substitute Spicy Waffle Fries,addon,2.25
+698,823,Substitute Salad,addon,2.25
+699,824,Substitute Baked Potato,addon,2.25
+700,824,Substitute Onion Rings,addon,2.25
+701,824,Substitute Sweet Potato Fries,addon,2.25
+702,824,Substitute Spicy Waffle Fries,addon,2.25
+703,824,Substitute Salad,addon,2.25
+704,825,Substitute Baked Potato,addon,2.25
+705,825,Substitute Onion Rings,addon,2.25
+706,825,Substitute Sweet Potato Fries,addon,2.25
+707,825,Substitute Spicy Waffle Fries,addon,2.25
+708,825,Substitute Salad,addon,2.25
+709,901,Substitute Onion Rings,addon,2.75
+710,901,Substitute Sweet Potato Fries,addon,2.75
+711,901,Substitute Spicy Waffle Fries,addon,2.75
+712,901,Substitute Salad,addon,2.75
+713,902,Substitute Onion Rings,addon,2.75
+714,902,Substitute Sweet Potato Fries,addon,2.75
+715,902,Substitute Spicy Waffle Fries,addon,2.75
+716,902,Substitute Salad,addon,2.75
+717,903,Substitute Onion Rings,addon,2.75
+718,903,Substitute Sweet Potato Fries,addon,2.75
+719,903,Substitute Spicy Waffle Fries,addon,2.75
+720,903,Substitute Salad,addon,2.75
+721,904,Substitute Onion Rings,addon,2.75
+722,904,Substitute Sweet Potato Fries,addon,2.75
+723,904,Substitute Spicy Waffle Fries,addon,2.75
+724,904,Substitute Salad,addon,2.75
+725,905,Substitute Onion Rings,addon,2.75
+726,905,Substitute Sweet Potato Fries,addon,2.75
+727,905,Substitute Spicy Waffle Fries,addon,2.75
+728,905,Substitute Salad,addon,2.75
+729,906,Substitute Onion Rings,addon,2.75
+730,906,Substitute Sweet Potato Fries,addon,2.75
+731,906,Substitute Spicy Waffle Fries,addon,2.75
+732,906,Substitute Salad,addon,2.75
+733,907,Substitute Onion Rings,addon,2.75
+734,907,Substitute Sweet Potato Fries,addon,2.75
+735,907,Substitute Spicy Waffle Fries,addon,2.75
+736,907,Substitute Salad,addon,2.75
+737,908,Substitute Onion Rings,addon,2.75
+738,908,Substitute Sweet Potato Fries,addon,2.75
+739,908,Substitute Spicy Waffle Fries,addon,2.75
+740,908,Substitute Salad,addon,2.75
+741,909,Substitute Onion Rings,addon,2.75
+742,909,Substitute Sweet Potato Fries,addon,2.75
+743,909,Substitute Spicy Waffle Fries,addon,2.75
+744,909,Substitute Salad,addon,2.75
+745,910,Substitute Onion Rings,addon,2.75
+746,910,Substitute Sweet Potato Fries,addon,2.75
+747,910,Substitute Spicy Waffle Fries,addon,2.75
+748,910,Substitute Salad,addon,2.75
+749,911,Substitute Onion Rings,addon,2.75
+750,911,Substitute Sweet Potato Fries,addon,2.75
+751,911,Substitute Spicy Waffle Fries,addon,2.75
+752,911,Substitute Salad,addon,2.75
+753,912,Substitute Onion Rings,addon,2.75
+754,912,Substitute Sweet Potato Fries,addon,2.75
+755,912,Substitute Spicy Waffle Fries,addon,2.75
+756,912,Substitute Salad,addon,2.75
+757,913,Substitute Onion Rings,addon,2.75
+758,913,Substitute Sweet Potato Fries,addon,2.75
+759,913,Substitute Spicy Waffle Fries,addon,2.75
+760,913,Substitute Salad,addon,2.75
+761,914,Substitute Onion Rings,addon,2.75
+762,914,Substitute Sweet Potato Fries,addon,2.75
+763,914,Substitute Spicy Waffle Fries,addon,2.75
+764,914,Substitute Salad,addon,2.75
+765,915,Substitute Onion Rings,addon,2.75
+766,915,Substitute Sweet Potato Fries,addon,2.75
+767,915,Substitute Spicy Waffle Fries,addon,2.75
+768,915,Substitute Salad,addon,2.75
+769,916,Substitute Onion Rings,addon,2.75
+770,916,Substitute Sweet Potato Fries,addon,2.75
+771,916,Substitute Spicy Waffle Fries,addon,2.75
+772,916,Substitute Salad,addon,2.75
+773,917,Substitute Onion Rings,addon,2.75
+774,917,Substitute Sweet Potato Fries,addon,2.75
+775,917,Substitute Spicy Waffle Fries,addon,2.75
+776,917,Substitute Salad,addon,2.75
+777,918,Substitute Onion Rings,addon,2.75
+778,918,Substitute Sweet Potato Fries,addon,2.75
+779,918,Substitute Spicy Waffle Fries,addon,2.75
+780,918,Substitute Salad,addon,2.75
+781,919,Substitute Onion Rings,addon,2.75
+782,919,Substitute Sweet Potato Fries,addon,2.75
+783,919,Substitute Spicy Waffle Fries,addon,2.75
+784,919,Substitute Salad,addon,2.75
+785,920,"Add Steak Fries, Spicy Waffle Fries, Sweet Potato Fries, Onion Rings or Potato Salad",addon,3.00
+786,921,"Add Steak Fries, Spicy Waffle Fries, Sweet Potato Fries, Onion Rings or Potato Salad",addon,3.00
+787,922,"Add Steak Fries, Spicy Waffle Fries, Sweet Potato Fries, Onion Rings or Potato Salad",addon,3.00
+788,923,"Add Steak Fries, Spicy Waffle Fries, Sweet Potato Fries, Onion Rings or Potato Salad",addon,3.00
+789,924,"Add Steak Fries, Spicy Waffle Fries, Sweet Potato Fries, Onion Rings or Potato Salad",addon,3.00
+790,925,"Add Steak Fries, Spicy Waffle Fries, Sweet Potato Fries, Onion Rings or Potato Salad",addon,3.00
+791,926,"Add Steak Fries, Spicy Waffle Fries, Sweet Potato Fries, Onion Rings or Potato Salad",addon,3.00
+792,927,"Add Steak Fries, Spicy Waffle Fries, Sweet Potato Fries, Onion Rings or Potato Salad",addon,3.00
+793,928,"Add Steak Fries, Spicy Waffle Fries, Sweet Potato Fries, Onion Rings or Potato Salad",addon,3.00
+794,929,"Add Steak Fries, Spicy Waffle Fries, Sweet Potato Fries, Onion Rings or Potato Salad",addon,3.00
+795,930,"Add Steak Fries, Spicy Waffle Fries, Sweet Potato Fries, Onion Rings or Potato Salad",addon,3.00
+796,931,"Add Steak Fries, Spicy Waffle Fries, Sweet Potato Fries, Onion Rings or Potato Salad",addon,3.00
+797,932,"Add Steak Fries, Spicy Waffle Fries, Sweet Potato Fries, Onion Rings or Potato Salad",addon,3.00
+850,1001,Blue Cheese Dressing,choice,0.00
+851,1001,Honey Mustard Dressing,choice,0.00
+852,1001,Ranch Dressing,choice,0.00
+853,1001,Russian Dressing,choice,0.00
+854,1001,Balsamic Vinaigrette,choice,0.00
+855,1001,French Dressing,choice,0.00
+856,1001,Creamy Caesar Dressing,choice,0.00
+857,1001,Add Feta Cheese,addon,3.25
+858,1001,Add Shredded Mozzarella,addon,2.25
+859,1001,Add Shredded Cheddar,addon,2.25
+860,1001,Add Hanger Steak,addon,10.25
+861,1001,Add Grill Chicken,addon,7.00
+862,1001,Add Breaded Chicken,addon,7.00
+863,1001,Add Broiled Salmon,addon,10.25
+864,1001,Add Broiled Shrimp,addon,11.25
+865,1001,Add Scoop Tuna Salad,addon,6.50
+866,1001,Add Scoop Chicken Salad,addon,6.50
+867,1001,Add Hamburger Pattie,addon,7.75
+868,1001,Add Avocado,addon,4.25
+869,1001,Add Dried Cranberries,addon,3.50
+870,1001,Add Apples,addon,3.50
+871,1001,Add Walnuts,addon,3.50
+872,1020,Spaghetti Marinara,choice,0.00
+873,1020,"Linguine in Garlic & Oil",choice,0.00
+874,1025,Shrimp,choice,0.00
+875,1025,Salmon,choice,0.00
+876,1025,Calamari,choice,0.00
+877,1026,with Meat Sauce,choice,0.00
+878,1026,with Meatball,choice,0.00
+879,1028,Penne,choice,0.00
+880,1028,Linguini,choice,0.00
+881,1028,Spaghetti,choice,0.00
+882,1020,Add Chicken,addon,7.00
+883,1020,Add Breaded Chicken,addon,7.00
+884,1020,Add Shrimp,addon,11.00
+885,1020,Add Salmon,addon,11.00
+886,1020,Add Calamari,addon,11.00
+887,1021,Add Chicken,addon,7.00
+888,1021,Add Breaded Chicken,addon,7.00
+889,1021,Add Shrimp,addon,11.00
+890,1021,Add Salmon,addon,11.00
+891,1021,Add Calamari,addon,11.00
+892,1022,Add Chicken,addon,7.00
+893,1022,Add Breaded Chicken,addon,7.00
+894,1022,Add Shrimp,addon,11.00
+895,1022,Add Salmon,addon,11.00
+896,1022,Add Calamari,addon,11.00
+897,1023,Add Chicken,addon,7.00
+898,1023,Add Breaded Chicken,addon,7.00
+899,1023,Add Shrimp,addon,11.00
+900,1023,Add Salmon,addon,11.00
+901,1023,Add Calamari,addon,11.00
+902,1024,Add Chicken,addon,7.00
+903,1024,Add Breaded Chicken,addon,7.00
+904,1024,Add Shrimp,addon,11.00
+905,1024,Add Salmon,addon,11.00
+906,1024,Add Calamari,addon,11.00
+907,1027,Add Chicken,addon,7.00
+908,1027,Add Breaded Chicken,addon,7.00
+909,1027,Add Shrimp,addon,11.00
+910,1027,Add Salmon,addon,11.00
+911,1027,Add Calamari,addon,11.00
+912,1101,Blue Cheese Dressing,choice,0.00
+913,1101,Honey Mustard Dressing,choice,0.00
+914,1101,Ranch Dressing,choice,0.00
+915,1101,Russian Dressing,choice,0.00
+916,1101,Balsamic Vinaigrette,choice,0.00
+917,1101,French Dressing,choice,0.00
+918,1101,Lite Italian Dressing,choice,0.00
+919,1101,Creamy Caesar Dressing,choice,0.00
+920,1102,Blue Cheese Dressing,choice,0.00
+921,1102,Honey Mustard Dressing,choice,0.00
+922,1102,Ranch Dressing,choice,0.00
+923,1102,Russian Dressing,choice,0.00
+924,1102,Balsamic Vinaigrette,choice,0.00
+925,1102,French Dressing,choice,0.00
+926,1102,Lite Italian Dressing,choice,0.00
+927,1102,Creamy Caesar Dressing,choice,0.00
+928,1103,Blue Cheese Dressing,choice,0.00
+929,1103,Honey Mustard Dressing,choice,0.00
+930,1103,Ranch Dressing,choice,0.00
+931,1103,Russian Dressing,choice,0.00
+932,1103,Balsamic Vinaigrette,choice,0.00
+933,1103,French Dressing,choice,0.00
+934,1103,Lite Italian Dressing,choice,0.00
+935,1103,Creamy Caesar Dressing,choice,0.00
+936,1104,Blue Cheese Dressing,choice,0.00
+937,1104,Honey Mustard Dressing,choice,0.00
+938,1104,Ranch Dressing,choice,0.00
+939,1104,Russian Dressing,choice,0.00
+940,1104,Balsamic Vinaigrette,choice,0.00
+941,1104,French Dressing,choice,0.00
+942,1104,Lite Italian Dressing,choice,0.00
+943,1104,Creamy Caesar Dressing,choice,0.00
+944,1105,Blue Cheese Dressing,choice,0.00
+945,1105,Honey Mustard Dressing,choice,0.00
+946,1105,Ranch Dressing,choice,0.00
+947,1105,Russian Dressing,choice,0.00
+948,1105,Balsamic Vinaigrette,choice,0.00
+949,1105,French Dressing,choice,0.00
+950,1105,Lite Italian Dressing,choice,0.00
+951,1105,Creamy Caesar Dressing,choice,0.00
+952,1106,Blue Cheese Dressing,choice,0.00
+953,1106,Honey Mustard Dressing,choice,0.00
+954,1106,Ranch Dressing,choice,0.00
+955,1106,Russian Dressing,choice,0.00
+956,1106,Balsamic Vinaigrette,choice,0.00
+957,1106,French Dressing,choice,0.00
+958,1106,Lite Italian Dressing,choice,0.00
+959,1106,Creamy Caesar Dressing,choice,0.00
+960,1107,Blue Cheese Dressing,choice,0.00
+961,1107,Honey Mustard Dressing,choice,0.00
+962,1107,Ranch Dressing,choice,0.00
+963,1107,Russian Dressing,choice,0.00
+964,1107,Balsamic Vinaigrette,choice,0.00
+965,1107,French Dressing,choice,0.00
+966,1107,Lite Italian Dressing,choice,0.00
+967,1107,Creamy Caesar Dressing,choice,0.00
+968,1108,Mashed Potato,choice,0.00
+969,1108,Baked Potato,choice,0.00
+970,1108,Broccoli,choice,0.00
+971,1108,Sweet Corn,choice,0.00
+972,1108,Blue Cheese Dressing,choice,0.00
+973,1108,Honey Mustard Dressing,choice,0.00
+974,1108,Ranch Dressing,choice,0.00
+975,1108,Russian Dressing,choice,0.00
+976,1108,Balsamic Vinaigrette,choice,0.00
+977,1108,French Dressing,choice,0.00
+978,1108,Lite Italian Dressing,choice,0.00
+979,1108,Creamy Caesar Dressing,choice,0.00
+980,1109,Blue Cheese Dressing,choice,0.00
+981,1109,Honey Mustard Dressing,choice,0.00
+982,1109,Ranch Dressing,choice,0.00
+983,1109,Russian Dressing,choice,0.00
+984,1109,Balsamic Vinaigrette,choice,0.00
+985,1109,French Dressing,choice,0.00
+986,1109,Lite Italian Dressing,choice,0.00
+987,1109,Creamy Caesar Dressing,choice,0.00
+988,1110,Blue Cheese Dressing,choice,0.00
+989,1110,Honey Mustard Dressing,choice,0.00
+990,1110,Ranch Dressing,choice,0.00
+991,1110,Russian Dressing,choice,0.00
+992,1110,Balsamic Vinaigrette,choice,0.00
+993,1110,French Dressing,choice,0.00
+994,1110,Lite Italian Dressing,choice,0.00
+995,1110,Creamy Caesar Dressing,choice,0.00
+996,1111,Blue Cheese Dressing,choice,0.00
+997,1111,Honey Mustard Dressing,choice,0.00
+998,1111,Ranch Dressing,choice,0.00
+999,1111,Russian Dressing,choice,0.00
+1000,1111,Balsamic Vinaigrette,choice,0.00
+1001,1111,French Dressing,choice,0.00
+1002,1111,Lite Italian Dressing,choice,0.00
+1003,1111,Creamy Caesar Dressing,choice,0.00
+1004,1116,Chicken Noodle,choice,0.00
+1005,1116,"Cream of Broccoli",choice,0.00
+1006,1118,with Chips,addon,3.00
+1007,1118,with Rice,addon,3.00
+1008,1211,French Vanilla,choice,0.00
+1009,1211,Hazelnut,choice,0.00
+1010,1211,Caramel,choice,0.00
+1011,1213,Hazelnut,choice,0.00
+1012,1213,French Vanilla,choice,0.00
+1013,1213,Caramel,choice,0.00
+1014,1230,a la Mode,addon,2.25
+1015,1233,"Apple Juice, Grapefruit Juice, or Cranberry Juice",choice,0.00
+1018,1236,Vanilla,choice,0.00
+1019,1236,Chocolate,choice,0.00
+1020,1238,Snapple,choice,0.00
+1021,1238,Gatorade,choice,0.00
+1022,1241,Vanilla,choice,0.00
+1023,1241,Chocolate,choice,0.00
+1024,1241,Strawberry,choice,0.00
+1025,1241,"Black & White",choice,0.00
+1026,1241,Make extra thick,addon,1.00
+1027,1242,Make extra thick,addon,1.00
+1028,1243,Make extra thick,addon,1.00
+1029,1244,Vanilla Ice Cream,choice,0.00
+1030,1244,Chocolate Ice Cream,choice,0.00
+1031,1244,Make extra thick,addon,1.00
+1032,1245,Make extra thick,addon,1.00
+1033,1259,Broccoli,choice,0.00
+1034,1259,Carrots,choice,0.00
+1035,1260,Bacon,choice,0.00
+1036,1260,Ham,choice,0.00
+1037,1260,Sausage,choice,0.00
+1038,1263,Marinara,choice,0.00
+1039,1263,"Garlic & Oil",choice,0.00

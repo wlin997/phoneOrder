@@ -1,0 +1,42 @@
+-- Customers
+CREATE TABLE customers (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  phone TEXT UNIQUE NOT NULL,
+  address TEXT
+);
+
+-- Orders
+CREATE TABLE orders (
+  id SERIAL PRIMARY KEY,
+  customer_id INTEGER REFERENCES customers(id),
+  order_type TEXT,
+  total_price NUMERIC(10,2),
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT now()
+);
+
+-- Order Items
+CREATE TABLE order_items (
+  id SERIAL PRIMARY KEY,
+  order_id INTEGER REFERENCES orders(id),
+  item_name TEXT,
+  quantity INTEGER,
+  base_price NUMERIC(10,2),
+  total_price NUMERIC(10,2)
+);
+
+-- Modifiers for each item
+CREATE TABLE order_item_modifiers (
+  id SERIAL PRIMARY KEY,
+  order_item_id INTEGER REFERENCES order_items(id),
+  modifier_name TEXT,
+  price_delta NUMERIC(10,2)
+);
+
+-- Optional: Raw JSON logs for reference/debug
+CREATE TABLE raw_order_logs (
+  id SERIAL PRIMARY KEY,
+  payload JSONB,
+  created_at TIMESTAMP DEFAULT now()
+);

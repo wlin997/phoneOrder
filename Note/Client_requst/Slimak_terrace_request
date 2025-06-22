@@ -1,0 +1,14 @@
+Slimak
+
+Key take away
+
+1. Wants a switch board service that can handle various service not just orders
+2. Wants the ability to do the "usual" by looking up existing orders.
+3. route call base on user's needs.
+4. Needs to be able to know how to identify the order item and it's modifier requirement on order.
+
+Terrance
+
+1. Needs to be able to know how to identify the order item and it's modifier requirement on order.
+2. Need to be able to tally the total.
+3. 
