@@ -177,7 +177,7 @@ export default function KDS() {
 
     const handlePrepOrder = async (order, prepTime) => {
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/kds/prep-order/${order.rowIndex}`, {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/kds/prep-order/${order.id}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ prepTime }),

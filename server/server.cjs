@@ -622,7 +622,17 @@ app.get("/api/kds/active-orders", async (req, res) => {
         const activeKitchenOrders = allOrders
             .filter(o => o.printedCount > 0 && o.order_update_status !== 'Prepped')
             .sort((a, b) => new Date(a.timeOrdered).getTime() - new Date(b.timeOrdered).getTime());
-        res.json(activeKitchenOrders);
+
+        // *** ADD THIS MAPPING STEP ***
+        // This creates a new 'id' property for each order object
+        const formattedOrders = activeKitchenOrders.map(order => ({
+            ...order,
+            id: order.order_id 
+        }));
+
+        // Send the newly formatted array to the frontend
+        res.json(formattedOrders);
+
     } catch (err) {
         console.error("[KDS API] Failed to fetch active orders:", err);
         res.status(500).json({ error: "Failed to fetch active kitchen orders", details: err.message });
