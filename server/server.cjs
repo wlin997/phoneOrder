@@ -663,6 +663,33 @@ app.post("/api/kds/prep-order/:orderId", async (req, res) => {
     }
 });
 
+// ADD THIS ENTIRE NEW ENDPOINT to server.cjs
+
+app.get("/api/kds/prepped-orders", async (req, res) => {
+    try {
+        const allOrders = await getOrdersFromDB(); // This function should already exist in your file
+
+        // Filter for orders that are marked as 'Prepped'
+        const preppedKitchenOrders = allOrders
+            .filter(o => o.order_update_status === 'Prepped')
+            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) // Sort newest first
+            .slice(0, 20); // Optionally limit to the last 20 prepped orders
+
+        // Format the data for the frontend (id vs order_id)
+        const formattedOrders = preppedKitchenOrders.map(order => ({
+            ...order,
+            id: order.order_id
+        }));
+
+        res.json(formattedOrders);
+
+    } catch (err) {
+        console.error("[KDS API] Failed to fetch prepped orders:", err);
+        res.status(500).json({ error: "Failed to fetch prepped orders", details: err.message });
+    }
+});
+
+
 // ** PRESERVED PRINTER AND SETTINGS CODE **
 app.post("/api/cloudprnt", (req, res) => {
     if (req.body && req.body.jobToken) {
