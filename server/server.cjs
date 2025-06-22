@@ -64,6 +64,12 @@ app.use(express.json());
 // =================================================================================
 // DATABASE CONNECTION (PostgreSQL)
 // =================================================================================
+// ... your other requires like express, cors, etc.
+const { Pool } = require('pg');
+
+// ADD THIS DEBUGGING LINE:
+console.log('--- DEBUG --- DATABASE_URL is:', process.env.DATABASE_URL);
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
