@@ -14,7 +14,7 @@ const https = require('https');
 const net = require('net');
 const axios = require('axios');
 const { Pool } = require('pg'); // Import the pg Pool
-
+const { pool } = require("./db"); // Ensure you are importing your PostgreSQL pool
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -88,38 +88,40 @@ let cloudPrintJobs = []; // Preserve this from original code
 // This new function completely replaces getSheetData() and getOrderRows()
 async function getOrdersFromDB() {
   const query = `
-    SELECT
-      o.id AS order_id,
-      o.order_type,
-      o.total_price,
-      o.notes,
-      o.created_at,
-      o.utensil_request,
-      o.category,
-      o.food_prep_time,
-      o.order_update_status,
-      o.printed_count,
-      o.is_the_usual,
-      c.id AS customer_id,
-      c.name AS customer_name,
-      c.phone AS customer_phone,
-      c.email AS customer_email,
-      c.address AS customer_address,
-      i.id AS item_id,
-      i.item_name,
-      i.quantity,
-      i.base_price,
-      i.total_price AS total_price_each,
-      m.id AS modifier_id,
-      m.modifier_name,
-      m.price_delta
-    FROM orders o
-    JOIN customers c ON o.customer_id = c.id
-    LEFT JOIN order_items i ON o.id = i.order_id
-    LEFT JOIN order_item_modifiers m ON i.id = m.order_item_id
-    WHERE archived = FALSE;
-    ORDER BY o.created_at DESC 
-  `;
+  SELECT
+    o.id AS order_id,
+    o.order_type,
+    o.total_price,
+    o.notes,
+    o.created_at,
+    o.utensil_request,
+    o.category,
+    o.food_prep_time,
+    o.order_update_status,
+    o.printed_count,
+    o.is_the_usual,
+    o.archived,
+    c.id AS customer_id,
+    c.name AS customer_name,
+    c.phone AS customer_phone,
+    c.email AS customer_email,
+    c.address AS customer_address,
+    i.id AS item_id,
+    i.item_name,
+    i.quantity,
+    i.base_price,
+    i.total_price AS total_price_each,
+    m.id AS modifier_id,
+    m.modifier_name,
+    m.price_delta
+  FROM orders o
+  JOIN customers c ON o.customer_id = c.id
+  LEFT JOIN order_items i ON o.id = i.order_id
+  LEFT JOIN order_item_modifiers m ON i.id = m.order_item_id
+  WHERE o.archived = FALSE
+  ORDER BY o.created_at DESC;
+`;
+
 
   const { rows } = await pool.query(query);
 
@@ -756,7 +758,7 @@ const startCronJob = () => {
                 const result = await pool.query(`
                     UPDATE orders
                     SET archived = TRUE
-                    WHERE created_at < CURRENT_DATEs
+                    WHERE created_at < CURRENT_DATE
                       AND archived = FALSE;
                 `);
                 console.log(`[Cron Job] Archived ${result.rowCount} old unprocessed orders.`);
