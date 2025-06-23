@@ -150,6 +150,7 @@ export default function KDS() {
 
             setActiveOrders(activeData);
             setPreppedOrders(preppedData);
+            console.log("✅ Prepped Orders received from backend:", preppedData);
         } catch (error) {
             console.error("Error fetching KDS data:", error);
         }
