@@ -677,7 +677,7 @@ app.get("/api/kds/prepped-orders", async (req, res) => {
         // Format the data for the frontend (id vs order_id)
         const formattedOrders = preppedKitchenOrders.map(order => ({
             ...order,
-            id: order.order_id
+            id: order.id
         }));
 
         res.json(formattedOrders);
