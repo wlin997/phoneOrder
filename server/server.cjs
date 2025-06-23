@@ -620,7 +620,7 @@ app.get("/api/kds/active-orders", async (req, res) => {
     try {
         const allOrders = await getOrdersFromDB();
         const activeKitchenOrders = allOrders
-            .filter(o => o.printedCount > 0 && o.orderupdatestatus !== 'Prepped')
+            .filter(o => o.printedCount > 0 && o.orderUpdateStatus !== 'Prepped')
             .sort((a, b) => new Date(a.timeOrdered).getTime() - new Date(b.timeOrdered).getTime());
 
         // Fix the id mapping
