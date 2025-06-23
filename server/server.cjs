@@ -623,14 +623,12 @@ app.get("/api/kds/active-orders", async (req, res) => {
             .filter(o => o.printedCount > 0 && o.order_update_status !== 'Prepped')
             .sort((a, b) => new Date(a.timeOrdered).getTime() - new Date(b.timeOrdered).getTime());
 
-        // *** ADD THIS MAPPING STEP ***
-        // This creates a new 'id' property for each order object
+        // Fix the id mapping
         const formattedOrders = activeKitchenOrders.map(order => ({
             ...order,
-            id: order.order_id 
+            id: order.id // <-- this ensures frontend gets the DB id
         }));
 
-        // Send the newly formatted array to the frontend
         res.json(formattedOrders);
 
     } catch (err) {
@@ -638,6 +636,7 @@ app.get("/api/kds/active-orders", async (req, res) => {
         res.status(500).json({ error: "Failed to fetch active kitchen orders", details: err.message });
     }
 });
+
 
 app.post("/api/kds/prep-order/:orderId", async (req, res) => {
     const { orderId } = req.params;

@@ -178,14 +178,14 @@ export default function KDS() {
     const handlePrepOrder = async (order, prepTime) => {
         console.log('Prepping order:', order); // 👈 Add this
 
-        if (!order?.id) {
-            alert("Order is missing ID and cannot be prepped.");
+        if (!order?.rowIndex) {
+            alert("Order is missing rowIndex and cannot be prepped.");
             return;
         }
 
 
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/kds/prep-order/${order.id}`, {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/kds/prep-order/${order.rowIndex}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ prepTime }),
