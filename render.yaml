@@ -10,11 +10,8 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 18
-      # Add any backend environment variables here
-      # - key: DATABASE_URL
-      #   value: your-db-connection-string
 
-  - type: web
+  - type: static  # <-- was 'web', now correctly 'static'
     name: frontend
     env: static
     plan: free
