@@ -11,7 +11,7 @@ services:
       - key: NODE_VERSION
         value: 18
 
-  - type: static  # <-- was 'web', now correctly 'static'
+  - type: web
     name: frontend
     env: static
     plan: free
