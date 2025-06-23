@@ -14,7 +14,7 @@ const https = require('https');
 const net = require('net');
 const axios = require('axios');
 const { Pool } = require('pg'); // Import the pg Pool
-const { pool } = require("./db"); // Ensure you are importing your PostgreSQL pool
+
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -756,7 +756,7 @@ const startCronJob = () => {
                 const result = await pool.query(`
                     UPDATE orders
                     SET archived = TRUE
-                    WHERE created_at < CURRENT_DATE
+                    WHERE created_at < CURRENT_DATEs
                       AND archived = FALSE;
                 `);
                 console.log(`[Cron Job] Archived ${result.rowCount} old unprocessed orders.`);
