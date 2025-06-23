@@ -14,6 +14,7 @@ const https = require('https');
 const net = require('net');
 const axios = require('axios');
 const { Pool } = require('pg'); // Import the pg Pool
+const { pool } = require("./db"); // Ensure you are importing your PostgreSQL pool
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -116,7 +117,8 @@ async function getOrdersFromDB() {
     JOIN customers c ON o.customer_id = c.id
     LEFT JOIN order_items i ON o.id = i.order_id
     LEFT JOIN order_item_modifiers m ON i.id = m.order_item_id
-    ORDER BY o.created_at DESC;
+    WHERE archived = FALSE;
+    ORDER BY o.created_at DESC 
   `;
 
   const { rows } = await pool.query(query);
@@ -389,13 +391,18 @@ app.get('/api/customer-stats', async (req, res) => {
 app.get('/api/app-settings', (req, res) => res.json(appSettings));
 app.post('/api/app-settings', async (req, res) => {
     try {
-        await fsp.writeFile(appSettingsFilePath, JSON.stringify(req.body, null, 2));
-        appSettings = req.body;
+        const newSettings = req.body;
+        await saveAppSettings(newSettings);
+        appSettings = newSettings;
+
+        // 🔁 Restart the cron job with updated schedule
         if (cronJob) cronJob.stop();
         startCronJob();
-        res.json({ success: true, message: 'App settings saved.' });
+
+        res.json({ success: true, message: 'App settings updated and cron job restarted.' });
     } catch (err) {
-        res.status(500).json({ error: 'Failed to save app settings: ' + err.message });
+        console.error("[App Settings] Failed to update settings:", err);
+        res.status(500).json({ error: "Failed to update app settings" });
     }
 });
 app.get('/api/print-settings', async (req, res) => {
@@ -734,16 +741,38 @@ app.get('/api/printer-status', async (req, res) => {
 // SERVER INITIALIZATION
 // =================================================================================
 let cronJob;
+
 const startCronJob = () => {
     if (cronJob) {
         cronJob.stop();
     }
-    cronJob = cron.schedule(appSettings.archiveCronSchedule, archiveOrders, {
-        scheduled: true,
-        timezone: appSettings.timezone
-    });
+
+    cronJob = cron.schedule(
+        appSettings.archiveCronSchedule,
+        async function archiveOrders() {
+            console.log(`[Cron Job] Running archiveOrders at ${new Date().toLocaleTimeString()}`);
+
+            try {
+                const result = await pool.query(`
+                    UPDATE orders
+                    SET archived = TRUE
+                    WHERE created_at < CURRENT_DATE
+                      AND archived = FALSE;
+                `);
+                console.log(`[Cron Job] Archived ${result.rowCount} old unprocessed orders.`);
+            } catch (err) {
+                console.error("[Cron Job] Failed to archive orders:", err);
+            }
+        },
+        {
+            scheduled: true,
+            timezone: appSettings.timezone
+        }
+    );
+
     console.log(`[Cron Job] Scheduled to run at: ${appSettings.archiveCronSchedule} in timezone ${appSettings.timezone}`);
-}
+};
+
 
 pool.connect()
     .then(() => {
