@@ -14,7 +14,7 @@ const https = require('https');
 const net = require('net');
 const axios = require('axios');
 const { Pool } = require('pg'); // Import the pg Pool
-
+const { DateTime } = require('luxon');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -22,6 +22,11 @@ const PORT = process.env.PORT || 3001;
 // --- File paths for local settings ---
 const appSettingsFilePath = path.join(__dirname, 'appSettings.json');
 const printerSettingsFilePath = path.join(__dirname, 'printerSettings.json');
+
+
+const now = DateTime.now()
+  .setZone('America/New_York')
+  .toISO();  // Example: '2025-06-23T16:55:00.123-04:00'
 
 // --- Load app settings from file or use defaults ---
 const getAppSettings = () => {
@@ -549,11 +554,13 @@ ${totalLine}Fired at: ${firedAt}
 }
 
 app.post("/api/fire-order", async (req, res) => {
-    const { rowIndex: orderId } = req.body; // Renamed for clarity
+    const { rowIndex: orderId } = req.body;
     if (!orderId || typeof orderId !== "number") {
         return res.status(400).json({ error: "Invalid order ID" });
     }
+
     try {
+        // Load printer settings
         let printerSettings;
         try {
             const data = await fsp.readFile(printerSettingsFilePath, 'utf8');
@@ -562,40 +569,57 @@ app.post("/api/fire-order", async (req, res) => {
             return res.status(400).json({ error: "Printer settings not configured." });
         }
 
+        // Fetch order
         const allOrders = await getOrdersFromDB();
         const orderToProcess = allOrders.find(o => o.id === orderId);
         if (!orderToProcess) {
             return res.status(404).json({ error: "Order not found" });
         }
 
+        // Format receipt
         const htmlReceipt = buildOrderHTML(orderToProcess);
         let printerResponseData = null;
         let printerError = null;
 
+        // Send to printer
         switch (printerSettings.mode) {
             case 'MOCK':
                 try {
                     if (!printerSettings.printerUrl) throw new Error("No URL for MOCK mode");
-                    const response = await axios.post(printerSettings.printerUrl, { ...orderToProcess, mode: 'MOCK' }, { timeout: 10000 });
+                    const response = await axios.post(
+                        printerSettings.printerUrl,
+                        { ...orderToProcess, mode: 'MOCK' },
+                        { timeout: 10000 }
+                    );
                     printerResponseData = response.data;
                 } catch (mockErr) {
                     printerError = { error: "Failed to send to MOCK webhook", details: mockErr.message };
                 }
                 break;
+
             case 'LAN':
                 try {
                     if (!printerSettings.printerUrl) throw new Error("No IP address for LAN mode");
-                    const plainTextReceipt = htmlReceipt.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/  +/g, ' ');
+                    const plainTextReceipt = htmlReceipt
+                        .replace(/<[^>]+>/g, ' ')
+                        .replace(/&nbsp;/g, ' ')
+                        .replace(/  +/g, ' ');
                     printerResponseData = await printViaLan(printerSettings.printerUrl, plainTextReceipt);
                 } catch (lanErr) {
                     printerError = lanErr;
                 }
                 break;
+
             case 'CLOUD':
-                const newJob = { jobId: `job-${Date.now()}`, content: htmlReceipt, contentType: 'text/html' };
+                const newJob = {
+                    jobId: `job-${Date.now()}`,
+                    content: htmlReceipt,
+                    contentType: 'text/html'
+                };
                 cloudPrintJobs.push(newJob);
                 printerResponseData = { status: "CLOUD job staged", jobId: newJob.jobId };
                 break;
+
             default:
                 printerError = { error: `Invalid printer mode: ${printerSettings.mode}` };
         }
@@ -604,20 +628,34 @@ app.post("/api/fire-order", async (req, res) => {
             return res.status(503).json(printerError);
         }
 
+        // Get timestamp in Eastern Time (New York)
+        const now = DateTime.now()
+            .setZone("America/New_York")
+            .toISO();  // e.g. 2025-06-23T17:45:00.123-04:00
+
+        // Update DB: increment count and add timestamp
         const updateQuery = `
             UPDATE orders
-            SET printed_count = printed_count + 1
+            SET 
+                printed_count = printed_count + 1,
+                printed_timestamps = 
+                    CASE 
+                        WHEN printed_timestamps IS NULL THEN ARRAY[$2]::text[]
+                        ELSE array_append(printed_timestamps, $2)
+                    END
             WHERE id = $1
-            RETURNING printed_count;
+            RETURNING printed_count, printed_timestamps;
         `;
-        const { rows } = await pool.query(updateQuery, [orderId]);
-        
+        const { rows } = await pool.query(updateQuery, [orderId, now]);
+
         res.json({
             success: true,
             printerResponse: printerResponseData,
             message: `Order processed successfully.`,
-            printedCount: rows[0].printed_count
+            printedCount: rows[0].printed_count,
+            printedTimestamps: rows[0].printed_timestamps
         });
+
     } catch (err) {
         console.error("[🔥 API Error /api/fire-order]", err);
         res.status(500).json({ error: "Failed to process order", details: err.message });
