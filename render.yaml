@@ -14,7 +14,6 @@ services:
   - type: web
     name: frontend
     env: static
-    plan: free
     rootDir: client
     buildCommand: npm install && npm run build
     staticPublishPath: dist
