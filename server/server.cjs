@@ -620,7 +620,7 @@ app.get("/api/kds/active-orders", async (req, res) => {
     try {
         const allOrders = await getOrdersFromDB();
         const activeKitchenOrders = allOrders
-            .filter(o => o.printedCount > 0 && o.order_update_status !== 'Prepped')
+            .filter(o => o.printedCount > 0 && o.orderupdatestatus !== 'Prepped')
             .sort((a, b) => new Date(a.timeOrdered).getTime() - new Date(b.timeOrdered).getTime());
 
         // Fix the id mapping
@@ -670,7 +670,7 @@ app.get("/api/kds/prepped-orders", async (req, res) => {
         console.log("🔎 Raw orders from DB:", allOrders);
         // Filter for orders that are marked as 'Prepped'
         const preppedKitchenOrders = allOrders
-            .filter(o => o.order_update_status === 'Prepped')
+            .filter(o => o.orderUpdateStatus === 'Prepped')
             .sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) // Sort newest first
             .slice(0, 20); // Optionally limit to the last 20 prepped orders
 
