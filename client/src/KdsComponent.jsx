@@ -176,24 +176,23 @@ export default function KDS() {
     };
 
     const handlePrepOrder = async (order, prepTime) => {
-        console.log('Prepping order:', order); // 👈 Add this
+        console.log('Prepping order:', order);
 
         if (!order?.id) {
             alert("Order is missing ID and cannot be prepped.");
             return;
         }
 
-
         try {
-                const res = await fetch(`${import.meta.env.VITE_API_URL}/api/kds/prep-order/${order.id}`, {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/kds/prep-order/${order.id}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ prepTime }),
             });
+
             if (!res.ok) throw new Error("Failed to mark order as prepped");
-            
-            setActiveOrders(prev => prev.filter(o => o.id !== order.id));
-            setPreppedOrders(prev => [order, ...prev]);
+
+            await fetchData(); // ✅ ensures UI syncs with DB
             setSelectedOrder(null);
 
         } catch (error) {
