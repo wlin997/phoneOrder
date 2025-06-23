@@ -667,7 +667,7 @@ app.post("/api/kds/prep-order/:orderId", async (req, res) => {
 app.get("/api/kds/prepped-orders", async (req, res) => {
     try {
         const allOrders = await getOrdersFromDB(); // This function should already exist in your file
-
+        console.log("🔎 Raw orders from DB:", allOrders);
         // Filter for orders that are marked as 'Prepped'
         const preppedKitchenOrders = allOrders
             .filter(o => o.order_update_status === 'Prepped')
