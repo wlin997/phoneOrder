@@ -193,6 +193,9 @@ export default function KDS() {
             alert("Could not mark order as prepped. Please try again.");
         }
     };
+
+
+    
     
     return (
         <ErrorBoundary>
