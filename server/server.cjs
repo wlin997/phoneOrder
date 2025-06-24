@@ -213,11 +213,15 @@ app.get("/", (req, res) => res.send("✅ Backend server is alive"));
 
 const isTodayFilter = (order) => {
     if (!order || !order.timeOrdered) return false;
-    const now = new Date();
-    const orderDate = new Date(order.timeOrdered);
-    return orderDate.getFullYear() === now.getFullYear() &&
-           orderDate.getMonth() === now.getMonth() &&
-           orderDate.getDate() === now.getDate();
+
+    // Use Luxon to parse the order time in UTC and then convert it to your desired comparison timezone (e.g., America/New_York)
+    const orderDateTime = DateTime.fromISO(order.timeOrdered, { zone: 'utc' }).setZone('America/New_York');
+
+    // Get the current time in the same desired comparison timezone
+    const nowDateTime = DateTime.now().setZone('America/New_York');
+
+    // Compare date components
+    return orderDateTime.toISODate() === nowDateTime.toISODate();
 };
 
 app.get("/api/list", async (req, res) => {
