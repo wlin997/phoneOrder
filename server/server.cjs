@@ -303,7 +303,7 @@ app.get('/api/today-stats', async (req, res) => {
                 COUNT(*) AS total,
                 COUNT(*) FILTER (WHERE printed_count > 0) AS processed
             FROM orders
-            WHERE created_at >= $1 AND created_at <= $2; // <--- CRITICAL CHANGE HERE: Use explicit start/end
+            WHERE created_at >= $1 AND created_at <= $2;
         `;
         // Pass the calculated start and end dates as parameters
         const { rows } = await pool.query(query, [startDateISO, endDateISO]); // <--- New parameters
