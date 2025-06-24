@@ -727,7 +727,7 @@ function App() {
                                     >
                                         <div className="grid grid-cols-[20px,120px,80px,1fr] gap-2 items-center flex-grow min-w-[300px] mb-2 md:mb-0">
                                             <div className="w-3 h-3 rounded-full bg-gray-400"></div>
-                                            <div className="text-gray-700 truncate">{orderDate} {orderTime}</div>
+                                            <div className="text-gray-700 whitespace-nowrap min-w-[160px]">{orderDate} {orderTime}</div>
                                             <div className="font-medium text-gray-800 truncate">#{order.orderNum}</div>
                                             <div className="text-gray-600 truncate">{order.callerName} ({order.callerPhone})</div>
                                         </div>
@@ -747,11 +747,11 @@ function App() {
                                             </button>
                                         </div>
                                         {Array.isArray(order.printedTimestamps) && order.printedTimestamps.length > 0 && (
-                                            <div className="text-xs text-gray-500 mt-1 w-full pl-6">
-                                                {order.printedTimestamps.map((ts, idx) => (
-                                                    <div key={idx}>Fired: {new Date(ts).toLocaleString()}</div>
-                                                ))}
-                                            </div>
+                                          <div className="text-xs text-gray-500 mt-1 w-full pl-6">
+                                            {order.printedTimestamps.map((ts, idx) => (
+                                              <div key={idx}>Fired: {new Date(ts).toLocaleString()}</div>
+                                            ))}
+                                          </div>
                                         )}
                                     </div>
                                 );

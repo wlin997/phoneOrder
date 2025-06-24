@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: backend
+    env: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install
+    startCommand: node server.cjs
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      # Add any backend environment variables here
+      # - key: DATABASE_URL
+      #   value: your-db-connection-string
+
+  - type: web
+    name: frontend
+    env: static
+    plan: free
+    rootDir: client
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    autoDeploy: true

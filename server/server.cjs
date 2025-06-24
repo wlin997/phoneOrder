@@ -104,6 +104,7 @@ async function getOrdersFromDB() {
     o.food_prep_time,
     o.order_update_status,
     o.printed_count,
+    o.printed_timestamps,
     o.is_the_usual,
     o.archived,
     c.id AS customer_id,
@@ -136,27 +137,29 @@ async function getOrdersFromDB() {
   for (const row of rows) {
     if (!ordersMap.has(row.order_id)) {
       ordersMap.set(row.order_id, {
-        id: row.order_id,
-        rowIndex: row.order_id, // For backward compatibility with frontend
-        orderNum: row.order_id,
-        orderType: row.order_type,
-        totalCost: row.total_price,
-        notes: row.notes,
-        timeOrdered: row.created_at,
-        utensil: row.utensil_request,
-        category: row.category,
-        orderUpdateStatus: row.order_update_status,
-        printedCount: row.printed_count,
-        isTheUsual: row.is_the_usual,
-        orderProcessed: row.printed_count > 0, // Logic: if printed, it's processed
-        orderPrepped: row.order_update_status === 'Prepped', // New logic for KDS
-        cancelled: row.order_update_status === 'Cancelled', // New logic
-        callerName: row.customer_name,
-        callerPhone: row.customer_phone,
-        email: row.customer_email,
-        callerAddress: row.customer_address,
-        items: [],
-      });
+          id: row.order_id,
+          rowIndex: row.order_id, // For backward compatibility with frontend
+          orderNum: row.order_id,
+          orderType: row.order_type,
+          totalCost: row.total_price,
+          notes: row.notes,
+          timeOrdered: row.created_at,
+          utensil: row.utensil_request,
+          category: row.category,
+          orderUpdateStatus: row.order_update_status,
+          printedCount: row.printed_count,
+          printedTimestamps: row.printed_timestamps || [], // ✅ ADD THIS
+          isTheUsual: row.is_the_usual,
+          orderProcessed: row.printed_count > 0, // Logic: if printed, it's processed
+          orderPrepped: row.order_update_status === 'Prepped',
+          cancelled: row.order_update_status === 'Cancelled',
+          callerName: row.customer_name,
+          callerPhone: row.customer_phone,
+          email: row.customer_email,
+          callerAddress: row.customer_address,
+          items: [],
+        });
+
     }
 
     const order = ordersMap.get(row.order_id);
