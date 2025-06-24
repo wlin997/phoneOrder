@@ -287,21 +287,29 @@ app.get("/api/order-by-row/:orderId", async (req, res) => {
 // =================================================================================
 app.get('/api/today-stats', async (req, res) => {
     try {
+        // Get the current date in the specific timezone (America/New_York)
+        // using Luxon to ensure precise start and end of the day.
+        const nowInNY = DateTime.now().setZone(appSettings.timezone); // Use appSettings.timezone
+        const todayNYStart = nowInNY.startOf('day'); // Midnight of today in NY time
+        const todayNYEnd = nowInNY.endOf('day');     // End of day in NY time
+
+        // Convert these Luxon DateTime objects to ISO strings for PostgreSQL
+        // PostgreSQL will correctly interpret these UTC ISO strings as timestamps
+        const startDateISO = todayNYStart.toISO(); // e.g., '2025-06-24T04:00:00.000Z'
+        const endDateISO = todayNYEnd.toISO();     // e.g., '2025-06-25T03:59:59.999Z'
+
         const query = `
             SELECT
                 COUNT(*) AS total,
                 COUNT(*) FILTER (WHERE printed_count > 0) AS processed
             FROM orders
-            WHERE created_at >= current_date AT TIME ZONE $1;
+            WHERE created_at >= $1 AND created_at <= $2; // <--- CRITICAL CHANGE HERE: Use explicit start/end
         `;
-        const { rows } = await pool.query(query, [appSettings.timezone]);
+        // Pass the calculated start and end dates as parameters
+        const { rows } = await pool.query(query, [startDateISO, endDateISO]); // <--- New parameters
 
-        // --- ADD THIS LOG ---
         console.log("[Backend] /api/today-stats - Raw SQL rows response:", rows);
-
         res.json(rows[0]);
-
-        // --- ADD THIS LOG ---
         console.log("[Backend] /api/today-stats - Final JSON sent:", rows[0]);
 
     } catch (error) {
