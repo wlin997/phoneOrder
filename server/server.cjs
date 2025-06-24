@@ -351,23 +351,36 @@ app.get('/api/popular-items', async (req, res) => {
 
 app.get('/api/hourly-orders', async (req, res) => {
     try {
-        const startHour = parseInt(appSettings.reportStartHour, 10) || 8; // Ensure this is 0 if you want 12 AM to be included.
+        const startHour = parseInt(appSettings.reportStartHour, 10) || 0; // It's best to set this to 0 for a full 24-hour daily report
+        const endHour = 23; // End of the day
+
+        // Get the current date in the specific timezone (America/New_York)
+        // using Luxon to ensure precise start and end of the day.
+        const nowInNY = DateTime.now().setZone(appSettings.timezone);
+        const todayNYStart = nowInNY.startOf('day');
+        const todayNYEnd = nowInNY.endOf('day');
+
+        // Convert these Luxon DateTime objects to ISO strings for PostgreSQL
+        // PostgreSQL will correctly interpret these UTC ISO strings as timestamps
+        const startDateISO = todayNYStart.toISO(); // e.g., '2025-06-24T04:00:00.000Z'
+        const endDateISO = todayNYEnd.toISO();   // e.g., '2025-06-25T03:59:59.999Z'
+
         const query = `
             SELECT
                 EXTRACT(HOUR FROM created_at AT TIME ZONE $1) as hour,
                 COUNT(*) as count
             FROM orders
-            WHERE created_at >= current_date AT TIME ZONE $1
+            WHERE created_at >= $2 AND created_at <= $3 -- <--- CRITICAL CHANGE HERE
             GROUP BY hour
             ORDER BY hour;
         `;
-        const { rows } = await pool.query(query, [appSettings.timezone]);
+        // Pass the timezone for EXTRACT and the calculated start/end dates
+        const { rows } = await pool.query(query, [appSettings.timezone, startDateISO, endDateISO]); // <--- New parameters
 
-        // --- ADD THIS LOG ---
-        console.log("[Backend] /api/hourly-orders - Raw SQL rows:", rows);
-
+        // The rest of your Node.js processing logic remains the same,
+        // but ensure your initialization loop covers the full range if startHour is 0.
         const hourlyCounts = {};
-        for (let h = startHour; h <= 23; h++) {
+        for (let h = 0; h <= 23; h++) { // Loop from 0 to 23 for a full day's report
             const hourLabel = h < 12 ? `${h === 0 ? 12 : h} AM` : `${h === 12 ? 12 : h - 12} PM`;
             hourlyCounts[hourLabel] = 0;
         }
@@ -379,9 +392,7 @@ app.get('/api/hourly-orders', async (req, res) => {
             }
         });
 
-        // --- ADD THIS LOG ---
         console.log("[Backend] /api/hourly-orders - Final hourlyCounts sent:", hourlyCounts);
-
         res.json(hourlyCounts);
     } catch (error) {
         console.error('Error fetching hourly orders:', error);
