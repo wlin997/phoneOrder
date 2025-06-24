@@ -287,14 +287,23 @@ app.get("/api/order-by-row/:orderId", async (req, res) => {
 // =================================================================================
 app.get('/api/today-stats', async (req, res) => {
     try {
-        const { rows } = await pool.query(`
+        const query = `
             SELECT
                 COUNT(*) AS total,
                 COUNT(*) FILTER (WHERE printed_count > 0) AS processed
             FROM orders
             WHERE created_at >= current_date AT TIME ZONE $1;
-        `, [appSettings.timezone]);
+        `;
+        const { rows } = await pool.query(query, [appSettings.timezone]);
+
+        // --- ADD THIS LOG ---
+        console.log("[Backend] /api/today-stats - Raw SQL rows response:", rows);
+
         res.json(rows[0]);
+
+        // --- ADD THIS LOG ---
+        console.log("[Backend] /api/today-stats - Final JSON sent:", rows[0]);
+
     } catch (error) {
         console.error('Error fetching today\'s stats:', error);
         res.status(500).json({ error: 'Failed to fetch today\'s stats: ' + error.message });
