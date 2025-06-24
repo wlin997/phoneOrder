@@ -185,7 +185,8 @@ function App() {
                 throw new Error(`Failed to fetch incoming orders: ${res.status} ${res.statusText}`);
             }
             const data = await res.json();
-
+            console.log("Data received from /api/list:", data); // ADD THIS LINE HERE
+            
             setIncomingOrders(() => {
                 const newOrderObjs = data.map((order) => {
                     const isViewed = !!viewedOrdersRef.current[order.id];

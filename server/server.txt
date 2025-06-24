@@ -1,43 +1,51 @@
-// This line is kept for local development consistency.
-// The primary setting should be the TZ variable in your Render dashboard.
-process.env.TZ = 'America/New_York';
+// =================================================================================
+// SETUP & CONFIGURATION
+// =================================================================================
+process.env.TZ = 'America/New_York'; // Set default timezone
 
-const axios = require('axios');
 const express = require("express");
-const { google } = require("googleapis");
 const fs = require("fs");
 const fsp = require("fs").promises;
 const path = require("path");
 const cors = require("cors");
-const { v4: uuidv4 } = require("uuid");
 const cron = require('node-cron');
 const http = require('http');
 const https = require('https');
 const net = require('net');
+const axios = require('axios');
+const { Pool } = require('pg'); // Import the pg Pool
+const { DateTime } = require('luxon');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-// --- File paths for settings ---
+
+// --- File paths for local settings ---
 const appSettingsFilePath = path.join(__dirname, 'appSettings.json');
 const printerSettingsFilePath = path.join(__dirname, 'printerSettings.json');
-// --- Function to load app settings from file or use defaults ---
+
+
+const now = DateTime.now()
+  .setZone('America/New_York')
+  .toISO();  // Example: '2025-06-23T16:55:00.123-04:00'
+
+// --- Load app settings from file or use defaults ---
 const getAppSettings = () => {
   try {
     const data = fs.readFileSync(appSettingsFilePath, 'utf8');
-return JSON.parse(data);
+    return JSON.parse(data);
   } catch (err) {
-    // If file doesn't exist or is invalid, return defaults
     return {
       timezone: 'America/New_York',
       reportStartHour: 8,
       archiveCronSchedule: '0 2 * * *' // Default to 2 AM
     };
-}
+  }
 };
 
-// --- MODIFIED: Load settings on startup ---
 let appSettings = getAppSettings();
 process.env.TZ = appSettings.timezone;
+
+// --- CORS Configuration ---
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
@@ -46,7 +54,8 @@ const allowedOrigins = [
   'http://127.0.0.1:3001',
   'http://127.0.0.1:5173',
   process.env.RENDER_FRONTEND_URL
-];
+].filter(Boolean);
+
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) {
@@ -58,417 +67,164 @@ app.use(cors({
 }));
 app.use(express.json());
 
-const SERVICE_ACCOUNT_FILE = path.join(__dirname, process.env.GOOGLE_APPLICATION_CREDENTIALS);
-const SHEET_ID = '1jhfeNgtIsnZZya8R91dPoMmXdbAUT_0wtcCq_022MGE';
-const SHEET_TAB = 'orderItems';
-const ORDER_HISTORY_TAB = 'orderHistory';
-const COLUMN_HEADERS = {
-    CATEGORY: 'Category',
-    CANCELLED: 'Cancelled',
-    ORDER_PROCESSED: 'Order_Processed',
-    ORDER_TYPE: 'Order_type',
-    ORDER_UPDATE_STATUS: 'Order_Update_Status',
-    TIME_ORDERED: 'Time_ordered',
-    EMAIL: 'Email',
-    ORDER_NUM: 'OrderNum',
-    CALLER_NAME: 'Caller_name',
-    CALLER_PHONE: 'Caller_phone',
-    CALLER_ADDRESS: 'Caller_address',
-    CALLER_CITY: 'Caller_City',
-    CALLER_STATE: 'Caller_State',
-    CALLER_ZIP: 'Caller_Zip',
-    SHEET_LAST_MODIFIED: 'Sheet_Last_Modified',
-    PRINTED_COUNT: 'Printed_Count',
-    PRINTED_TIMESTAMPS: 'Printed_Timestamps',
-    ORDER_ITEM_PREFIX: 'Order_item_',
-    QTY_PREFIX: 'Qty_',
-    MODIFIER_PREFIX: 'modifier_',
-    ORDER_SUMMARY: 'orderSummary',
-    TOTAL_COST: 'Total_cost',
-    UTENSIL: 'Utensil',
-    // --- NEW: Column headers for KDS ---
-    ORDER_PREP: 'Order_prep',
-    FOOD_PREP_TIME: 'Food_prep_time'
-};
-const printHistoryFile = path.join(__dirname, "printHistory.json");
-let printHistory = [];
-let sheets;
-let cloudPrintJobs = [];
-let sheetDataCache = {
-    data: [],
-    lastFetchTime: 0,
-    isFetching: false,
-    fetchPromise: null
-};
+// =================================================================================
+// DATABASE CONNECTION (PostgreSQL)
+// =================================================================================
+// ... your other requires like express, cors, etc.
+
+
+// ADD THIS DEBUGGING LINE:
+console.log('--- DEBUG --- DATABASE_URL is:', process.env.DATABASE_URL);
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
+});
+
+console.log("✅ PostgreSQL client initialized.");
+
 // =================================================================================
 // HELPER AND UTILITY FUNCTIONS
 // =================================================================================
+let cloudPrintJobs = []; // Preserve this from original code
 
-function columnToLetter(n) {
-    let s = '';
-while (n > 0) {
-        const m = (n - 1) % 26;
-s = String.fromCharCode(65 + m) + s;
-        n = Math.floor((n - 1) / 26);
+// This new function completely replaces getSheetData() and getOrderRows()
+async function getOrdersFromDB() {
+  const query = `
+  SELECT
+    o.id AS order_id,
+    o.order_type,
+    o.total_price,
+    o.notes,
+    o.created_at,
+    o.utensil_request,
+    o.category,
+    o.food_prep_time,
+    o.order_update_status,
+    o.printed_count,
+    o.printed_timestamps,
+    o.is_the_usual,
+    o.archived,
+    c.id AS customer_id,
+    c.name AS customer_name,
+    c.phone AS customer_phone,
+    c.email AS customer_email,
+    c.address AS customer_address,
+    i.id AS item_id,
+    i.item_name,
+    i.quantity,
+    i.base_price,
+    i.total_price AS total_price_each,
+    m.id AS modifier_id,
+    m.modifier_name,
+    m.price_delta
+  FROM orders o
+  JOIN customers c ON o.customer_id = c.id
+  LEFT JOIN order_items i ON o.id = i.order_id
+  LEFT JOIN order_item_modifiers m ON i.id = m.order_item_id
+  WHERE o.archived = FALSE
+  ORDER BY o.created_at DESC;
+`;
+
+
+  const { rows } = await pool.query(query);
+
+  // Restructure the flat SQL result into the nested JSON the frontend expects
+  const ordersMap = new Map();
+
+  for (const row of rows) {
+    if (!ordersMap.has(row.order_id)) {
+      ordersMap.set(row.order_id, {
+          id: row.order_id,
+          rowIndex: row.order_id, // For backward compatibility with frontend
+          orderNum: row.order_id,
+          orderType: row.order_type,
+          totalCost: row.total_price,
+          notes: row.notes,
+          timeOrdered: row.created_at,
+          utensil: row.utensil_request,
+          category: row.category,
+          orderUpdateStatus: row.order_update_status,
+          printedCount: row.printed_count,
+          printedTimestamps: row.printed_timestamps || [], // ✅ ADD THIS
+          isTheUsual: row.is_the_usual,
+          orderProcessed: row.printed_count > 0, // Logic: if printed, it's processed
+          orderPrepped: row.order_update_status === 'Prepped',
+          cancelled: row.order_update_status === 'Cancelled',
+          callerName: row.customer_name,
+          callerPhone: row.customer_phone,
+          email: row.customer_email,
+          callerAddress: row.customer_address,
+          items: [],
+        });
+
     }
-    return s;
-}
 
-function invalidateSheetDataCache() {
-    sheetDataCache.data = [];
-    sheetDataCache.lastFetchTime = 0;
-    console.log("[Backend Cache] Sheet data cache invalidated.");
-}
+    const order = ordersMap.get(row.order_id);
 
-function buildOrderHTML(order) {
-    const items = order.items.map(item => {
-        const name = item.item || 'Unknown Item';
-        const qty = item.qty || '1';
-        const mod = item.modifier ? `<br>  <span style="color: red;">- ${item.modifier}</span>` : '';
-        return `${qty}x ${name}${mod}`;
-    }).join('<br>');
-const timeOrdered = new Date(order.timeOrdered || Date.now()).toLocaleString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-    });
-const firedAt = new Date().toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-
-    // Per example: "Utensils: 3 sets" then "Order Items:" (label is "ITEMS:")
-    const utensilLine = order.utensil ? `Utensils:     ${order.utensil}\n\n` : '';
-
-    // --- NEW DEBUG LINES ---
-    console.log("[Debug] Raw order.utensil value:", order.utensil);
-    console.log("[Debug] Constructed utensilLine:", utensilLine);
-    // --- END DEBUG LINES ---
-
-
-    // Per example: separator, then "Total: ${{Total_cost}}"
-    // This will be inserted after the item separator.
-    const totalLine = order.totalCost ? `Total:        $${order.totalCost}\n` : '';
-
-return `
-<pre style="font-family: 'Courier New', Courier, monospace; font-size: 12pt; width: 80mm; margin: 0; padding: 0; line-height: 1.2;">
---------------------------------
-    ** ORDER #${order.orderNum ||
-'N/A'} **
---------------------------------
-Order Type:   ${order.orderType || 'N/A'}
-Time Ordered: ${timeOrdered}
-Status:       ${order.orderUpdateStatus ||
-'N/A'}
---------------------------------
-Caller:  ${order.callerName || 'N/A'}
-Phone:   ${order.callerPhone || 'N/A'}
-Email:   ${order.email ||'N/A'}
-Address: ${[order.callerAddress, order.callerCity, order.callerState, order.callerZip].filter(Boolean).join(', ') || 'N/A'}
---------------------------------
-${utensilLine}ITEMS:
-${items}
---------------------------------
-${totalLine}Fired at: ${firedAt}
-</pre>
-  `;
-}
-
-function printViaLan(printerIp, payload) {
-    return new Promise((resolve, reject) => {
-        const port = 9100;
-        const client = new net.Socket();
-        client.setTimeout(5000);
-        client.connect(port, printerIp, () => {
-            console.log(`[LAN] Connected to printer at ${printerIp}:${port}`);
-            const cutCommand = '\x1b\x64\x00';
-            client.write(payload 
-+ '\n\n\n' + cutCommand);
-            client.end();
-            resolve({ status: "success", message: "Print job sent to LAN printer." });
-        });
-        client.on('error', (err) => {
-            console.error('[LAN] Printer connection error:', err);
-            client.destroy();
-            reject({ error: "Failed to connect to LAN printer", details: err.message });
-        });
-        client.on('timeout', () => {
-            console.error(`[LAN] Connection to ${printerIp}:${port} timed out.`);
-            client.destroy();
-            reject({ error: "Connection to LAN printer timed out." });
-});
-    });
-}
-
-async function testPrinterConnectivity(printerUrl, mode = 'LAN') {
-    if (mode === 'LAN') {
-        return new Promise((resolve) => {
-            const client = new net.Socket();
-            client.setTimeout(3000);
-            client.connect(9100, printerUrl, () => {
-                client.end();
-            
-    resolve({ available: true, message: 'LAN printer is responsive.' });
-            });
-            client.on('error', (err) => resolve({ available: false, error: `LAN printer error: ${err.message}` }));
-            client.on('timeout', () => {
-                client.destroy();
-                resolve({ available: false, error: 'Connection to LAN printer timed out.' });
-            });
-        });
-}
-
-    // For CLOUD and MOCK, we perform an HTTP check
-    return new Promise((resolve) => {
-        let url;
-        try {
-            url = new URL(printerUrl);
-        } catch (err) {
-            return resolve({ available: false, error: `Invalid URL: ${err.message}` });
-        }
-       
- const protocol = url.protocol === 'https:' ? https : http;
-        const method = mode === 'MOCK' ? 'POST' : 'HEAD';
-        const testPayload = mode === 'MOCK' ? JSON.stringify({ test: true, from: 'PrinterStatusCheck' }) : '';
-
-        const options = {
-            hostname: url.hostname,
-            port: url.port || (url.protocol === 'https:' ? 443 : 80),
-      
-      path: url.pathname + (url.search || ''),
-            method,
-            timeout: 5000,
-            headers: {
-                'User-Agent': 'Node.js Printer Status Check',
-                ...(mode === 'MOCK' ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(testPayload) } : {})
-    
-        }
-        };
-
-        const req = protocol.request(options, (res) => {
-            if (res.statusCode >= 200 && res.statusCode < 400) {
-                 resolve({ available: true, message: `Endpoint responded with status ${res.statusCode}` });
-} else {
-                 resolve({ available: false, error: `Endpoint not available (Status: ${res.statusCode})` });
-}
-        });
-
-        req.on('timeout', () => {
-            req.destroy();
-            resolve({ available: false, error: 'Connection timed out.' });
-        });
-req.on('error', (err) => resolve({ available: false, error: `Request error: ${err.message}` }));
-if (method === 'POST') {
-            req.write(testPayload);
-}
-        req.end();
-    });
-}
-
-// =================================================================================
-// GOOGLE SHEETS AND DATA LOGIC
-// =================================================================================
-
-const normalizeToUTCMidnight = (date) => {
-    return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-};
-
-async function getOrderRows() {
-    if (!sheets) throw new Error("Google Sheets client not initialized.");
-try {
-        const response = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: ORDER_HISTORY_TAB });
-const rows = response.data.values || [];
-        if (rows.length === 0) return [];
-        const header = rows[0].map(h => String(h).trim());
-const dataRows = rows.slice(1);
-        return dataRows.map(row => {
-            const obj = {};
-            header.forEach((colName, index) => obj[colName] = row[index] !== undefined ? String(row[index]).trim() : '');
-            return obj;
-        });
-} catch (err) {
-        console.error(`Error reading Google Sheet from ${ORDER_HISTORY_TAB}:`, err.message);
-throw new Error(`Failed to read Google Sheet data for report: ${err.message}`);
-}
-}
-
-async function initializeGoogleClients() {
-    try {
-        await fsp.access(SERVICE_ACCOUNT_FILE);
-const auth = new google.auth.GoogleAuth({ keyFile: SERVICE_ACCOUNT_FILE, scopes: ["https://www.googleapis.com/auth/spreadsheets"] });
-        const authClient = await auth.getClient();
-sheets = google.sheets({ version: "v4", auth: authClient });
-        console.log("✅ Google Sheets client initialized successfully.");
-} catch (err) {
-        console.error("❌ Failed to initialize Google Sheets client:", err.message);
-throw new Error(`Google Sheets client initialization failed: ${err.message}`);
+    if (row.item_id && !order.items.some(i => i.id === row.item_id)) {
+      order.items.push({
+        id: row.item_id,
+        item: row.item_name,
+        qty: row.quantity,
+        modifier: '', // Will be built from modifiers array
+        modifiers: [],
+      });
     }
-}
 
-async function ensurePrintHistory() {
-    try {
-        await fsp.access(printHistoryFile);
-} catch (err) {
-        await fsp.writeFile(printHistoryFile, JSON.stringify([]));
-}
-}
+    if (row.modifier_id) {
+      const item = order.items.find(i => i.id === row.item_id);
+      if (item && !item.modifiers.some(m => m.id === row.modifier_id)) {
+        item.modifiers.push({
+          id: row.modifier_id,
+          name: row.modifier_name,
+          price_delta: row.price_delta,
+        });
+      }
+    }
+  }
 
-async function loadPrintHistory() {
-    try {
-        const data = await fsp.readFile(printHistoryFile, "utf8");
-printHistory = JSON.parse(data);
-    } catch (err) {
-        console.error("Error loading printHistory.json:", err.message);
-}
-}
+  // Final pass to format the modifier string the old frontend expects
+  for (const order of ordersMap.values()) {
+      for (const item of order.items) {
+          item.modifier = item.modifiers.map(m => m.name).join(', ');
+      }
+  }
 
-async function savePrintHistory() {
-    try {
-        await fsp.writeFile(printHistoryFile, JSON.stringify(printHistory, null, 2));
-} catch (err) {
-        console.error("Error saving printHistory.json:", err.message);
-}
-}
-
-async function getSheetData(forceFetch = false) {
-    const now = Date.now();
-    const CACHE_DURATION = 30000;
-if (sheetDataCache.isFetching) return sheetDataCache.fetchPromise;
-    if (!forceFetch && sheetDataCache.data.length > 0 && (now - sheetDataCache.lastFetchTime < CACHE_DURATION)) {
-        return Promise.resolve(sheetDataCache.data);
-}
-    sheetDataCache.isFetching = true;
-    sheetDataCache.fetchPromise = (async () => {
-        try {
-            const response = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: SHEET_TAB });
-            const rows = response.data.values || [];
-            if (rows.length < 1) {
-                sheetDataCache.data = [];
-       
-         sheetDataCache.lastFetchTime = now;
-                return [];
-            }
-            const header = rows[0];
-            const colMap = Object.fromEntries(header.map((h, i) => [h, i]));
-            const dataRows = rows.slice(1);
-           
- const parsedData = dataRows.map((row, index) => {
-                const getVal = (colName) => row[colMap[colName]] !== undefined ? String(row[colMap[colName]]).trim() : '';
-                const order = {
-                    id: (index + 2),
-                    orderNum: getVal(COLUMN_HEADERS.ORDER_NUM) || `TEMP-${uuidv4().substring(0, 
-8)}-${index + 2}`,
-                    category: getVal(COLUMN_HEADERS.CATEGORY),
-                    cancelled: getVal(COLUMN_HEADERS.CANCELLED).toUpperCase() === 'TRUE',
-                    orderProcessed: getVal(COLUMN_HEADERS.ORDER_PROCESSED).toUpperCase() === 'Y',
-                    orderType: getVal(COLUMN_HEADERS.ORDER_TYPE),
-          
-          orderUpdateStatus: getVal(COLUMN_HEADERS.ORDER_UPDATE_STATUS) ||
-'NONE',
-                    timeOrdered: getVal(COLUMN_HEADERS.TIME_ORDERED),
-                    email: getVal(COLUMN_HEADERS.EMAIL),
-                    callerName: getVal(COLUMN_HEADERS.CALLER_NAME),
-                    callerPhone: getVal(COLUMN_HEADERS.CALLER_PHONE),
-                
-    callerAddress: getVal(COLUMN_HEADERS.CALLER_ADDRESS),
-                    callerCity: getVal(COLUMN_HEADERS.CALLER_CITY),
-                    callerState: getVal(COLUMN_HEADERS.CALLER_STATE),
-                    callerZip: getVal(COLUMN_HEADERS.CALLER_ZIP),
-                    sheetLastModified: getVal(COLUMN_HEADERS.SHEET_LAST_MODIFIED),
-           
-         printedCount: parseInt(getVal(COLUMN_HEADERS.PRINTED_COUNT) || '0', 10),
-                    printedTimestamps: getVal(COLUMN_HEADERS.PRINTED_TIMESTAMPS).split(',').filter(Boolean),
-                    orderSummary: getVal(COLUMN_HEADERS.ORDER_SUMMARY),
-                    totalCost: getVal(COLUMN_HEADERS.TOTAL_COST),
-                    utensil: getVal(COLUMN_HEADERS.UTENSIL),
-                    rowIndex: index + 2,
-                    orderPrepped: getVal(COLUMN_HEADERS.ORDER_PREP).toUpperCase() 
-=== 'Y',
-                    foodPrepTime: getVal(COLUMN_HEADERS.FOOD_PREP_TIME),
-                    items: []
-                };
-for (let j = 1; j <= 20; j++) {
-                    const itemCol = COLUMN_HEADERS.ORDER_ITEM_PREFIX + j;
-if (colMap[itemCol] !== undefined && getVal(itemCol)) {
-                        order.items.push({
-                            item: getVal(itemCol),
-                            qty: getVal(COLUMN_HEADERS.QTY_PREFIX + j) || '1',
-        
-                    modifier: getVal(COLUMN_HEADERS.MODIFIER_PREFIX + j) || ''
-                        });
-}
-                }
-                return order;
-});
-            sheetDataCache.data = parsedData;
-            sheetDataCache.lastFetchTime = now;
-            return parsedData;
-        } catch (err) {
-            console.error("Error reading Google Sheet data:", err.message);
-throw new Error("Failed to read Google Sheet data: " + err.message);
-} finally {
-            sheetDataCache.isFetching = false;
-}
-    })();
-    return sheetDataCache.fetchPromise;
+  return Array.from(ordersMap.values());
 }
 
 async function archiveOrders() {
     console.log(`[Cron Job] Running archiveOrders at ${new Date().toLocaleTimeString()}`);
-try {
-        const response = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: SHEET_TAB });
-const rows = response.data.values || [];
-        if (rows.length <= 1) return;
-        const dataRowsToArchive = rows.slice(1);
-        if (dataRowsToArchive.length === 0) return;
-await sheets.spreadsheets.values.append({
-            spreadsheetId: SHEET_ID,
-            range: ORDER_HISTORY_TAB,
-            valueInputOption: 'USER_ENTERED',
-            insertDataOption: 'INSERT_ROWS',
-            requestBody: { values: dataRowsToArchive },
-        });
-const endColumnLetter = columnToLetter(rows[0].length || 26);
-        await sheets.spreadsheets.values.clear({ spreadsheetId: SHEET_ID, range: `${SHEET_TAB}!A2:${endColumnLetter}` });
-        invalidateSheetDataCache();
-        console.log("[Cron Job] Archiving complete.");
-} catch (err) {
-        console.error('[Cron Job] Error during archiveOrders:', err.message);
-}
+    // This logic is now handled by querying based on date ranges.
+    // Archiving can be a more complex database operation (e.g., moving to another table).
+    // For now, we will log that the concept exists.
+    console.log("[Cron Job] Archive logic would run here. No action taken in this version.");
 }
 
+
 // =================================================================================
-// EXPRESS API ENDPOINTS
+// EXPRESS API ENDPOINTS (Refactored for PostgreSQL)
 // =================================================================================
 
 app.get("/", (req, res) => res.send("✅ Backend server is alive"));
+
 const isTodayFilter = (order) => {
-    if (!order || !order.timeOrdered) {
-        return false;
-}
-    try {
-        const now = new Date();
-const orderDate = new Date(order.timeOrdered);
-        const isMatch = orderDate.getFullYear() === now.getFullYear() &&
-                        orderDate.getMonth() === now.getMonth() &&
-                        orderDate.getDate() === now.getDate();
-return isMatch;
-    } catch (e) {
-        console.error(`Error parsing date for order: ${order.orderNum}`, e);
-return false;
-    }
+    if (!order || !order.timeOrdered) return false;
+    const now = new Date();
+    const orderDate = new Date(order.timeOrdered);
+    return orderDate.getFullYear() === now.getFullYear() &&
+           orderDate.getMonth() === now.getMonth() &&
+           orderDate.getDate() === now.getDate();
 };
 
 app.get("/api/list", async (req, res) => {
   try {
-    const allOrders = await getSheetData();
+    const allOrders = await getOrdersFromDB();
     const incomingOrdersToday = allOrders
-      .filter(o => {
-          return (
-            !o.cancelled &&
-            !o.orderProcessed &&
-            (o.orderUpdateStatus || '').toUpperCase() === 'NONE' &&
-            
-isTodayFilter(o)
-          );
-        })
+      .filter(o => !o.orderProcessed && o.orderUpdateStatus !== 'ChkRecExist' && isTodayFilter(o))
       .sort((a, b) => new Date(a.timeOrdered).getTime() - new Date(b.timeOrdered).getTime());
     res.json(incomingOrdersToday);
   } catch (err) {
@@ -476,261 +232,187 @@ isTodayFilter(o)
     res.status(500).json({ error: "Failed to fetch incoming orders: " + err.message });
   }
 });
+
 app.get("/api/updating", async (req, res) => {
     try {
-        const allOrders = await getSheetData();
+        const allOrders = await getOrdersFromDB();
         const updatingOrdersToday = allOrders
-            .filter(o => !o.cancelled && !o.orderProcessed && o.orderUpdateStatus === 'ChkRecExist' && isTodayFilter(o))
+            .filter(o => !o.orderProcessed && o.orderUpdateStatus === 'ChkRecExist' && isTodayFilter(o))
             .sort((a, b) => new Date(b.timeOrdered).getTime() - new Date(a.timeOrdered).getTime());
         res.json(updatingOrdersToday);
     } catch (err) {
         res.status(500).json({ error: "Failed to fetch updating orders: " + err.message });
     }
 });
+
 app.get("/api/printed", async (req, res) => {
     try {
-        const allOrders = await getSheetData();
+        const allOrders = await getOrdersFromDB();
         const processedOrders = allOrders
             .filter(order => order.orderProcessed)
             .sort((a, b) => new Date(b.timeOrdered).getTime() - new Date(a.timeOrdered).getTime());
         res.json(processedOrders);
     } catch (err) {
         res.status(500).json({ error: "Failed to fetch processed orders: " + err.message });
- 
    }
 });
 
-app.get("/api/order-by-row/:rowIndex", async (req, res) => {
+app.get("/api/order-by-row/:orderId", async (req, res) => {
     try {
-        const rowIndex = parseInt(req.params.rowIndex, 10);
-        if (isNaN(rowIndex)) return res.status(400).json({ error: "Invalid rowIndex." });
-        const allOrders = await getSheetData();
-        const order = allOrders.find(o => o.rowIndex === rowIndex);
+        const orderId = parseInt(req.params.orderId, 10);
+        if (isNaN(orderId)) return res.status(400).json({ error: "Invalid orderId." });
+        const allOrders = await getOrdersFromDB();
+        const order = allOrders.find(o => o.id === orderId);
         order ? res.json(order) : res.status(404).json({ error: "Order not found." });
     } catch (err) {
-        
-res.status(500).json({ error: "Failed to fetch order by rowIndex: " + err.message });
+        res.status(500).json({ error: "Failed to fetch order by ID: " + err.message });
     }
 });
-// =================================================================================
-// REPORTING AND SETTINGS ENDPOINTS
-// =================================================================================
 
+
+// =================================================================================
+// REPORTING AND SETTINGS ENDPOINTS (Refactored for PostgreSQL)
+// =================================================================================
 app.get('/api/today-stats', async (req, res) => {
     try {
-        const allOrders = await getSheetData(true);
-        const todayOrders = allOrders.filter(order => isTodayFilter(order));
-        
-        const total = todayOrders.filter(o => !o.cancelled).length;
-        const processed = todayOrders.filter(o => !o.cancelled && o.orderProcessed).length;
-
-        res.json({ total, processed });
+        const { rows } = await pool.query(`
+            SELECT
+                COUNT(*) AS total,
+                COUNT(*) FILTER (WHERE printed_count > 0) AS processed
+            FROM orders
+            WHERE created_at >= current_date AT TIME ZONE $1;
+        `, [appSettings.timezone]);
+        res.json(rows[0]);
     } catch (error) {
-     
-   console.error('Error fetching today\'s stats:', error);
+        console.error('Error fetching today\'s stats:', error);
         res.status(500).json({ error: 'Failed to fetch today\'s stats: ' + error.message });
     }
 });
+
 app.get('/api/order-stats', async (req, res) => {
     try {
         const { range } = req.query;
-        const days = range === 'YTD' ?
-            Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 1)) / (1000 * 60 * 60 * 24)) :
-            parseInt(range, 10);
-
-        const dateRange = [];
-        const endDate = 
-new Date();
-        endDate.setDate(endDate.getDate() - 1);
-        endDate.setHours(0, 0, 0, 0);
-
-        for (let i = 0; i < days; i++) {
-            const date = new Date(endDate);
-            date.setDate(date.getDate() - i);
-            dateRange.push(date.toLocaleDateString('en-CA'));
-        }
-
-        const orderRows = 
-await getOrderRows();
-        const countByDate = {};
-        dateRange.forEach(date => countByDate[date] = 0);
-
-        orderRows.forEach(row => {
-            const rawDate = row[COLUMN_HEADERS.TIME_ORDERED];
-            const processed = row[COLUMN_HEADERS.ORDER_PROCESSED];
-            const cancelled = row[COLUMN_HEADERS.CANCELLED];
-
-            if (rawDate && processed === 'Y' && cancelled !== 
-'TRUE') {
-                const orderDate = new Date(rawDate).toLocaleDateString('en-CA');
-if (countByDate.hasOwnProperty(orderDate)) {
-                    countByDate[orderDate]++;
-}
-            }
-        });
-res.json(countByDate);
+        const days = range === 'YTD' ? 365 : parseInt(range, 10);
+        const query = `
+            SELECT
+                DATE(created_at AT TIME ZONE $1) as order_date,
+                COUNT(*) as count
+            FROM orders
+            WHERE created_at > (NOW() - INTERVAL '${days} days')
+            GROUP BY order_date
+            ORDER BY order_date;
+        `;
+        const { rows } = await pool.query(query, [appSettings.timezone]);
+        const stats = rows.reduce((acc, row) => {
+            acc[new Date(row.order_date).toISOString().split('T')[0]] = parseInt(row.count, 10);
+            return acc;
+        }, {});
+        res.json(stats);
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch order stats: ' + error.message });
-}
+    }
 });
 
 app.get('/api/popular-items', async (req, res) => {
     try {
         const { range } = req.query;
-        const days = range === 'YTD'
-            ? Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 1)) / (1000 * 60 * 60 * 24))
-            : parseInt(range, 10);
-
-        const endDate = new Date();
-        endDate.setDate(endDate.getDate() 
-- 1);
-        endDate.setHours(23, 59, 59, 999);
-
-        const startDate = new Date(endDate);
-        startDate.setDate(startDate.getDate() - (days - 1));
-        startDate.setHours(0, 0, 0, 0);
-
-        const orderRows = await getOrderRows();
-        const itemCounts = {};
-
-        const normalize = (str) => str.toLowerCase().trim().replace(/\s+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-
-        orderRows.forEach(row => {
-  
-          const rawDate = row[COLUMN_HEADERS.TIME_ORDERED];
-            if (!rawDate) return;
-            const orderDate = new Date(rawDate);
-            if (orderDate < startDate || orderDate > endDate) return;
-if (row[COLUMN_HEADERS.ORDER_PROCESSED] === 'Y' && row[COLUMN_HEADERS.CANCELLED] !== 'TRUE') {
-                for (let i = 1; i <= 20; i++) {
-                    let itemName = row[COLUMN_HEADERS.ORDER_ITEM_PREFIX + i];
-if (!itemName) continue;
-                    itemName = normalize(itemName);
-                    const quantity = parseInt(row[COLUMN_HEADERS.QTY_PREFIX + i] || '1', 10);
-if (itemName) {
-                        itemCounts[itemName] = (itemCounts[itemName] || 0) + quantity;
-}
-                }
-            }
-        });
-res.json(itemCounts);
+        const days = range === 'YTD' ? 365 : parseInt(range, 10);
+        const query = `
+            SELECT item_name, SUM(quantity) as count
+            FROM order_items
+            JOIN orders ON order_items.order_id = orders.id
+            WHERE orders.created_at > (NOW() - INTERVAL '${days} days')
+            GROUP BY item_name
+            ORDER BY count DESC
+            LIMIT 10;
+        `;
+        const { rows } = await pool.query(query);
+        const itemCounts = rows.reduce((acc, row) => {
+            acc[row.item_name] = parseInt(row.count, 10);
+            return acc;
+        }, {});
+        res.json(itemCounts);
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch popular items: ' + error.message });
-}
+    }
 });
 
 app.get('/api/hourly-orders', async (req, res) => {
     try {
-        const now = new Date();
-        const currentHour = now.getHours();
         const startHour = parseInt(appSettings.reportStartHour, 10) || 4;
-        
+        const query = `
+            SELECT
+                EXTRACT(HOUR FROM created_at AT TIME ZONE $1) as hour,
+                COUNT(*) as count
+            FROM orders
+            WHERE created_at >= current_date AT TIME ZONE $1
+            GROUP BY hour
+            ORDER BY hour;
+        `;
+        const { rows } = await pool.query(query, [appSettings.timezone]);
         const hourlyCounts = {};
         for (let h = startHour; h <= 23; h++) {
-            const hourLabel = h 
-< 12 ? `${h === 0 ? 12 : h} AM` : `${h === 12 ? 12 : h - 12} PM`;
+            const hourLabel = h < 12 ? `${h === 0 ? 12 : h} AM` : `${h === 12 ? 12 : h - 12} PM`;
             hourlyCounts[hourLabel] = 0;
         }
-
-        const allOrders = await getSheetData();
-        const todayOrders = allOrders.filter(order => isTodayFilter(order));
-
-        todayOrders.forEach(order => {
-            if (order.timeOrdered) {
-        
-        const orderHour = new Date(order.timeOrdered).getHours();
-                const hourLabel = orderHour < 12 ? `${orderHour === 0 ? 12 : orderHour} AM` : `${orderHour === 12 ? 12 : orderHour - 12} PM`;
-                if (hourlyCounts.hasOwnProperty(hourLabel)) {
-                    hourlyCounts[hourLabel]++;
-         
-       }
+        rows.forEach(row => {
+            const orderHour = parseInt(row.hour, 10);
+            const hourLabel = orderHour < 12 ? `${orderHour === 0 ? 12 : orderHour} AM` : `${orderHour === 12 ? 12 : orderHour - 12} PM`;
+            if (hourlyCounts.hasOwnProperty(hourLabel)) {
+                hourlyCounts[hourLabel] += parseInt(row.count, 10);
             }
         });
-const finalHourlyCounts = {};
-        for (let h = startHour; h <= currentHour; h++) {
-             const hourLabel = h < 12 ?
-`${h === 0 ? 12 : h} AM` : `${h === 12 ? 12 : h - 12} PM`;
-finalHourlyCounts[hourLabel] = hourlyCounts[hourLabel];
-        }
-
-        res.json(finalHourlyCounts);
-} catch (error) {
+        res.json(hourlyCounts);
+    } catch (error) {
         res.status(500).json({ error: 'Failed to fetch hourly orders: ' + error.message });
-}
+    }
 });
 
 app.get('/api/customer-stats', async (req, res) => {
     try {
         const { range } = req.query;
-        const days = range === 'YTD' ? 
-            Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 1)) / (1000 * 60 * 60 * 24)) :
-            parseInt(range, 10);
-
-        const endDate = new Date();
-        
-endDate.setDate(endDate.getDate() - 1);
-        endDate.setHours(23, 59, 59, 999);
-
-        const startDate = new Date(endDate);
-        startDate.setDate(startDate.getDate() - (days - 1));
-        startDate.setHours(0, 0, 0, 0);
-        
-        const orderRows = await getOrderRows();
-
-        const filteredOrders = orderRows.filter(row => {
-            const rawDate = row[COLUMN_HEADERS.TIME_ORDERED];
-    
-        if (!rawDate) return false;
-            const orderDate = new Date(rawDate);
-            return orderDate >= startDate && orderDate <= endDate &&
-                   row[COLUMN_HEADERS.ORDER_PROCESSED] === 'Y' && 
-                   row[COLUMN_HEADERS.CANCELLED] !== 'TRUE';
-});
-
-        const customerData = {}; 
-        filteredOrders.forEach(order => {
-            const phone = order[COLUMN_HEADERS.CALLER_PHONE];
-            if (!phone) return;
-
-            if (!customerData[phone]) {
-                customerData[phone] = { count: 0, name: order[COLUMN_HEADERS.CALLER_NAME] };
-            }
-            customerData[phone].count++;
-   
-         customerData[phone].name = order[COLUMN_HEADERS.CALLER_NAME];
-        });
-const totalOrders = filteredOrders.length;
-        const repeatCustomers = Object.values(customerData).filter(data => data.count > 1).length;
-const topCustomers = Object.entries(customerData)
-            .sort(([, a], [, b]) => b.count - a.count)
+        const days = range === 'YTD' ? 365 : parseInt(range, 10);
+        const query = `
+            SELECT
+                c.id,
+                c.name,
+                c.phone,
+                COUNT(o.id) as count
+            FROM customers c
+            JOIN orders o ON c.id = o.customer_id
+            WHERE o.created_at > (NOW() - INTERVAL '${days} days')
+            GROUP BY c.id, c.name, c.phone;
+        `;
+        const { rows } = await pool.query(query);
+        const totalOrders = rows.reduce((sum, row) => sum + parseInt(row.count, 10), 0);
+        const repeatCustomers = rows.filter(row => parseInt(row.count, 10) > 1).length;
+        const topCustomers = rows
+            .sort((a, b) => b.count - a.count)
             .slice(0, 5)
-            .map(([phone, data]) => ({
-                phone,
-                name: data.name,
-                count: 
-data.count
-            }));
-
+            .map(row => ({ name: row.name, phone: row.phone, count: parseInt(row.count, 10) }));
         res.json({ totalOrders, repeatCustomers, topCustomers });
-} catch (error) {
+    } catch (error) {
         console.error('Error fetching customer stats:', error);
-res.status(500).json({ error: 'Failed to fetch customer stats: ' + error.message });
+        res.status(500).json({ error: 'Failed to fetch customer stats: ' + error.message });
     }
 });
-// --- Settings Endpoints ---
-app.get('/api/app-settings', (req, res) => {
-    res.json(appSettings);
-});
+
+// Settings Endpoints
+app.get('/api/app-settings', (req, res) => res.json(appSettings));
 app.post('/api/app-settings', async (req, res) => {
     try {
-        await fsp.writeFile(appSettingsFilePath, JSON.stringify(req.body, null, 2));
-        appSettings = req.body;
-        // Re-schedule cron job if it has changed
+        const newSettings = req.body;
+        await saveAppSettings(newSettings);
+        appSettings = newSettings;
+
+        // 🔁 Restart the cron job with updated schedule
         if (cronJob) cronJob.stop();
         startCronJob();
-        res.json({ success: true, message: 'App settings saved.' });
+
+        res.json({ success: true, message: 'App settings updated and cron job restarted.' });
     } catch (err) {
-        res.status(500).json({ error: 'Failed to save app settings: ' + err.message });
+        console.error("[App Settings] Failed to update settings:", err);
+        res.status(500).json({ error: "Failed to update app settings" });
     }
 });
 app.get('/api/print-settings', async (req, res) => {
@@ -749,107 +431,315 @@ app.post('/api/print-settings', async (req, res) => {
         res.status(500).json({ error: 'Failed to save printer settings: ' + err.message });
     }
 });
+
+
 // =================================================================================
-// MAIN PRINTING AND SETTINGS ENDPOINTS
+// MAIN PRINTING AND KDS ENDPOINTS (Refactored)
 // =================================================================================
+// Preserved helper functions for printing
+function printViaLan(printerIp, payload) {
+    return new Promise((resolve, reject) => {
+        const port = 9100;
+        const client = new net.Socket();
+        client.setTimeout(5000);
+        client.connect(port, printerIp, () => {
+            console.log(`[LAN] Connected to printer at ${printerIp}:${port}`);
+            const cutCommand = '\x1b\x64\x00';
+            client.write(payload + '\n\n\n' + cutCommand);
+            client.end();
+            resolve({ status: "success", message: "Print job sent to LAN printer." });
+        });
+        client.on('error', (err) => {
+            console.error('[LAN] Printer connection error:', err);
+            client.destroy();
+            reject({ error: "Failed to connect to LAN printer", details: err.message });
+        });
+        client.on('timeout', () => {
+            console.error(`[LAN] Connection to ${printerIp}:${port} timed out.`);
+            client.destroy();
+            reject({ error: "Connection to LAN printer timed out." });
+        });
+    });
+}
+
+async function testPrinterConnectivity(printerUrl, mode = 'LAN') {
+    if (mode === 'LAN') {
+        return new Promise((resolve) => {
+            const client = new net.Socket();
+            client.setTimeout(3000);
+            client.connect(9100, printerUrl, () => {
+                client.end();
+                resolve({ available: true, message: 'LAN printer is responsive.' });
+            });
+            client.on('error', (err) => resolve({ available: false, error: `LAN printer error: ${err.message}` }));
+            client.on('timeout', () => {
+                client.destroy();
+                resolve({ available: false, error: 'Connection to LAN printer timed out.' });
+            });
+        });
+    }
+
+    // For CLOUD and MOCK, we perform an HTTP check
+    return new Promise((resolve) => {
+        let url;
+        try {
+            url = new URL(printerUrl);
+        } catch (err) {
+            return resolve({ available: false, error: `Invalid URL: ${err.message}` });
+        }
+
+        const protocol = url.protocol === 'https:' ? https : http;
+        const method = mode === 'MOCK' ? 'POST' : 'HEAD';
+        const testPayload = mode === 'MOCK' ? JSON.stringify({ test: true, from: 'PrinterStatusCheck' }) : '';
+
+        const options = {
+            hostname: url.hostname,
+            port: url.port || (url.protocol === 'https:' ? 443 : 80),
+            path: url.pathname + (url.search || ''),
+            method,
+            timeout: 5000,
+            headers: {
+                'User-Agent': 'Node.js Printer Status Check',
+                ...(mode === 'MOCK' ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(testPayload) } : {})
+            }
+        };
+
+        const req = protocol.request(options, (res) => {
+            if (res.statusCode >= 200 && res.statusCode < 400) {
+                 resolve({ available: true, message: `Endpoint responded with status ${res.statusCode}` });
+            } else {
+                 resolve({ available: false, error: `Endpoint not available (Status: ${res.statusCode})` });
+            }
+        });
+
+        req.on('timeout', () => {
+            req.destroy();
+            resolve({ available: false, error: 'Connection timed out.' });
+        });
+        req.on('error', (err) => resolve({ available: false, error: `Request error: ${err.message}` }));
+        if (method === 'POST') {
+            req.write(testPayload);
+        }
+        req.end();
+    });
+}
+
+function buildOrderHTML(order) {
+    const items = order.items.map(item => {
+        const name = item.item || 'Unknown Item';
+        const qty = item.qty || '1';
+        const mod = item.modifier ? `<br>  <span style="color: red;">- ${item.modifier}</span>` : '';
+        return `${qty}x ${name}${mod}`;
+    }).join('<br>');
+    const timeOrdered = new Date(order.timeOrdered || Date.now()).toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const firedAt = new Date().toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const utensilLine = order.utensil ? `Utensils:     ${order.utensil}\n\n` : '';
+    const totalLine = order.totalCost ? `Total:        $${order.totalCost}\n` : '';
+
+    return `<pre style="font-family: 'Courier New', Courier, monospace; font-size: 12pt; width: 80mm; margin: 0; padding: 0; line-height: 1.2;">
+--------------------------------
+    ** ORDER #${order.orderNum || 'N/A'} **
+--------------------------------
+Order Type:   ${order.orderType || 'N/A'}
+Time Ordered: ${timeOrdered}
+Status:       ${order.orderUpdateStatus || 'N/A'}
+--------------------------------
+Caller:  ${order.callerName || 'N/A'}
+Phone:   ${order.callerPhone || 'N/A'}
+Email:   ${order.email ||'N/A'}
+Address: ${order.callerAddress || 'N/A'}
+--------------------------------
+${utensilLine}ITEMS:
+${items}
+--------------------------------
+${totalLine}Fired at: ${firedAt}
+</pre>`;
+}
 
 app.post("/api/fire-order", async (req, res) => {
-    const order = req.body;
-    if (!order || typeof order.rowIndex !== "number") {
-        return res.status(400).json({ error: "Invalid order format or missing rowIndex" });
+    const { rowIndex: orderId } = req.body;
+    if (!orderId || typeof orderId !== "number") {
+        return res.status(400).json({ error: "Invalid order ID" });
     }
+
     try {
+        // Load printer settings
         let printerSettings;
         try {
             const data = await fsp.readFile(printerSettingsFilePath, 'utf8');
-         
-   printerSettings = JSON.parse(data);
+            printerSettings = JSON.parse(data);
         } catch (err) {
             return res.status(400).json({ error: "Printer settings not configured." });
         }
 
-        const allOrders = await getSheetData(true);
-        const orderToProcess = allOrders.find(o => o.rowIndex === order.rowIndex);
+        // Fetch order
+        const allOrders = await getOrdersFromDB();
+        const orderToProcess = allOrders.find(o => o.id === orderId);
         if (!orderToProcess) {
             return res.status(404).json({ error: "Order not found" });
-  
-      }
+        }
 
-        let printerResponseData = null;
-let printerError = null;
+        // Format receipt
         const htmlReceipt = buildOrderHTML(orderToProcess);
+        let printerResponseData = null;
+        let printerError = null;
 
+        // Send to printer
         switch (printerSettings.mode) {
             case 'MOCK':
                 try {
                     if (!printerSettings.printerUrl) throw new Error("No URL for MOCK mode");
-const response = await axios.post(printerSettings.printerUrl, { ...orderToProcess, mode: 'MOCK' }, { timeout: 10000 });
+                    const response = await axios.post(
+                        printerSettings.printerUrl,
+                        { ...orderToProcess, mode: 'MOCK' },
+                        { timeout: 10000 }
+                    );
                     printerResponseData = response.data;
-} catch (mockErr) {
+                } catch (mockErr) {
                     printerError = { error: "Failed to send to MOCK webhook", details: mockErr.message };
-}
+                }
                 break;
-case 'LAN':
+
+            case 'LAN':
                 try {
                     if (!printerSettings.printerUrl) throw new Error("No IP address for LAN mode");
-const plainTextReceipt = htmlReceipt.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/  +/g, ' ');
+                    const plainTextReceipt = htmlReceipt
+                        .replace(/<[^>]+>/g, ' ')
+                        .replace(/&nbsp;/g, ' ')
+                        .replace(/  +/g, ' ');
                     printerResponseData = await printViaLan(printerSettings.printerUrl, plainTextReceipt);
-} catch (lanErr) {
+                } catch (lanErr) {
                     printerError = lanErr;
-}
+                }
                 break;
-case 'CLOUD':
-                const newJob = { jobId: `job-${Date.now()}`, content: htmlReceipt, contentType: 'text/html' };
-cloudPrintJobs.push(newJob);
+
+            case 'CLOUD':
+                const newJob = {
+                    jobId: `job-${Date.now()}`,
+                    content: htmlReceipt,
+                    contentType: 'text/html'
+                };
+                cloudPrintJobs.push(newJob);
                 printerResponseData = { status: "CLOUD job staged", jobId: newJob.jobId };
                 break;
-default:
+
+            default:
                 printerError = { error: `Invalid printer mode: ${printerSettings.mode}` };
-}
+        }
 
         if (printerError) {
             return res.status(503).json(printerError);
-}
-
-        // Update Google Sheet
-        const now = new Date().toISOString();
-const newPrintedCount = (orderToProcess.printedCount || 0) + 1;
-        const newPrintedTimestamps = [...(orderToProcess.printedTimestamps || []), now];
-const headerResponse = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${SHEET_TAB}!1:1` });
-        const header = headerResponse.data.values[0];
-const colMap = Object.fromEntries(header.map((h, i) => [h, i + 1]));
-
-        const updates = [];
-if (orderToProcess.orderProcessed !== true) {
-             if (colMap[COLUMN_HEADERS.ORDER_PROCESSED]) {
-                updates.push({ range: `${SHEET_TAB}!${columnToLetter(colMap[COLUMN_HEADERS.ORDER_PROCESSED])}${order.rowIndex}`, values: [['Y']] });
-}
-        }
-        if (colMap[COLUMN_HEADERS.SHEET_LAST_MODIFIED]) updates.push({ range: `${SHEET_TAB}!${columnToLetter(colMap[COLUMN_HEADERS.SHEET_LAST_MODIFIED])}${order.rowIndex}`, values: [[now]] });
-if (colMap[COLUMN_HEADERS.PRINTED_COUNT]) updates.push({ range: `${SHEET_TAB}!${columnToLetter(colMap[COLUMN_HEADERS.PRINTED_COUNT])}${order.rowIndex}`, values: [[newPrintedCount]] });
-        if (colMap[COLUMN_HEADERS.PRINTED_TIMESTAMPS]) updates.push({ range: `${SHEET_TAB}!${columnToLetter(colMap[COLUMN_HEADERS.PRINTED_TIMESTAMPS])}${order.rowIndex}`, values: [[newPrintedTimestamps.join(',')]] });
-if (updates.length > 0) {
-            await sheets.spreadsheets.values.batchUpdate({
-                spreadsheetId: SHEET_ID,
-                resource: { data: updates, valueInputOption: "USER_ENTERED" }
-            });
-invalidateSheetDataCache();
         }
 
-        printHistory.push({ id: orderToProcess.rowIndex, orderNum: orderToProcess.orderNum, printedAt: now, mode: printerSettings.mode });
-await savePrintHistory();
+        // Get timestamp in Eastern Time (New York)
+        const now = DateTime.now()
+            .setZone("America/New_York")
+            .toISO();  // e.g. 2025-06-23T17:45:00.123-04:00
+
+        // Update DB: increment count and add timestamp
+        const updateQuery = `
+            UPDATE orders
+            SET 
+                printed_count = printed_count + 1,
+                printed_timestamps = 
+                    CASE 
+                        WHEN printed_timestamps IS NULL THEN ARRAY[$2]::text[]
+                        ELSE array_append(printed_timestamps, $2)
+                    END
+            WHERE id = $1
+            RETURNING printed_count, printed_timestamps;
+        `;
+        const { rows } = await pool.query(updateQuery, [orderId, now]);
 
         res.json({
             success: true,
             printerResponse: printerResponseData,
             message: `Order processed successfully.`,
-            printedCount: newPrintedCount
+            printedCount: rows[0].printed_count,
+            printedTimestamps: rows[0].printed_timestamps
         });
-} catch (err) {
+
+    } catch (err) {
         console.error("[🔥 API Error /api/fire-order]", err);
-res.status(500).json({ error: "Failed to process order", details: err.message });
+        res.status(500).json({ error: "Failed to process order", details: err.message });
     }
 });
+
+
+app.get("/api/kds/active-orders", async (req, res) => {
+    try {
+        const allOrders = await getOrdersFromDB();
+        const activeKitchenOrders = allOrders
+            .filter(o => o.printedCount > 0 && o.orderUpdateStatus !== 'Prepped')
+            .sort((a, b) => new Date(a.timeOrdered).getTime() - new Date(b.timeOrdered).getTime());
+
+        // Fix the id mapping
+        const formattedOrders = activeKitchenOrders.map(order => ({
+            ...order,
+            id: order.id // <-- this ensures frontend gets the DB id
+        }));
+
+        res.json(formattedOrders);
+
+    } catch (err) {
+        console.error("[KDS API] Failed to fetch active orders:", err);
+        res.status(500).json({ error: "Failed to fetch active kitchen orders", details: err.message });
+    }
+});
+
+
+app.post("/api/kds/prep-order/:orderId", async (req, res) => {
+    const { orderId } = req.params;
+    const { prepTime } = req.body;
+
+    if (!orderId || prepTime === undefined) {
+        return res.status(400).json({ error: "Missing orderId or prepTime" });
+    }
+
+    try {
+        const updateQuery = `
+            UPDATE orders
+            SET
+                order_update_status = 'Prepped',
+                food_prep_time = $1
+            WHERE id = $2;
+        `;
+        await pool.query(updateQuery, [prepTime, orderId]);
+        res.json({ success: true, message: `Order #${orderId} marked as prepped.` });
+    } catch (err) {
+        console.error(`[KDS API] Failed to update order #${orderId}:`, err);
+        res.status(500).json({ error: "Failed to update order in database", details: err.message });
+    }
+});
+
+// ADD THIS ENTIRE NEW ENDPOINT to server.cjs
+
+app.get("/api/kds/prepped-orders", async (req, res) => {
+    try {
+        const allOrders = await getOrdersFromDB(); // This function should already exist in your file
+        console.log("🔎 Raw orders from DB:", allOrders);
+        // Filter for orders that are marked as 'Prepped'
+        const preppedKitchenOrders = allOrders
+            .filter(o => o.orderUpdateStatus === 'Prepped')
+            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) // Sort newest first
+            .slice(0, 20); // Optionally limit to the last 20 prepped orders
+
+        // Format the data for the frontend (id vs order_id)
+        const formattedOrders = preppedKitchenOrders.map(order => ({
+            ...order,
+            id: order.id
+        }));
+
+        res.json(formattedOrders);
+
+    } catch (err) {
+        console.error("[KDS API] Failed to fetch prepped orders:", err);
+        res.status(500).json({ error: "Failed to fetch prepped orders", details: err.message });
+    }
+});
+
+
+// ** PRESERVED PRINTER AND SETTINGS CODE **
 app.post("/api/cloudprnt", (req, res) => {
     if (req.body && req.body.jobToken) {
         const jobIndex = cloudPrintJobs.findIndex(job => job.jobId === req.body.jobToken);
@@ -860,13 +750,13 @@ app.post("/api/cloudprnt", (req, res) => {
         const job = cloudPrintJobs[0];
         const host = req.get('host');
         const protocol = req.get('x-forwarded-proto') || req.protocol;
-    
-    const getUrl = `${protocol}://${host}/api/cloudprnt-content/${job.jobId}`;
+        const getUrl = `${protocol}://${host}/api/cloudprnt-content/${job.jobId}`;
         res.json({ jobReady: true, mediaTypes: [job.contentType], jobToken: job.jobId, get: getUrl });
     } else {
         res.json({ jobReady: false, pollInterval: 30000 });
     }
 });
+
 app.get('/api/cloudprnt-content/:jobId', (req, res) => {
     const job = cloudPrintJobs.find(j => j.jobId === req.params.jobId);
     if (job) {
@@ -875,6 +765,7 @@ app.get('/api/cloudprnt-content/:jobId', (req, res) => {
         res.status(404).send('Job not found.');
     }
 });
+
 app.get('/api/printer-status', async (req, res) => {
     try {
         const data = await fsp.readFile(printerSettingsFilePath, 'utf8');
@@ -883,126 +774,61 @@ app.get('/api/printer-status', async (req, res) => {
             return res.status(400).json({ available: false, mode: settings.mode, error: 'No printer URL configured' });
         }
         const printerCheck = await testPrinterConnectivity(settings.printerUrl, settings.mode);
-        res.status(printerCheck.available ? 200 : 
-503).json({ ...printerCheck, mode: settings.mode });
+        res.status(printerCheck.available ? 200 : 503).json({ ...printerCheck, mode: settings.mode });
     } catch (err) {
         res.status(500).json({ available: false, error: 'Failed to check printer status: ' + err.message });
     }
 });
-// --- NEW: KDS API ENDPOINTS ---
-app.get("/api/kds/active-orders", async (req, res) => {
-    try {
-        const allOrders = await getSheetData(true); // Force fetch for real-time data
-        const activeKitchenOrders = allOrders
-            .filter(o => {
-                return o.orderProcessed && // Must be processed/fired
-                   
-    !o.cancelled &&     // Must not be cancelled
-                       !o.orderPrepped;    // Must not be prepped yet
-            })
-            .sort((a, b) => new Date(a.timeOrdered).getTime() - new Date(b.timeOrdered).getTime()); // Ascending time order
-
-        res.json(activeKitchenOrders);
-    } catch (err) {
-    
-    console.error("[KDS API] Failed to fetch active orders:", err);
-        res.status(500).json({ error: "Failed to fetch active kitchen orders", details: err.message });
-    }
-});
-app.get("/api/kds/prepped-orders", async (req, res) => {
-    try {
-        const allOrders = await getSheetData(true); // Force fetch for real-time data
-        const preppedOrders = allOrders
-            .filter(o => o.orderPrepped && !o.cancelled)
-            .sort((a, b) => new Date(b.timeOrdered).getTime() - new Date(a.timeOrdered).getTime()) // Descending time order
-            .slice(0, 20); // Limit to the last 20 for performance
-
- 
-       res.json(preppedOrders);
-    } catch (err) {
-        console.error("[KDS API] Failed to fetch prepped orders:", err);
-        res.status(500).json({ error: "Failed to fetch prepped orders", details: err.message });
-    }
-});
-app.post("/api/kds/prep-order/:rowIndex", async (req, res) => {
-    const { rowIndex } = req.params;
-    const { prepTime } = req.body; // e.g., "05:30"
-
-    if (!rowIndex || prepTime === undefined) {
-        return res.status(400).json({ error: "Missing rowIndex or prepTime in request" });
-    }
-
-    try {
-        const headerResponse = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `${SHEET_TAB}!1:1` });
-        const header = headerResponse.data.values[0];
-
-        const orderPrepColIndex 
-= header.indexOf(COLUMN_HEADERS.ORDER_PREP);
-        const prepTimeColIndex = header.indexOf(COLUMN_HEADERS.FOOD_PREP_TIME);
-
-        if (orderPrepColIndex === -1 || prepTimeColIndex === -1) {
-            return res.status(500).json({ error: "Could not find 'Order_prep' or 'Food_prep_time' columns in the sheet." });
-        }
-        
-        const orderPrepColLetter = columnToLetter(orderPrepColIndex + 1);
-        const prepTimeColLetter = columnToLetter(prepTimeColIndex + 1);
-const updates = [{
-            range: `${SHEET_TAB}!${orderPrepColLetter}${rowIndex}`,
-            values: [['Y']]
-        }, {
-            range: `${SHEET_TAB}!${prepTimeColLetter}${rowIndex}`,
-            values: [[prepTime]]
-        }];
-await sheets.spreadsheets.values.batchUpdate({
-            spreadsheetId: SHEET_ID,
-            resource: {
-                data: updates,
-                valueInputOption: "USER_ENTERED"
-            }
-        });
-invalidateSheetDataCache();
-        res.json({ success: true, message: `Order at row ${rowIndex} marked as prepped.` });
-} catch (err) {
-        console.error(`[KDS API] Failed to update order at row ${rowIndex}:`, err);
-res.status(500).json({ error: "Failed to update order in Google Sheet", details: err.message });
-    }
-});
-
 
 // =================================================================================
 // SERVER INITIALIZATION
 // =================================================================================
 let cronJob;
+
 const startCronJob = () => {
     if (cronJob) {
         cronJob.stop();
-}
-    cronJob = cron.schedule(appSettings.archiveCronSchedule, archiveOrders, {
-        scheduled: true,
-        timezone: appSettings.timezone
-    });
-console.log(`[Cron Job] Scheduled to run at: ${appSettings.archiveCronSchedule} in timezone ${appSettings.timezone}`);
-}
-
-initializeGoogleClients().then(async () => {
-    await ensurePrintHistory();
-    await loadPrintHistory();
-    try {
-        await getSheetData(true);
-    } catch (err) {
-        console.error("Initial sheet data fetch failed:", err.message);
     }
-    
-    startCronJob();
-    
-    app.listen(PORT, () => {
-        console.log(`🚀 Server running at http://localhost:${PORT}`);
-        if (process.env.RENDER_URL) {
-        
-    console.log(`✅ Server is publicly available at: ${process.env.RENDER_URL}`);
+
+    cronJob = cron.schedule(
+        appSettings.archiveCronSchedule,
+        async function archiveOrders() {
+            console.log(`[Cron Job] Running archiveOrders at ${new Date().toLocaleTimeString()}`);
+
+            try {
+                const result = await pool.query(`
+                    UPDATE orders
+                    SET archived = TRUE
+                    WHERE created_at < CURRENT_DATE
+                      AND archived = FALSE;
+                `);
+                console.log(`[Cron Job] Archived ${result.rowCount} old unprocessed orders.`);
+            } catch (err) {
+                console.error("[Cron Job] Failed to archive orders:", err);
+            }
+        },
+        {
+            scheduled: true,
+            timezone: appSettings.timezone
         }
+    );
+
+    console.log(`[Cron Job] Scheduled to run at: ${appSettings.archiveCronSchedule} in timezone ${appSettings.timezone}`);
+};
+
+
+pool.connect()
+    .then(() => {
+        console.log("✅ Database connection successful.");
+        startCronJob();
+        app.listen(PORT, () => {
+            console.log(`🚀 Server running at http://localhost:${PORT}`);
+            if (process.env.RENDER_URL) {
+                console.log(`✅ Server is publicly available at: ${process.env.RENDER_URL}`);
+            }
+        });
+    })
+    .catch(err => {
+        console.error("❌ Failed to connect to the database and start server:", err.message);
+        process.exit(1);
     });
-}).catch(err => {
-    console.error("❌ Failed to start server:", err.message);
-    process.exit(1);
-});
