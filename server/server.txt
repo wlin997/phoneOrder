@@ -130,7 +130,7 @@ async function getOrdersFromDB() {
 
 
   const { rows } = await pool.query(query);
-
+  console.log("[Backend] Raw rows from DB query:", rows); // ADD THIS LINE
   // Restructure the flat SQL result into the nested JSON the frontend expects
   const ordersMap = new Map();
 
@@ -192,7 +192,7 @@ async function getOrdersFromDB() {
           item.modifier = item.modifiers.map(m => m.name).join(', ');
       }
   }
-
+  console.log("[Backend] ordersMap values (pre-filter):", Array.from(ordersMap.values())); // ADD THIS LINE
   return Array.from(ordersMap.values());
 }
 
@@ -213,11 +213,22 @@ app.get("/", (req, res) => res.send("✅ Backend server is alive"));
 
 const isTodayFilter = (order) => {
     if (!order || !order.timeOrdered) return false;
-    const now = new Date();
-    const orderDate = new Date(order.timeOrdered);
-    return orderDate.getFullYear() === now.getFullYear() &&
-           orderDate.getMonth() === now.getMonth() &&
-           orderDate.getDate() === now.getDate();
+
+    // *** CHANGE THIS LINE ***
+    // Use fromJSDate() because order.timeOrdered is already a JavaScript Date object from the PG driver.
+    const orderDateTime = DateTime.fromJSDate(order.timeOrdered).setZone('America/New_York');
+
+    // Get the current time in the same desired comparison timezone
+    const nowDateTime = DateTime.now().setZone('America/New_York');
+
+    // Keep your logs for verification (these are very helpful!)
+    console.log(`[isTodayFilter] Checking Order ${order.orderNum}:`);
+    console.log(`[isTodayFilter] Order time (NY): ${orderDateTime.toISO()}`);
+    console.log(`[isTodayFilter] Server's 'now' (NY): ${nowDateTime.toISO()}`);
+    console.log(`[isTodayFilter] Comparison: ${orderDateTime.toISODate()} === ${nowDateTime.toISODate()}`);
+    console.log(`[isTodayFilter] Result: ${orderDateTime.toISODate() === nowDateTime.toISODate()}`);
+
+    return orderDateTime.toISODate() === nowDateTime.toISODate();
 };
 
 app.get("/api/list", async (req, res) => {
@@ -226,6 +237,7 @@ app.get("/api/list", async (req, res) => {
     const incomingOrdersToday = allOrders
       .filter(o => !o.orderProcessed && o.orderUpdateStatus !== 'ChkRecExist' && isTodayFilter(o))
       .sort((a, b) => new Date(a.timeOrdered).getTime() - new Date(b.timeOrdered).getTime());
+    console.log("[Backend] incomingOrdersToday array sent to frontend:", incomingOrdersToday); // ADD THIS LINE
     res.json(incomingOrdersToday);
   } catch (err) {
     console.error("[Backend] ❌ Failed to fetch incoming orders:", err.message);

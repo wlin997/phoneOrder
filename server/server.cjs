@@ -351,7 +351,7 @@ app.get('/api/popular-items', async (req, res) => {
 
 app.get('/api/hourly-orders', async (req, res) => {
     try {
-        const startHour = parseInt(appSettings.reportStartHour, 10) || 4;
+        const startHour = parseInt(appSettings.reportStartHour, 10) || 8; // Ensure this is 0 if you want 12 AM to be included.
         const query = `
             SELECT
                 EXTRACT(HOUR FROM created_at AT TIME ZONE $1) as hour,
@@ -362,6 +362,10 @@ app.get('/api/hourly-orders', async (req, res) => {
             ORDER BY hour;
         `;
         const { rows } = await pool.query(query, [appSettings.timezone]);
+
+        // --- ADD THIS LOG ---
+        console.log("[Backend] /api/hourly-orders - Raw SQL rows:", rows);
+
         const hourlyCounts = {};
         for (let h = startHour; h <= 23; h++) {
             const hourLabel = h < 12 ? `${h === 0 ? 12 : h} AM` : `${h === 12 ? 12 : h - 12} PM`;
@@ -374,8 +378,13 @@ app.get('/api/hourly-orders', async (req, res) => {
                 hourlyCounts[hourLabel] += parseInt(row.count, 10);
             }
         });
+
+        // --- ADD THIS LOG ---
+        console.log("[Backend] /api/hourly-orders - Final hourlyCounts sent:", hourlyCounts);
+
         res.json(hourlyCounts);
     } catch (error) {
+        console.error('Error fetching hourly orders:', error);
         res.status(500).json({ error: 'Failed to fetch hourly orders: ' + error.message });
     }
 });
