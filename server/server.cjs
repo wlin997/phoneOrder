@@ -214,13 +214,16 @@ app.get("/", (req, res) => res.send("✅ Backend server is alive"));
 const isTodayFilter = (order) => {
     if (!order || !order.timeOrdered) return false;
 
-    // Use Luxon to parse the order time in UTC and then convert it to your desired comparison timezone (e.g., America/New_York)
     const orderDateTime = DateTime.fromISO(order.timeOrdered, { zone: 'utc' }).setZone('America/New_York');
-
-    // Get the current time in the same desired comparison timezone
     const nowDateTime = DateTime.now().setZone('America/New_York');
 
-    // Compare date components
+    // ADD THIS LOG
+    console.log(`[isTodayFilter] Checking Order ${order.orderNum}:`);
+    console.log(`[isTodayFilter] Order time (NY): ${orderDateTime.toISO()}`);
+    console.log(`[isTodayFilter] Server's 'now' (NY): ${nowDateTime.toISO()}`);
+    console.log(`[isTodayFilter] Comparison: ${orderDateTime.toISODate()} === ${nowDateTime.toISODate()}`);
+    console.log(`[isTodayFilter] Result: ${orderDateTime.toISODate() === nowDateTime.toISODate()}`);
+
     return orderDateTime.toISODate() === nowDateTime.toISODate();
 };
 
