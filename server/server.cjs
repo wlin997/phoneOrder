@@ -130,7 +130,7 @@ async function getOrdersFromDB() {
 
 
   const { rows } = await pool.query(query);
-
+  console.log("[Backend] Raw rows from DB query:", rows); // ADD THIS LINE
   // Restructure the flat SQL result into the nested JSON the frontend expects
   const ordersMap = new Map();
 
@@ -226,6 +226,7 @@ app.get("/api/list", async (req, res) => {
     const incomingOrdersToday = allOrders
       .filter(o => !o.orderProcessed && o.orderUpdateStatus !== 'ChkRecExist' && isTodayFilter(o))
       .sort((a, b) => new Date(a.timeOrdered).getTime() - new Date(b.timeOrdered).getTime());
+    console.log("[Backend] incomingOrdersToday array sent to frontend:", incomingOrdersToday); // ADD THIS LINE
     res.json(incomingOrdersToday);
   } catch (err) {
     console.error("[Backend] ❌ Failed to fetch incoming orders:", err.message);
