@@ -214,10 +214,14 @@ app.get("/", (req, res) => res.send("✅ Backend server is alive"));
 const isTodayFilter = (order) => {
     if (!order || !order.timeOrdered) return false;
 
-    const orderDateTime = DateTime.fromISO(order.timeOrdered, { zone: 'utc' }).setZone('America/New_York');
+    // *** CHANGE THIS LINE ***
+    // Use fromJSDate() because order.timeOrdered is already a JavaScript Date object from the PG driver.
+    const orderDateTime = DateTime.fromJSDate(order.timeOrdered).setZone('America/New_York');
+
+    // Get the current time in the same desired comparison timezone
     const nowDateTime = DateTime.now().setZone('America/New_York');
 
-    // ADD THIS LOG
+    // Keep your logs for verification (these are very helpful!)
     console.log(`[isTodayFilter] Checking Order ${order.orderNum}:`);
     console.log(`[isTodayFilter] Order time (NY): ${orderDateTime.toISO()}`);
     console.log(`[isTodayFilter] Server's 'now' (NY): ${nowDateTime.toISO()}`);
