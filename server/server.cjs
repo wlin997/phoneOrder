@@ -192,7 +192,7 @@ async function getOrdersFromDB() {
           item.modifier = item.modifiers.map(m => m.name).join(', ');
       }
   }
-
+  console.log("[Backend] ordersMap values (pre-filter):", Array.from(ordersMap.values())); // ADD THIS LINE
   return Array.from(ordersMap.values());
 }
 
