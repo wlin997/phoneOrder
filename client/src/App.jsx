@@ -1,3 +1,4 @@
+// App.jsx
 import { useEffect, useState, Component, useRef, useCallback } from "react";
 import "./App.css";
 import "./index.css";
@@ -14,7 +15,7 @@ const MAX_PRINTED_ORDERS = 1000;
 const loadViewedOrders = () => {
     try {
         const stored = localStorage.getItem('viewedOrders');
-        return stored ? JSON.parse(stored) : {};s
+        return stored ? JSON.parse(stored) : {};
     } catch (err) {
         console.error('Error loading viewed orders from localStorage:', err);
         return {};
@@ -41,16 +42,12 @@ function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
     if (!order) {
         return (
             <div className="text-gray-500 text-center flex flex-col items-center justify-center h-full">
-                <svg className="mx-auto h-24 w-24 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                <svg className="mx-auto h-24 w-24 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16v1a3 3 0 003 3h10a3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                 <p className="mt-2 text-lg">No order selected.</p>
                 <p className="text-base">Toggle an incoming order or click 'View Details' to preview.</p>
             </div>
         );
     }
-
-    const formatItem = (item) => {
-        return `${item.qty} x ${item.item}`;
-    };
 
     return (
         <div className="bg-white p-6 rounded-lg shadow-inner overflow-y-auto h-full text-base text-left">
@@ -92,21 +89,44 @@ function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
 
             <h5 className="font-semibold text-lg mb-2">Order Items:</h5>
             {order.items && order.items.length > 0 ? (
-                <ul className="mb-4">
-                    {order.items.map((item, index) => (
-                        <li key={index} className="mb-1">
-                            <span>{formatItem(item)}</span>
-                            {item.modifier && (
-                                <div className="ml-6 text-red-500">
-                                    Mod: {item.modifier}
+                <div className="mb-4 text-base space-y-2">
+                    {order.items.map((item, index) => {
+                        const itemPrice = item.basePrice ? parseFloat(item.basePrice).toFixed(2) : '0.00';
+                        return (
+                            <div key={index} className="py-2 border-b border-gray-100 last:border-b-0">
+                                {/* Item row */}
+                                <div className="grid grid-cols-[max-content,1fr] gap-x-4">
+                                    <div className="w-16 text-right font-mono font-medium text-gray-700">${itemPrice}</div>
+                                    <div className="font-semibold text-gray-900">{item.qty} x {item.item}</div>
                                 </div>
-                            )}
-                        </li>
-                    ))}
-                </ul>
+
+                                {/* Modifiers rows */}
+                                {item.modifiers && item.modifiers.length > 0 && (
+                                    <div className="mt-1">
+                                        {item.modifiers.map((mod, modIdx) => {
+                                            const modPrice = parseFloat(mod.priceDelta || 0);
+                                            let modPriceDisplay = '';
+                                            if (modPrice !== 0) {
+                                                modPriceDisplay = modPrice > 0 ? `+$${modPrice.toFixed(2)}` : `-$${Math.abs(modPrice).toFixed(2)}`;
+                                            }
+
+                                            return (
+                                                <div key={modIdx} className="grid grid-cols-[max-content,1fr] gap-x-4 text-sm">
+                                                    <div className="w-16 text-right font-mono text-red-600">{modPriceDisplay}</div>
+                                                    <div className="text-red-600 pl-4">- {mod.name}</div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
             ) : (
                 <p className="text-gray-500 mb-4">No items listed.</p>
             )}
+
 
             {order.totalCost && (
                 <div className="mt-4 pt-4 border-t border-gray-200">
