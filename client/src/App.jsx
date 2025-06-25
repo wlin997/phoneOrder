@@ -371,102 +371,112 @@ function App() {
         return () => clearInterval(interval);
     }, [fetchOrders, fetchPrintedOrders, fetchUpdatingOrders]);
 
-    const handleToggle = async (id, orderNum) => {
-        viewedOrdersRef.current = {
-            ...viewedOrdersRef.current,
-            [id]: true
-        };
-
-        const isCurrentlyToggled = toggledOrdersRef.current[id];
-
-        if (isCurrentlyToggled) {
-            toggledOrdersRef.current[id] = false;
-            setSelectedOrderDetails(null);
-        } else {
-            Object.keys(toggledOrdersRef.current).forEach(key => {
-                toggledOrdersRef.current[key] = false;
-            });
-            toggledOrdersRef.current[id] = true;
-
-            try {
-                const response = await fetch(`${import.meta.env.VITE_API_URL}/api/order-by-row/${id}`);
-                if (!response.ok) {
-                    throw new Error(`Failed to fetch order details for rowIndex ${id}: ${response.statusText}`);
-                }
-                const orderData = await response.json();
-                setSelectedOrderDetails({
-                    ...orderData,
-                    viewed: !!viewedOrdersRef.current[orderData.id],
-                    items: orderData.items.map(item => ({
-                        ...item,
-                        total_price_each: item.total_price_each || item.base_price // Ensure total_price_each is set
-                    }))
-                });
-            } catch (error) {
-                console.error('Error fetching order details:', error);
-                setSelectedOrderDetails(null);
-                alert('Failed to load order details. Please check console for details.');
-            }
-        }
-
-        setIncomingOrders((prevOrders) =>
-            prevOrders.map((order) => ({
-                ...order,
-                toggled: toggledOrdersRef.current[order.id] || false,
-                viewed: !!viewedOrdersRef.current[order.id],
-                flashing: !viewedOrdersRef.current[order.id]
-            }))
-        );
-        saveViewedOrders(viewedOrdersRef.current);
+const handleToggle = async (id, orderNum) => {
+    viewedOrdersRef.current = {
+        ...viewedOrdersRef.current,
+        [id]: true
     };
 
-    const handleViewDetails = async (order) => {
-        console.log('handleViewDetails for order:', order.orderNum, 'rowIndex:', order.rowIndex);
+    const isCurrentlyToggled = toggledOrdersRef.current[id];
 
-        if (order.rowIndex && !order.orderProcessed) {
-            viewedOrdersRef.current = {
-                ...viewedOrdersRef.current,
-                [order.rowIndex]: true
-            };
-            saveViewedOrders(viewedOrdersRef.current);
-
-            setIncomingOrders(prev => prev.map(o => o.id === order.rowIndex ? {...o, viewed: true, flashing: false} : o));
-            setUpdatingOrders(prev => prev.map(o => o.id === order.rowIndex ? {...o, viewed: true} : o));
-        }
-
-        if (selectedOrderDetails && selectedOrderDetails.rowIndex !== order.rowIndex) {
-            if (toggledOrdersRef.current[selectedOrderDetails.rowIndex]) {
-                toggledOrdersRef.current[selectedOrderDetails.rowIndex] = false;
-            }
-        }
-
-        if (order.orderProcessed || order.orderUpdateStatus === 'ChkRecExist') {
-            Object.keys(toggledOrdersRef.current).forEach(key => {
-                toggledOrdersRef.current[key] = false;
-            });
-            setIncomingOrders(prev => prev.map(o => ({...o, toggled: false})));
-        }
+    if (isCurrentlyToggled) {
+        toggledOrdersRef.current[id] = false;
+        setSelectedOrderDetails(null);
+    } else {
+        Object.keys(toggledOrdersRef.current).forEach(key => {
+            toggledOrdersRef.current[key] = false;
+        });
+        toggledOrdersRef.current[id] = true;
 
         try {
-            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/order-by-row/${order.rowIndex}`);
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/order-by-row/${id}`);
             if (!response.ok) {
-                throw new Error(`Failed to fetch order details for rowIndex ${order.rowIndex}: ${response.statusText}`);
+                throw new Error(`Failed to fetch order details for rowIndex ${id}: ${response.status} ${response.statusText}`);
             }
             const orderData = await response.json();
+            console.log('[Debug] API Response for handleToggle:', orderData);
             setSelectedOrderDetails({
                 ...orderData,
-                viewed: true,
-                items: orderData.items.map(item => ({
-                    ...item,
-                    total_price_each: item.total_price_each || item.base_price // Ensure total_price_each is set
-                }))
+                viewed: !!viewedOrdersRef.current[orderData.id],
+                items: orderData.items?.map(item => {
+                    const modifierDelta = item.modifiers?.reduce((sum, mod) => sum + (parseFloat(mod.price_delta) || 0), 0) || 0;
+                    const computedPrice = item.base_price ? parseFloat(item.base_price) + modifierDelta : '0.00';
+                    return {
+                        ...item,
+                        total_price_each: item.total_price_each || computedPrice.toFixed(2)
+                    };
+                }) || [] // Default to empty array if items is undefined
             });
         } catch (error) {
             console.error('Error fetching order details:', error);
             setSelectedOrderDetails(null);
-            alert('Failed to load order details.');
+            alert(`Failed to load order details: ${error.message}`);
         }
-    };
+    }
+
+    setIncomingOrders((prevOrders) =>
+        prevOrders.map((order) => ({
+            ...order,
+            toggled: toggledOrdersRef.current[order.id] || false,
+            viewed: !!viewedOrdersRef.current[order.id],
+            flashing: !viewedOrdersRef.current[order.id]
+        }))
+    );
+    saveViewedOrders(viewedOrdersRef.current);
+};
+
+const handleViewDetails = async (order) => {
+    console.log('handleViewDetails for order:', order.orderNum, 'rowIndex:', order.rowIndex);
+
+    if (order.rowIndex && !order.orderProcessed) {
+        viewedOrdersRef.current = {
+            ...viewedOrdersRef.current,
+            [order.rowIndex]: true
+        };
+        saveViewedOrders(viewedOrdersRef.current);
+
+        setIncomingOrders(prev => prev.map(o => o.id === order.rowIndex ? {...o, viewed: true, flashing: false} : o));
+        setUpdatingOrders(prev => prev.map(o => o.id === order.rowIndex ? {...o, viewed: true} : o));
+    }
+
+    if (selectedOrderDetails && selectedOrderDetails.rowIndex !== order.rowIndex) {
+        if (toggledOrdersRef.current[selectedOrderDetails.rowIndex]) {
+            toggledOrdersRef.current[selectedOrderDetails.rowIndex] = false;
+        }
+    }
+
+    if (order.orderProcessed || order.orderUpdateStatus === 'ChkRecExist') {
+        Object.keys(toggledOrdersRef.current).forEach(key => {
+            toggledOrdersRef.current[key] = false;
+        });
+        setIncomingOrders(prev => prev.map(o => ({...o, toggled: false})));
+    }
+
+    try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/order-by-row/${order.rowIndex}`);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch order details for rowIndex ${order.rowIndex}: ${response.status} ${response.statusText}`);
+        }
+        const orderData = await response.json();
+        console.log('[Debug] API Response for handleViewDetails:', orderData);
+        setSelectedOrderDetails({
+            ...orderData,
+            viewed: true,
+            items: orderData.items?.map(item => {
+                const modifierDelta = item.modifiers?.reduce((sum, mod) => sum + (parseFloat(mod.price_delta) || 0), 0) || 0;
+                const computedPrice = item.base_price ? parseFloat(item.base_price) + modifierDelta : '0.00';
+                return {
+                    ...item,
+                    total_price_each: item.total_price_each || computedPrice.toFixed(2)
+                };
+            }) || [] // Default to empty array if items is undefined
+        });
+    } catch (error) {
+        console.error('Error fetching order details:', error);
+        setSelectedOrderDetails(null);
+        alert(`Failed to load order details: ${error.message}`);
+    }
+};
 
     const handleMenuOpen = () => {
         setIsMenuOpen(prev => !prev);
