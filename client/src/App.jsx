@@ -92,16 +92,24 @@ function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
                 <div className="mb-4 text-base space-y-2">
                     {order.items && order.items.map((item, itemIndex) => (
                     <div key={itemIndex} className="text-sm text-gray-700 mb-1 pl-4">
-                        <div className="flex justify-between items-center">
-                            <span>{item.quantity} x {item.item}</span> {/* 'item.item' is the name of the item from backend */}
-                            {/* CORRECTED: Access item.basePrice from the backend, convert to number */}
-                            <span>${(parseFloat(item.basePrice || 0) * item.quantity).toFixed(2)}</span>
+                        {/* Removed flex justify-between here to keep name and price together */}
+                        {/* Put item quantity, name, and its price in one span/div */}
+                        <div>
+                            <span>
+                                {item.quantity} x {item.item}
+                                {/* Ensure basePrice is treated as a number.
+                                    Use a defensive check to make sure it's not NaN after parsing,
+                                    or default to 0 if it's undefined/null/empty string. */}
+                                ${(parseFloat(item.basePrice || '0') * item.quantity).toFixed(2)}
+                            </span>
                         </div>
                         {item.modifiers && item.modifiers.map((modifier, modIndex) => (
                             <div key={modIndex} className="text-xs text-gray-600 pl-4">
-                                <span className="mr-1">- {modifier.name}</span>
-                                {/* CORRECTED: Access modifier.priceDelta from the backend, convert to number */}
-                                <span>${parseFloat(modifier.priceDelta || 0).toFixed(2)}</span>
+                                <span>
+                                    <span className="mr-1">- {modifier.name}</span>
+                                    {/* Ensure priceDelta is treated as a number */}
+                                    ${parseFloat(modifier.priceDelta || '0').toFixed(2)}
+                                </span>
                             </div>
                         ))}
                     </div>
