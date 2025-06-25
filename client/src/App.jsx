@@ -49,7 +49,9 @@ function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
     }
 
     const formatItem = (item) => {
-        const price = item.total_price_each ? `$${parseFloat(item.total_price_each).toFixed(2)}` : '$0.00';
+        const price = item.total_price_each ? `$${parseFloat(item.total_price_each).toFixed(2)}` : 
+                     item.base_price ? `$${parseFloat(item.base_price).toFixed(2)}` : '$0.00';
+        console.log(`[Debug] Item: ${item.item}, total_price_each: ${item.total_price_each}, base_price: ${item.base_price}, price: ${price}`);
         return `${price} - ${item.qty} x ${item.item}`;
     };
 
@@ -143,6 +145,7 @@ function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
         </div>
     );
 }
+
 function App() {
     console.log('App component initializing');
     const [incomingOrders, setIncomingOrders] = useState([]);
@@ -190,8 +193,8 @@ function App() {
                 throw new Error(`Failed to fetch incoming orders: ${res.status} ${res.statusText}`);
             }
             const data = await res.json();
-            console.log("Data received from /api/list:", data); // ADD THIS LINE HERE
-            
+            console.log("Data received from /api/list:", data);
+
             setIncomingOrders(() => {
                 const newOrderObjs = data.map((order) => {
                     const isViewed = !!viewedOrdersRef.current[order.id];
@@ -213,7 +216,11 @@ function App() {
                     if (toggledOrdersRef.current[selectedOrderDetails.id] || selectedOrderDetails.orderProcessed) {
                         setSelectedOrderDetails({
                             ...updatedSelected,
-                            viewed: !!viewedOrdersRef.current[selectedOrderDetails.id]
+                            viewed: !!viewedOrdersRef.current[selectedOrderDetails.id],
+                            items: updatedSelected.items.map(item => ({
+                                ...item,
+                                total_price_each: item.total_price_each || item.base_price // Ensure total_price_each is set
+                            }))
                         });
                     }
                 } else if (toggledOrdersRef.current[selectedOrderDetails.id] && !selectedOrderDetails.orderProcessed) {
@@ -279,7 +286,11 @@ function App() {
                 if (updatedSelected) {
                     setSelectedOrderDetails({
                         ...updatedSelected,
-                        viewed: !!viewedOrdersRef.current[selectedOrderDetails.id]
+                        viewed: !!viewedOrdersRef.current[selectedOrderDetails.id],
+                        items: updatedSelected.items.map(item => ({
+                            ...item,
+                            total_price_each: item.total_price_each || item.base_price // Ensure total_price_each is set
+                        }))
                     });
                 } else {
                     setSelectedOrderDetails(null);
@@ -314,8 +325,7 @@ function App() {
             await fetchUpdatingOrders();
         }
     };
-    
-    // UPDATED handleReprint to use the /api/fire-order endpoint
+
     const handleReprint = async (order) => {
         setIsProcessing(true);
         console.log(`[App.jsx] Reprinting order at rowIndex: ${order.rowIndex}`);
@@ -330,13 +340,12 @@ function App() {
                 const errorData = await response.json();
                 throw new Error(errorData.details || `Reprint failed: ${response.status}`);
             }
-            
+
             const data = await response.json();
             console.log(`[App.jsx] Order ${order.orderNum} re-processed. New count: ${data.printedCount}`);
             alert('Order sent for reprint!');
             await fetchPrintedOrders();
-            await fetchUpdatingOrders(); // Also refresh updating orders
-
+            await fetchUpdatingOrders();
         } catch (error) {
             console.error('[App.jsx] Error reprocessing order:', error);
             alert(`Failed to re-process order: ${error.message}`);
@@ -387,7 +396,11 @@ function App() {
                 const orderData = await response.json();
                 setSelectedOrderDetails({
                     ...orderData,
-                    viewed: !!viewedOrdersRef.current[orderData.id]
+                    viewed: !!viewedOrdersRef.current[orderData.id],
+                    items: orderData.items.map(item => ({
+                        ...item,
+                        total_price_each: item.total_price_each || item.base_price // Ensure total_price_each is set
+                    }))
                 });
             } catch (error) {
                 console.error('Error fetching order details:', error);
@@ -442,7 +455,11 @@ function App() {
             const orderData = await response.json();
             setSelectedOrderDetails({
                 ...orderData,
-                viewed: true
+                viewed: true,
+                items: orderData.items.map(item => ({
+                    ...item,
+                    total_price_each: item.total_price_each || item.base_price // Ensure total_price_each is set
+                }))
             });
         } catch (error) {
             console.error('Error fetching order details:', error);
@@ -504,7 +521,6 @@ function App() {
         }
     };
 
-    // Updated printer status check to use /api/printer-status
     useEffect(() => {
         const checkPrinterStatus = async () => {
             try {
@@ -517,8 +533,8 @@ function App() {
                 setPrinterStatus('Not Connected');
             }
         };
-        checkPrinterStatus(); // Initial check
-        const intervalId = setInterval(checkPrinterStatus, 60000); // Check every minute
+        checkPrinterStatus();
+        const intervalId = setInterval(checkPrinterStatus, 60000);
         return () => clearInterval(intervalId);
     }, []);
 
@@ -535,7 +551,6 @@ function App() {
                     </svg>
                 </button>
 
-                {/* Printer Status Indicator */}
                 <div className="fixed top-4 left-4 z-50 flex items-center bg-white p-2 rounded-full shadow-md">
                     <svg
                         className={`w-5 h-5 mr-2 ${printerStatus === 'Connected' ? 'text-green-500' : 'text-red-500'}`}
@@ -607,13 +622,13 @@ function App() {
                                         onClick={() => requestSort('timeOrdered')}
                                         className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${sortConfig.key === 'timeOrdered' ? 'bg-cyan-500 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`}
                                     >
-                                        Date/Time {sortConfig.key === 'timeOrdered' ? (sortConfig.direction === 'ascending' ? '↑' : '↓') : ''}
+                                        Date/Time {sortConfig.key === 'timeOrdered' ? (sortConfig.direction === 'ascending' ? 'â��' : 'â��') : ''}
                                     </button>
                                     <button
                                         onClick={() => requestSort('callerName')}
                                         className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${sortConfig.key === 'callerName' ? 'bg-cyan-500 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`}
                                     >
-                                        Name {sortConfig.key === 'callerName' ? (sortConfig.direction === 'ascending' ? '↑' : '↓') : ''}
+                                        Name {sortConfig.key === 'callerName' ? (sortConfig.direction === 'ascending' ? 'â��' : 'â��') : ''}
                                     </button>
                                 </div>
                             </div>
