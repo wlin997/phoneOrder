@@ -84,8 +84,9 @@ console.log("✅ PostgreSQL client initialized.");
 let cloudPrintJobs = [];
 // Preserve this from original code
 
+
 // This new function completely replaces getSheetData() and getOrderRows()
-sync function getOrdersFromDB() {
+ async function getOrdersFromDB() {
     const query = `
         SELECT
             o.id AS order_id,
@@ -197,6 +198,7 @@ async function archiveOrders() {
 // Archiving can be a more complex database operation (e.g., moving to another table).
 // For now, we will log that the concept exists.
 console.log("[Cron Job] Archive logic would run here. No action taken in this version.");
+
 }
 
 
@@ -267,12 +269,14 @@ app.get("/api/order-by-row/:orderId", async (req, res) => {
         if (isNaN(orderId)) return res.status(400).json({ error: "Invalid orderId." });
         const allOrders = await getOrdersFromDB();
         const order = allOrders.find(o => o.id === orderId);
+        console.log('[Backend] Order data before sending to frontend:', order); // Log the full order object
         order ? res.json(order) : res.status(404).json({ error: "Order not found." });
     } catch (err) {
         res.status(500).json({ 
-error: "Failed to fetch order by ID: " + err.message });
+            error: "Failed to fetch order by ID: " + err.message 
+        });
     }
-});
+});s
 // =================================================================================
 // REPORTING AND SETTINGS ENDPOINTS (Refactored for PostgreSQL)
 // =================================================================================
