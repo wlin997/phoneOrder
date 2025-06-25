@@ -85,110 +85,110 @@ let cloudPrintJobs = [];
 // Preserve this from original code
 
 // This new function completely replaces getSheetData() and getOrderRows()
-async function getOrdersFromDB() {
-  const query = `
-  SELECT
-    o.id AS order_id,
-    o.order_type,
-    o.total_price,
-    o.notes,
-    o.created_at,
-    o.utensil_request,
-    o.category,
-    o.food_prep_time,
-    o.order_update_status,
-    o.printed_count,
-    o.printed_timestamps,
-    o.is_the_usual,
-    o.archived,
-    c.id AS customer_id,
-    c.name AS customer_name,
-    c.phone AS customer_phone,
-    c.email AS customer_email,
-    c.address AS customer_address,
-    i.id AS item_id,
-    i.item_name,
-    i.quantity,
-    i.base_price,
-    i.total_price AS total_price_each,
-    m.id AS modifier_id,
-    m.modifier_name,
-    m.price_delta
-  FROM orders o
-  JOIN customers c ON o.customer_id = c.id
-  LEFT JOIN order_items i ON o.id = i.order_id
-  LEFT JOIN order_item_modifiers m ON i.id = m.order_item_id
-  WHERE o.archived = FALSE
-  ORDER BY o.created_at DESC;
-`;
+sync function getOrdersFromDB() {
+    const query = `
+        SELECT
+            o.id AS order_id,
+            o.order_type,
+            o.total_price,
+            o.notes,
+            o.created_at,
+            o.utensil_request,
+            o.category,
+            o.food_prep_time,
+            o.order_update_status,
+            o.printed_count,
+            o.printed_timestamps,
+            o.is_the_usual,
+            o.archived,
+            c.id AS customer_id,
+            c.name AS customer_name,
+            c.phone AS customer_phone,
+            c.email AS customer_email,
+            c.address AS customer_address,
+            i.id AS item_id,
+            i.item_name,
+            i.quantity,
+            i.base_price,
+            i.total_price AS total_price_each,
+            m.id AS modifier_id,
+            m.modifier_name,
+            m.price_delta
+        FROM orders o
+        JOIN customers c ON o.customer_id = c.id
+        LEFT JOIN order_items i ON o.id = i.order_id
+        LEFT JOIN order_item_modifiers m ON i.id = m.order_item_id
+        WHERE o.archived = FALSE
+        ORDER BY o.created_at DESC;
+    `;
 
+    const { rows } = await pool.query(query);
+    console.log("[Backend] Raw rows from DB query:", rows);
 
-  const { rows } = await pool.query(query);
-  console.log("[Backend] Raw rows from DB query:", rows);
-// ADD THIS LINE
-  // Restructure the flat SQL result into the nested JSON the frontend expects
-  const ordersMap = new Map();
-  for (const row of rows) {
-    if (!ordersMap.has(row.order_id)) {
-      ordersMap.set(row.order_id, {
-          id: row.order_id,
-          rowIndex: row.order_id, // For backward compatibility with frontend
-          orderNum: row.order_id,
-          orderType: row.order_type,
-          totalCost: row.total_price,
-          notes: row.notes,
-          
-          timeOrdered: row.created_at,
-          utensil: row.utensil_request,
-          category: row.category,
-          orderUpdateStatus: row.order_update_status,
-          printedCount: row.printed_count,
-          printedTimestamps: row.printed_timestamps || [], // ✅ ADD THIS
-          isTheUsual: row.is_the_usual,
-          orderProcessed: row.printed_count > 0, // Logic: if printed, it's processed
-        
-          orderPrepped: row.order_update_status === 'Prepped',
-          cancelled: row.order_update_status === 'Cancelled',
-          callerName: row.customer_name,
-          callerPhone: row.customer_phone,
-          email: row.customer_email,
-          callerAddress: row.customer_address,
-          items: [],
-        });
+    // Restructure the flat SQL result into the nested JSON the frontend expects
+    const ordersMap = new Map();
+    for (const row of rows) {
+        if (!ordersMap.has(row.order_id)) {
+            ordersMap.set(row.order_id, {
+                id: row.order_id,
+                rowIndex: row.order_id, // For backward compatibility with frontend
+                orderNum: row.order_id,
+                orderType: row.order_type,
+                totalCost: row.total_price,
+                notes: row.notes,
+                timeOrdered: row.created_at,
+                utensil: row.utensil_request,
+                category: row.category,
+                orderUpdateStatus: row.order_update_status,
+                printedCount: row.printed_count,
+                printedTimestamps: row.printed_timestamps || [], // Ensure this is an array
+                isTheUsual: row.is_the_usual,
+                orderProcessed: row.printed_count > 0, // Logic: if printed, it's processed
+                orderPrepped: row.order_update_status === 'Prepped',
+                cancelled: row.order_update_status === 'Cancelled',
+                callerName: row.customer_name,
+                callerPhone: row.customer_phone,
+                email: row.customer_email,
+                callerAddress: row.customer_address,
+                items: [],
+            });
+        }
+
+        // Add item to the order if it exists
+        if (row.item_id) {
+            const order = ordersMap.get(row.order_id);
+            const existingItem = order.items.find(item => item.item_id === row.item_id);
+            if (!existingItem) {
+                order.items.push({
+                    item_id: row.item_id,
+                    item_name: row.item_name,
+                    qty: row.quantity,
+                    base_price: row.base_price,
+                    total_price_each: row.total_price_each,
+                    modifiers: [],
+                });
+            }
+
+            // Add modifier if it exists
+            if (row.modifier_id) {
+                const item = order.items.find(item => item.item_id === row.item_id);
+                item.modifiers.push({
+                    id: row.modifier_id,
+                    name: row.modifier_name,
+                    price_delta: row.price_delta,
+                });
+            }
+        }
     }
 
-    const order = ordersMap.get(row.order_id);
-
-    if (row.item_id && !order.items.some(i => i.id === row.item_id)) {
-      order.items.push({
-        id: row.item_id,
-        item: row.item_name,
-        qty: row.quantity,
-        modifier: '', // Will be built from modifiers array
-        modifiers: [],
-      });
+    // Final pass to format the modifier string the old frontend expects
+    for (const order of ordersMap.values()) {
+        for (const item of order.items) {
+            item.modifier = item.modifiers.map(m => m.name).join(', ');
+        }
     }
-
-    if (row.modifier_id) {
-      const item = order.items.find(i => i.id === row.item_id);
-      if (item && !item.modifiers.some(m => m.id === row.modifier_id)) {
-        item.modifiers.push({
-          id: row.modifier_id,
-          name: row.modifier_name,
-          price_delta: row.price_delta,
-        });
-      }
-    }
-  }
-
-  // Final pass to format the modifier string the old frontend expects
-  for (const order of ordersMap.values()) {
-      for (const item of order.items) {
-          item.modifier = item.modifiers.map(m => m.name).join(', ');
-      }
-  }
-  console.log("[Backend] ordersMap values (pre-filter):", Array.from(ordersMap.values())); // ADD THIS LINE
-  return Array.from(ordersMap.values());
+    console.log("[Backend] ordersMap values (pre-filter):", Array.from(ordersMap.values()));
+    return Array.from(ordersMap.values());
 }
 
 async function archiveOrders() {
