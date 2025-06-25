@@ -49,7 +49,8 @@ function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
     }
 
     const formatItem = (item) => {
-        return `${item.qty} x ${item.item}`;
+        const price = item.total_price_each ? `$${item.total_price_each.toFixed(2)}` : '$0.00';
+        return `${price} - ${item.qty} x ${item.item}`;
     };
 
     return (
