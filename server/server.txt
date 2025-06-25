@@ -1,49 +1,46 @@
 // =================================================================================
 // SETUP & CONFIGURATION
 // =================================================================================
-process.env.TZ = 'America/New_York'; // Set default timezone
-
 const express = require("express");
 const fs = require("fs");
 const fsp = require("fs").promises;
 const path = require("path");
 const cors = require("cors");
-const cron = require('node-cron');
-const http = require('http');
-const https = require('https');
-const net = require('net');
-const axios = require('axios');
-const { Pool } = require('pg'); // Import the pg Pool
-const { DateTime } = require('luxon');
+const cron = require("node-cron");
+const http = require("http");
+const https = require("https");
+const net = require("net");
+const axios = require("axios");
+const { Pool } = require("pg");
+const { DateTime } = require("luxon");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// --- File paths for local settings ---
-const appSettingsFilePath = path.join(__dirname, 'appSettings.json');
-const printerSettingsFilePath = path.join(__dirname, 'printerSettings.json');
+const appSettingsFilePath = path.join(__dirname, "appSettings.json");
+const printerSettingsFilePath = path.join(__dirname, "printerSettings.json");
 
-
-const now = DateTime.now()
-  .setZone('America/New_York')
-  .toISO();  // Example: '2025-06-23T16:55:00.123-04:00'
-
-// --- Load app settings from file or use defaults ---
-const getAppSettings = () => {
+function getAppSettings() {
   try {
-    const data = fs.readFileSync(appSettingsFilePath, 'utf8');
+    const data = fs.readFileSync(appSettingsFilePath, "utf8");
     return JSON.parse(data);
   } catch (err) {
     return {
-      timezone: 'America/New_York',
+      timezone: "America/New_York",
       reportStartHour: 8,
-      archiveCronSchedule: '0 2 * * *' // Default to 2 AM
+      archiveCronSchedule: "0 2 * * *"
     };
   }
-};
+}
 
 let appSettings = getAppSettings();
-process.env.TZ = appSettings.timezone;
+process.env.TZ = appSettings.timezone || "America/New_York";
+
+function getNowInConfiguredTZ() {
+  return DateTime.now().setZone(appSettings.timezone || "America/New_York");
+}
+
+
 
 // --- CORS Configuration ---
 const allowedOrigins = [
@@ -219,12 +216,13 @@ const isTodayFilter = (order) => {
     const orderDateTime = DateTime.fromJSDate(order.timeOrdered).setZone('America/New_York');
 
     // Get the current time in the same desired comparison timezone
-    const nowDateTime = DateTime.now().setZone('America/New_York');
+    const now = getNowInConfiguredTZ().toISO();
+
 
     // Keep your logs for verification (these are very helpful!)
     console.log(`[isTodayFilter] Checking Order ${order.orderNum}:`);
     console.log(`[isTodayFilter] Order time (NY): ${orderDateTime.toISO()}`);
-    console.log(`[isTodayFilter] Server's 'now' (NY): ${nowDateTime.toISO()}`);
+    console.log(`[isTodayFilter] Server's 'now' (NY): ${DateTime.fromISO(now)}`);
     console.log(`[isTodayFilter] Comparison: ${orderDateTime.toISODate()} === ${nowDateTime.toISODate()}`);
     console.log(`[isTodayFilter] Result: ${orderDateTime.toISODate() === nowDateTime.toISODate()}`);
 
@@ -287,14 +285,31 @@ app.get("/api/order-by-row/:orderId", async (req, res) => {
 // =================================================================================
 app.get('/api/today-stats', async (req, res) => {
     try {
-        const { rows } = await pool.query(`
+        // Get the current date in the specific timezone (America/New_York)
+        // using Luxon to ensure precise start and end of the day.
+        const nowInNY = DateTime.now().setZone(appSettings.timezone); // Use appSettings.timezone
+        const todayNYStart = nowInNY.startOf('day'); // Midnight of today in NY time
+        const todayNYEnd = nowInNY.endOf('day');     // End of day in NY time
+
+        // Convert these Luxon DateTime objects to ISO strings for PostgreSQL
+        // PostgreSQL will correctly interpret these UTC ISO strings as timestamps
+        const startDateISO = todayNYStart.toISO(); // e.g., '2025-06-24T04:00:00.000Z'
+        const endDateISO = todayNYEnd.toISO();     // e.g., '2025-06-25T03:59:59.999Z'
+
+        const query = `
             SELECT
                 COUNT(*) AS total,
                 COUNT(*) FILTER (WHERE printed_count > 0) AS processed
             FROM orders
-            WHERE created_at >= current_date AT TIME ZONE $1;
-        `, [appSettings.timezone]);
+            WHERE created_at >= $1 AND created_at <= $2;
+        `;
+        // Pass the calculated start and end dates as parameters
+        const { rows } = await pool.query(query, [startDateISO, endDateISO]); // <--- New parameters
+
+        console.log("[Backend] /api/today-stats - Raw SQL rows response:", rows);
         res.json(rows[0]);
+        console.log("[Backend] /api/today-stats - Final JSON sent:", rows[0]);
+
     } catch (error) {
         console.error('Error fetching today\'s stats:', error);
         res.status(500).json({ error: 'Failed to fetch today\'s stats: ' + error.message });
@@ -351,19 +366,36 @@ app.get('/api/popular-items', async (req, res) => {
 
 app.get('/api/hourly-orders', async (req, res) => {
     try {
-        const startHour = parseInt(appSettings.reportStartHour, 10) || 4;
+        const startHour = parseInt(appSettings.reportStartHour, 10) || 0; // It's best to set this to 0 for a full 24-hour daily report
+        const endHour = 23; // End of the day
+
+        // Get the current date in the specific timezone (America/New_York)
+        // using Luxon to ensure precise start and end of the day.
+        const nowInNY = DateTime.now().setZone(appSettings.timezone);
+        const todayNYStart = nowInNY.startOf('day');
+        const todayNYEnd = nowInNY.endOf('day');
+
+        // Convert these Luxon DateTime objects to ISO strings for PostgreSQL
+        // PostgreSQL will correctly interpret these UTC ISO strings as timestamps
+        const startDateISO = todayNYStart.toISO(); // e.g., '2025-06-24T04:00:00.000Z'
+        const endDateISO = todayNYEnd.toISO();   // e.g., '2025-06-25T03:59:59.999Z'
+
         const query = `
             SELECT
                 EXTRACT(HOUR FROM created_at AT TIME ZONE $1) as hour,
                 COUNT(*) as count
             FROM orders
-            WHERE created_at >= current_date AT TIME ZONE $1
+            WHERE created_at >= $2 AND created_at <= $3 -- <--- CRITICAL CHANGE HERE
             GROUP BY hour
             ORDER BY hour;
         `;
-        const { rows } = await pool.query(query, [appSettings.timezone]);
+        // Pass the timezone for EXTRACT and the calculated start/end dates
+        const { rows } = await pool.query(query, [appSettings.timezone, startDateISO, endDateISO]); // <--- New parameters
+
+        // The rest of your Node.js processing logic remains the same,
+        // but ensure your initialization loop covers the full range if startHour is 0.
         const hourlyCounts = {};
-        for (let h = startHour; h <= 23; h++) {
+        for (let h = 0; h <= 23; h++) { // Loop from 0 to 23 for a full day's report
             const hourLabel = h < 12 ? `${h === 0 ? 12 : h} AM` : `${h === 12 ? 12 : h - 12} PM`;
             hourlyCounts[hourLabel] = 0;
         }
@@ -374,8 +406,11 @@ app.get('/api/hourly-orders', async (req, res) => {
                 hourlyCounts[hourLabel] += parseInt(row.count, 10);
             }
         });
+
+        console.log("[Backend] /api/hourly-orders - Final hourlyCounts sent:", hourlyCounts);
         res.json(hourlyCounts);
     } catch (error) {
+        console.error('Error fetching hourly orders:', error);
         res.status(500).json({ error: 'Failed to fetch hourly orders: ' + error.message });
     }
 });
@@ -644,9 +679,7 @@ app.post("/api/fire-order", async (req, res) => {
         }
 
         // Get timestamp in Eastern Time (New York)
-        const now = DateTime.now()
-            .setZone("America/New_York")
-            .toISO();  // e.g. 2025-06-23T17:45:00.123-04:00
+        const now = getNowInConfiguredTZ().toISO();
 
         // Update DB: increment count and add timestamp
         const updateQuery = `

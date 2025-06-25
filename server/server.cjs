@@ -1,49 +1,46 @@
 // =================================================================================
 // SETUP & CONFIGURATION
 // =================================================================================
-process.env.TZ = 'America/New_York'; // Set default timezone
-
 const express = require("express");
 const fs = require("fs");
 const fsp = require("fs").promises;
 const path = require("path");
 const cors = require("cors");
-const cron = require('node-cron');
-const http = require('http');
-const https = require('https');
-const net = require('net');
-const axios = require('axios');
-const { Pool } = require('pg'); // Import the pg Pool
-const { DateTime } = require('luxon');
+const cron = require("node-cron");
+const http = require("http");
+const https = require("https");
+const net = require("net");
+const axios = require("axios");
+const { Pool } = require("pg");
+const { DateTime } = require("luxon");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// --- File paths for local settings ---
-const appSettingsFilePath = path.join(__dirname, 'appSettings.json');
-const printerSettingsFilePath = path.join(__dirname, 'printerSettings.json');
+const appSettingsFilePath = path.join(__dirname, "appSettings.json");
+const printerSettingsFilePath = path.join(__dirname, "printerSettings.json");
 
-
-const now = DateTime.now()
-  .setZone('America/New_York')
-  .toISO();  // Example: '2025-06-23T16:55:00.123-04:00'
-
-// --- Load app settings from file or use defaults ---
-const getAppSettings = () => {
+function getAppSettings() {
   try {
-    const data = fs.readFileSync(appSettingsFilePath, 'utf8');
+    const data = fs.readFileSync(appSettingsFilePath, "utf8");
     return JSON.parse(data);
   } catch (err) {
     return {
-      timezone: 'America/New_York',
+      timezone: "America/New_York",
       reportStartHour: 8,
-      archiveCronSchedule: '0 2 * * *' // Default to 2 AM
+      archiveCronSchedule: "0 2 * * *"
     };
   }
-};
+}
 
 let appSettings = getAppSettings();
-process.env.TZ = appSettings.timezone;
+process.env.TZ = appSettings.timezone || "America/New_York";
+
+function getNowInConfiguredTZ() {
+  return DateTime.now().setZone(appSettings.timezone || "America/New_York");
+}
+
+
 
 // --- CORS Configuration ---
 const allowedOrigins = [
@@ -219,12 +216,13 @@ const isTodayFilter = (order) => {
     const orderDateTime = DateTime.fromJSDate(order.timeOrdered).setZone('America/New_York');
 
     // Get the current time in the same desired comparison timezone
-    const nowDateTime = DateTime.now().setZone('America/New_York');
+    const now = getNowInConfiguredTZ().toISO();
+
 
     // Keep your logs for verification (these are very helpful!)
     console.log(`[isTodayFilter] Checking Order ${order.orderNum}:`);
     console.log(`[isTodayFilter] Order time (NY): ${orderDateTime.toISO()}`);
-    console.log(`[isTodayFilter] Server's 'now' (NY): ${nowDateTime.toISO()}`);
+    console.log(`[isTodayFilter] Server's 'now' (NY): ${DateTime.fromISO(now)}`);
     console.log(`[isTodayFilter] Comparison: ${orderDateTime.toISODate()} === ${nowDateTime.toISODate()}`);
     console.log(`[isTodayFilter] Result: ${orderDateTime.toISODate() === nowDateTime.toISODate()}`);
 
@@ -681,9 +679,7 @@ app.post("/api/fire-order", async (req, res) => {
         }
 
         // Get timestamp in Eastern Time (New York)
-        const now = DateTime.now()
-            .setZone("America/New_York")
-            .toISO();  // e.g. 2025-06-23T17:45:00.123-04:00
+        const now = getNowInConfiguredTZ().toISO();
 
         // Update DB: increment count and add timestamp
         const updateQuery = `
