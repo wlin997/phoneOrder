@@ -1,4 +1,3 @@
-// App.jsx
 import { useEffect, useState, Component, useRef, useCallback } from "react";
 import "./App.css";
 import "./index.css";
@@ -15,7 +14,7 @@ const MAX_PRINTED_ORDERS = 1000;
 const loadViewedOrders = () => {
     try {
         const stored = localStorage.getItem('viewedOrders');
-        return stored ? JSON.parse(stored) : {};
+        return stored ? JSON.parse(stored) : {};s
     } catch (err) {
         console.error('Error loading viewed orders from localStorage:', err);
         return {};
@@ -42,12 +41,16 @@ function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
     if (!order) {
         return (
             <div className="text-gray-500 text-center flex flex-col items-center justify-center h-full">
-                <svg className="mx-auto h-24 w-24 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16v1a3 3 0 003 3h10a3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                <svg className="mx-auto h-24 w-24 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                 <p className="mt-2 text-lg">No order selected.</p>
                 <p className="text-base">Toggle an incoming order or click 'View Details' to preview.</p>
             </div>
         );
     }
+
+    const formatItem = (item) => {
+        return `${item.qty} x ${item.item}`;
+    };
 
     return (
         <div className="bg-white p-6 rounded-lg shadow-inner overflow-y-auto h-full text-base text-left">
@@ -89,36 +92,21 @@ function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
 
             <h5 className="font-semibold text-lg mb-2">Order Items:</h5>
             {order.items && order.items.length > 0 ? (
-                <div className="mb-4 text-base space-y-2">
-                    {order.items && order.items.map((item, itemIndex) => (
-                    <div key={itemIndex} className="text-sm text-gray-700 mb-1 pl-4">
-                        {/* Removed flex justify-between here to keep name and price together */}
-                        {/* Put item quantity, name, and its price in one span/div */}
-                        <div>
-                            <span>
-                                {item.quantity} x {item.item}
-                                {/* Ensure basePrice is treated as a number.
-                                    Use a defensive check to make sure it's not NaN after parsing,
-                                    or default to 0 if it's undefined/null/empty string. */}
-                                ${(parseFloat(item.basePrice || '0') * item.quantity).toFixed(2)}
-                            </span>
-                        </div>
-                        {item.modifiers && item.modifiers.map((modifier, modIndex) => (
-                            <div key={modIndex} className="text-xs text-gray-600 pl-4">
-                                <span>
-                                    <span className="mr-1">- {modifier.name}</span>
-                                    {/* Ensure priceDelta is treated as a number */}
-                                    ${parseFloat(modifier.priceDelta || '0').toFixed(2)}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-                ))}
-                </div>
+                <ul className="mb-4">
+                    {order.items.map((item, index) => (
+                        <li key={index} className="mb-1">
+                            <span>{formatItem(item)}</span>
+                            {item.modifier && (
+                                <div className="ml-6 text-red-500">
+                                    Mod: {item.modifier}
+                                </div>
+                            )}
+                        </li>
+                    ))}
+                </ul>
             ) : (
                 <p className="text-gray-500 mb-4">No items listed.</p>
             )}
-
 
             {order.totalCost && (
                 <div className="mt-4 pt-4 border-t border-gray-200">
