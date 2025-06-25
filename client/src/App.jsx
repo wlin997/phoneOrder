@@ -49,7 +49,7 @@ function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
     }
 
     const formatItem = (item) => {
-        const price = item.total_price_each ? `$${item.total_price_each.toFixed(2)}` : '$0.00';
+        const price = item.total_price_each ? `$${parseFloat(item.total_price_each).toFixed(2)}` : '$0.00';
         return `${price} - ${item.qty} x ${item.item}`;
     };
 
@@ -97,9 +97,13 @@ function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
                     {order.items.map((item, index) => (
                         <li key={index} className="mb-1">
                             <span>{formatItem(item)}</span>
-                            {item.modifier && (
-                                <div className="ml-6 text-red-500">
-                                    Mod: {item.modifier}
+                            {item.modifiers && item.modifiers.length > 0 && (
+                                <div className="ml-6">
+                                    {item.modifiers.map((mod, modIndex) => (
+                                        <div key={modIndex} className="text-red-500">
+                                            Mod: {mod.name} {mod.price_delta ? `(+$${parseFloat(mod.price_delta).toFixed(2)})` : ''}
+                                        </div>
+                                    ))}
                                 </div>
                             )}
                         </li>
