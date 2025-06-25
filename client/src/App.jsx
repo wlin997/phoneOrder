@@ -90,38 +90,22 @@ function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
             <h5 className="font-semibold text-lg mb-2">Order Items:</h5>
             {order.items && order.items.length > 0 ? (
                 <div className="mb-4 text-base space-y-2">
-                    {order.items.map((item, index) => {
-                        const itemPrice = item.basePrice ? parseFloat(item.basePrice).toFixed(2) : '0.00';
-                        return (
-                            <div key={index} className="py-2 border-b border-gray-100 last:border-b-0">
-                                {/* Item row */}
-                                <div className="grid grid-cols-[max-content,1fr] gap-x-4">
-                                    <div className="w-16 text-right font-mono font-medium text-gray-700">${itemPrice}</div>
-                                    <div className="font-semibold text-gray-900">{item.qty} x {item.item}</div>
-                                </div>
-
-                                {/* Modifiers rows */}
-                                {item.modifiers && item.modifiers.length > 0 && (
-                                    <div className="mt-1">
-                                        {item.modifiers.map((mod, modIdx) => {
-                                            const modPrice = parseFloat(mod.priceDelta || 0);
-                                            let modPriceDisplay = '';
-                                            if (modPrice !== 0) {
-                                                modPriceDisplay = modPrice > 0 ? `+$${modPrice.toFixed(2)}` : `-$${Math.abs(modPrice).toFixed(2)}`;
-                                            }
-
-                                            return (
-                                                <div key={modIdx} className="grid grid-cols-[max-content,1fr] gap-x-4 text-sm">
-                                                    <div className="w-16 text-right font-mono text-red-600">{modPriceDisplay}</div>
-                                                    <div className="text-red-600 pl-4">- {mod.name}</div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                )}
+                    {order.items && order.items.map((item, itemIndex) => (
+                    <div key={itemIndex} className="text-sm text-gray-700 mb-1 pl-4">
+                        <div className="flex justify-between items-center">
+                            <span>{item.quantity} x {item.item}</span> {/* 'item.item' is the name of the item from backend */}
+                            {/* CORRECTED: Access item.basePrice from the backend, convert to number */}
+                            <span>${(parseFloat(item.basePrice || 0) * item.quantity).toFixed(2)}</span>
+                        </div>
+                        {item.modifiers && item.modifiers.map((modifier, modIndex) => (
+                            <div key={modIndex} className="text-xs text-gray-600 pl-4">
+                                <span className="mr-1">- {modifier.name}</span>
+                                {/* CORRECTED: Access modifier.priceDelta from the backend, convert to number */}
+                                <span>${parseFloat(modifier.priceDelta || 0).toFixed(2)}</span>
                             </div>
-                        );
-                    })}
+                        ))}
+                    </div>
+                ))}
                 </div>
             ) : (
                 <p className="text-gray-500 mb-4">No items listed.</p>
