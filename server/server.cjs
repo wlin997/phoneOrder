@@ -276,7 +276,7 @@ app.get("/api/order-by-row/:orderId", async (req, res) => {
             error: "Failed to fetch order by ID: " + err.message 
         });
     }
-});s
+});
 // =================================================================================
 // REPORTING AND SETTINGS ENDPOINTS (Refactored for PostgreSQL)
 // =================================================================================
