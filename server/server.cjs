@@ -1,3 +1,4 @@
+
 // =================================================================================
 // SETUP & CONFIGURATION
 // =================================================================================
@@ -163,7 +164,6 @@ async function getOrdersFromDB() {
         id: row.item_id,
         item: row.item_name,
         qty: row.quantity,
-        base_price: row.base_price, // Include base_price
         modifier: '', // Will be built from modifiers array
         modifiers: [],
       });
@@ -577,14 +577,8 @@ function buildOrderHTML(order) {
     const items = order.items.map(item => {
         const name = item.item || 'Unknown Item';
         const qty = item.qty || '1';
-        const itemPrice = item.base_price ? ` ($${item.base_price.toFixed(2)})` : ''; // Add item price
-        const modifiersHtml = item.modifiers && item.modifiers.length > 0 ?
-            item.modifiers.map(mod => {
-                const modPrice = mod.price_delta ? ` ($${mod.price_delta.toFixed(2)})` : '';
-                return `<br>  <span style="color: red;">- ${mod.name}${modPrice}</span>`;
-            }).join('') : '';
-
-        return `${qty}x ${name}${itemPrice}${modifiersHtml}`;
+        const mod = item.modifier ? `<br>  <span style="color: red;">- ${item.modifier}</span>` : '';
+        return `${qty}x ${name}${mod}`;
     }).join('<br>');
     const timeOrdered = new Date(order.timeOrdered || Date.now()).toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
     const firedAt = new Date().toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });

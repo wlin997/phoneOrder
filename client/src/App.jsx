@@ -14,7 +14,7 @@ const MAX_PRINTED_ORDERS = 1000;
 const loadViewedOrders = () => {
     try {
         const stored = localStorage.getItem('viewedOrders');
-        return stored ? JSON.parse(stored) : {};
+        return stored ? JSON.parse(stored) : {};s
     } catch (err) {
         console.error('Error loading viewed orders from localStorage:', err);
         return {};
@@ -48,10 +48,8 @@ function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
         );
     }
 
-    // Updated formatItem to include price
     const formatItem = (item) => {
-        const itemPrice = item.base_price ? ` ($${item.base_price.toFixed(2)})` : '';
-        return `${item.qty} x ${item.item}${itemPrice}`;
+        return `${item.qty} x ${item.item}`;
     };
 
     return (
@@ -98,15 +96,10 @@ function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
                     {order.items.map((item, index) => (
                         <li key={index} className="mb-1">
                             <span>{formatItem(item)}</span>
-                            {/* Iterate through modifiers and display their names and prices */}
-                            {item.modifiers && item.modifiers.length > 0 && (
-                                <ul className="ml-6 text-red-500 text-sm">
-                                    {item.modifiers.map((mod, modIdx) => (
-                                        <li key={modIdx}>
-                                            Mod: {mod.name} {mod.price_delta ? ` ($${mod.price_delta.toFixed(2)})` : ''}
-                                        </li>
-                                    ))}
-                                </ul>
+                            {item.modifier && (
+                                <div className="ml-6 text-red-500">
+                                    Mod: {item.modifier}
+                                </div>
                             )}
                         </li>
                     ))}
@@ -145,7 +138,6 @@ function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
         </div>
     );
 }
-
 function App() {
     console.log('App component initializing');
     const [incomingOrders, setIncomingOrders] = useState([]);
