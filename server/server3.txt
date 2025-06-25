@@ -1,4 +1,3 @@
-
 // =================================================================================
 // SETUP & CONFIGURATION
 // =================================================================================
@@ -14,15 +13,19 @@ const http = require('http');
 const https = require('https');
 const net = require('net');
 const axios = require('axios');
-const { Pool } = require('pg');
-// Import the pg Pool
+const { Pool } = require('pg'); // Import the pg Pool
 const { DateTime } = require('luxon');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
 // --- File paths for local settings ---
 const appSettingsFilePath = path.join(__dirname, 'appSettings.json');
 const printerSettingsFilePath = path.join(__dirname, 'printerSettings.json');
+
+
+const appSettings = getAppSettings();
+const now = DateTime.now().setZone(appSettings.timezone || 'America/New_York').toISO();
 
 // --- Load app settings from file or use defaults ---
 const getAppSettings = () => {
@@ -51,6 +54,7 @@ const allowedOrigins = [
   'http://127.0.0.1:5173',
   process.env.RENDER_FRONTEND_URL
 ].filter(Boolean);
+
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) {
@@ -70,19 +74,20 @@ app.use(express.json());
 
 // ADD THIS DEBUGGING LINE:
 console.log('--- DEBUG --- DATABASE_URL is:', process.env.DATABASE_URL);
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
     rejectUnauthorized: false
   }
 });
+
 console.log("✅ PostgreSQL client initialized.");
 
 // =================================================================================
 // HELPER AND UTILITY FUNCTIONS
 // =================================================================================
-let cloudPrintJobs = [];
-// Preserve this from original code
+let cloudPrintJobs = []; // Preserve this from original code
 
 // This new function completely replaces getSheetData() and getOrderRows()
 async function getOrdersFromDB() {
@@ -124,10 +129,10 @@ async function getOrdersFromDB() {
 
 
   const { rows } = await pool.query(query);
-  console.log("[Backend] Raw rows from DB query:", rows);
-// ADD THIS LINE
+  console.log("[Backend] Raw rows from DB query:", rows); // ADD THIS LINE
   // Restructure the flat SQL result into the nested JSON the frontend expects
   const ordersMap = new Map();
+
   for (const row of rows) {
     if (!ordersMap.has(row.order_id)) {
       ordersMap.set(row.order_id, {
@@ -137,7 +142,6 @@ async function getOrdersFromDB() {
           orderType: row.order_type,
           totalCost: row.total_price,
           notes: row.notes,
-          
           timeOrdered: row.created_at,
           utensil: row.utensil_request,
           category: row.category,
@@ -146,7 +150,6 @@ async function getOrdersFromDB() {
           printedTimestamps: row.printed_timestamps || [], // ✅ ADD THIS
           isTheUsual: row.is_the_usual,
           orderProcessed: row.printed_count > 0, // Logic: if printed, it's processed
-        
           orderPrepped: row.order_update_status === 'Prepped',
           cancelled: row.order_update_status === 'Cancelled',
           callerName: row.customer_name,
@@ -155,6 +158,7 @@ async function getOrdersFromDB() {
           callerAddress: row.customer_address,
           items: [],
         });
+
     }
 
     const order = ordersMap.get(row.order_id);
@@ -193,10 +197,10 @@ async function getOrdersFromDB() {
 
 async function archiveOrders() {
     console.log(`[Cron Job] Running archiveOrders at ${new Date().toLocaleTimeString()}`);
-// This logic is now handled by querying based on date ranges.
-// Archiving can be a more complex database operation (e.g., moving to another table).
-// For now, we will log that the concept exists.
-console.log("[Cron Job] Archive logic would run here. No action taken in this version.");
+    // This logic is now handled by querying based on date ranges.
+    // Archiving can be a more complex database operation (e.g., moving to another table).
+    // For now, we will log that the concept exists.
+    console.log("[Cron Job] Archive logic would run here. No action taken in this version.");
 }
 
 
@@ -205,20 +209,25 @@ console.log("[Cron Job] Archive logic would run here. No action taken in this ve
 // =================================================================================
 
 app.get("/", (req, res) => res.send("✅ Backend server is alive"));
+
 const isTodayFilter = (order) => {
     if (!order || !order.timeOrdered) return false;
-// *** CHANGE THIS LINE ***
+
+    // *** CHANGE THIS LINE ***
     // Use fromJSDate() because order.timeOrdered is already a JavaScript Date object from the PG driver.
-    const orderDateTime = DateTime.fromJSDate(order.timeOrdered).setZone(appSettings.timezone || 'America/New_York'); // Rectified: Use appSettings.timezone
+    const orderDateTime = DateTime.fromJSDate(order.timeOrdered).setZone('America/New_York');
 
     // Get the current time in the same desired comparison timezone
-    const nowDateTime = DateTime.now().setZone(appSettings.timezone || 'America/New_York');
-// Keep your logs for verification (these are very helpful!)
+    const now = DateTime.now().setZone(appSettings.timezone || 'America/New_York');
+
+
+    // Keep your logs for verification (these are very helpful!)
     console.log(`[isTodayFilter] Checking Order ${order.orderNum}:`);
-    console.log(`[isTodayFilter] Order time (${appSettings.timezone || 'America/New_York'}): ${orderDateTime.toISO()}`);
-    console.log(`[isTodayFilter] Server's 'now' (${appSettings.timezone || 'America/New_York'}): ${nowDateTime.toISO()}`);
+    console.log(`[isTodayFilter] Order time (NY): ${orderDateTime.toISO()}`);
+    console.log(`[isTodayFilter] Server's 'now' (NY): ${nowDateTime.toISO()}`);
     console.log(`[isTodayFilter] Comparison: ${orderDateTime.toISODate()} === ${nowDateTime.toISODate()}`);
     console.log(`[isTodayFilter] Result: ${orderDateTime.toISODate() === nowDateTime.toISODate()}`);
+
     return orderDateTime.toISODate() === nowDateTime.toISODate();
 };
 
@@ -244,10 +253,10 @@ app.get("/api/updating", async (req, res) => {
             .sort((a, b) => new Date(b.timeOrdered).getTime() - new Date(a.timeOrdered).getTime());
         res.json(updatingOrdersToday);
     } catch (err) {
-       
-res.status(500).json({ error: "Failed to fetch updating orders: " + err.message });
+        res.status(500).json({ error: "Failed to fetch updating orders: " + err.message });
     }
 });
+
 app.get("/api/printed", async (req, res) => {
     try {
         const allOrders = await getOrdersFromDB();
@@ -257,8 +266,7 @@ app.get("/api/printed", async (req, res) => {
         res.json(processedOrders);
     } catch (err) {
         res.status(500).json({ error: "Failed to fetch processed orders: " + err.message });
- 
-    }
+   }
 });
 
 app.get("/api/order-by-row/:orderId", async (req, res) => {
@@ -269,10 +277,11 @@ app.get("/api/order-by-row/:orderId", async (req, res) => {
         const order = allOrders.find(o => o.id === orderId);
         order ? res.json(order) : res.status(404).json({ error: "Order not found." });
     } catch (err) {
-        res.status(500).json({ 
-error: "Failed to fetch order by ID: " + err.message });
+        res.status(500).json({ error: "Failed to fetch order by ID: " + err.message });
     }
 });
+
+
 // =================================================================================
 // REPORTING AND SETTINGS ENDPOINTS (Refactored for PostgreSQL)
 // =================================================================================
@@ -282,8 +291,7 @@ app.get('/api/today-stats', async (req, res) => {
         // using Luxon to ensure precise start and end of the day.
         const nowInNY = DateTime.now().setZone(appSettings.timezone); // Use appSettings.timezone
         const todayNYStart = nowInNY.startOf('day'); // Midnight of today in NY time
-        const todayNYEnd = nowInNY.endOf('day'); 
-    // End of day in NY time
+        const todayNYEnd = nowInNY.endOf('day');     // End of day in NY time
 
         // Convert these Luxon DateTime objects to ISO strings for PostgreSQL
         // PostgreSQL will correctly interpret these UTC ISO strings as timestamps
@@ -291,26 +299,25 @@ app.get('/api/today-stats', async (req, res) => {
         const endDateISO = todayNYEnd.toISO();     // e.g., '2025-06-25T03:59:59.999Z'
 
         const query = `
-            
             SELECT
                 COUNT(*) AS total,
                 COUNT(*) FILTER (WHERE printed_count > 0) AS processed
             FROM orders
             WHERE created_at >= $1 AND created_at <= $2;
-`;
+        `;
         // Pass the calculated start and end dates as parameters
-        const { rows } = await pool.query(query, [startDateISO, endDateISO]);
-// <--- New parameters
+        const { rows } = await pool.query(query, [startDateISO, endDateISO]); // <--- New parameters
 
         console.log("[Backend] /api/today-stats - Raw SQL rows response:", rows);
         res.json(rows[0]);
-console.log("[Backend] /api/today-stats - Final JSON sent:", rows[0]);
+        console.log("[Backend] /api/today-stats - Final JSON sent:", rows[0]);
 
     } catch (error) {
         console.error('Error fetching today\'s stats:', error);
-res.status(500).json({ error: 'Failed to fetch today\'s stats: ' + error.message });
+        res.status(500).json({ error: 'Failed to fetch today\'s stats: ' + error.message });
     }
 });
+
 app.get('/api/order-stats', async (req, res) => {
     try {
         const { range } = req.query;
@@ -318,7 +325,7 @@ app.get('/api/order-stats', async (req, res) => {
         const query = `
             SELECT
                 DATE(created_at AT TIME ZONE $1) as order_date,
-            COUNT(*) as count
+                COUNT(*) as count
             FROM orders
             WHERE created_at > (NOW() - INTERVAL '${days} days')
             GROUP BY order_date
@@ -334,6 +341,7 @@ app.get('/api/order-stats', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch order stats: ' + error.message });
     }
 });
+
 app.get('/api/popular-items', async (req, res) => {
     try {
         const { range } = req.query;
@@ -342,7 +350,6 @@ app.get('/api/popular-items', async (req, res) => {
             SELECT item_name, SUM(quantity) as count
             FROM order_items
             JOIN orders ON order_items.order_id = orders.id
-  
             WHERE orders.created_at > (NOW() - INTERVAL '${days} days')
             GROUP BY item_name
             ORDER BY count DESC
@@ -350,8 +357,7 @@ app.get('/api/popular-items', async (req, res) => {
         `;
         const { rows } = await pool.query(query);
         const itemCounts = rows.reduce((acc, row) => {
-     
-        acc[row.item_name] = parseInt(row.count, 10);
+            acc[row.item_name] = parseInt(row.count, 10);
             return acc;
         }, {});
         res.json(itemCounts);
@@ -359,6 +365,7 @@ app.get('/api/popular-items', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch popular items: ' + error.message });
     }
 });
+
 app.get('/api/hourly-orders', async (req, res) => {
     try {
         const startHour = parseInt(appSettings.reportStartHour, 10) || 0; // It's best to set this to 0 for a full 24-hour daily report
@@ -375,19 +382,17 @@ app.get('/api/hourly-orders', async (req, res) => {
         const startDateISO = todayNYStart.toISO(); // e.g., '2025-06-24T04:00:00.000Z'
         const endDateISO = todayNYEnd.toISO();   // e.g., '2025-06-25T03:59:59.999Z'
 
-        const query = 
-            `
+        const query = `
             SELECT
                 EXTRACT(HOUR FROM created_at AT TIME ZONE $1) as hour,
                 COUNT(*) as count
             FROM orders
-            WHERE created_at >= $2 AND created_at <= $3  
+            WHERE created_at >= $2 AND created_at <= $3 -- <--- CRITICAL CHANGE HERE
             GROUP BY hour
             ORDER BY hour;
-            `;
+        `;
         // Pass the timezone for EXTRACT and the calculated start/end dates
-        const { rows } = await pool.query(query, [appSettings.timezone, startDateISO, endDateISO]);
-        // <--- New parameters
+        const { rows } = await pool.query(query, [appSettings.timezone, startDateISO, endDateISO]); // <--- New parameters
 
         // The rest of your Node.js processing logic remains the same,
         // but ensure your initialization loop covers the full range if startHour is 0.
@@ -395,22 +400,23 @@ app.get('/api/hourly-orders', async (req, res) => {
         for (let h = 0; h <= 23; h++) { // Loop from 0 to 23 for a full day's report
             const hourLabel = h < 12 ? `${h === 0 ? 12 : h} AM` : `${h === 12 ? 12 : h - 12} PM`;
             hourlyCounts[hourLabel] = 0;
-            }
-                rows.forEach(row => {
-                    const orderHour = parseInt(row.hour, 10);
-                    const hourLabel = orderHour < 12 ? `${orderHour === 0 ? 12 : orderHour} AM` : `${orderHour === 12 ? 12 : orderHour - 12} PM`;
-                    if (hourlyCounts.hasOwnProperty(hourLabel)) {
-                        hourlyCounts[hourLabel] += parseInt(row.count, 10);
-         
-                    }
-                });
-        console.log("[Backend] /api/hourly-orders - Final hourlyCounts sent:", hourlyCounts);
-                res.json(hourlyCounts);
-            } catch (error) {
-                console.error('Error fetching hourly orders:', error);
-        res.status(500).json({ error: 'Failed to fetch hourly orders: ' + error.message });
+        }
+        rows.forEach(row => {
+            const orderHour = parseInt(row.hour, 10);
+            const hourLabel = orderHour < 12 ? `${orderHour === 0 ? 12 : orderHour} AM` : `${orderHour === 12 ? 12 : orderHour - 12} PM`;
+            if (hourlyCounts.hasOwnProperty(hourLabel)) {
+                hourlyCounts[hourLabel] += parseInt(row.count, 10);
             }
         });
+
+        console.log("[Backend] /api/hourly-orders - Final hourlyCounts sent:", hourlyCounts);
+        res.json(hourlyCounts);
+    } catch (error) {
+        console.error('Error fetching hourly orders:', error);
+        res.status(500).json({ error: 'Failed to fetch hourly orders: ' + error.message });
+    }
+});
+
 app.get('/api/customer-stats', async (req, res) => {
     try {
         const { range } = req.query;
@@ -425,20 +431,18 @@ app.get('/api/customer-stats', async (req, res) => {
             JOIN orders o ON c.id = o.customer_id
             WHERE o.created_at > (NOW() - INTERVAL '${days} days')
             GROUP BY c.id, c.name, c.phone;
-   
-      `;
+        `;
         const { rows } = await pool.query(query);
         const totalOrders = rows.reduce((sum, row) => sum + parseInt(row.count, 10), 0);
         const repeatCustomers = rows.filter(row => parseInt(row.count, 10) > 1).length;
         const topCustomers = rows
             .sort((a, b) => b.count - a.count)
             .slice(0, 5)
-      
             .map(row => ({ name: row.name, phone: row.phone, count: parseInt(row.count, 10) }));
         res.json({ totalOrders, repeatCustomers, topCustomers });
-} catch (error) {
+    } catch (error) {
         console.error('Error fetching customer stats:', error);
-res.status(500).json({ error: 'Failed to fetch customer stats: ' + error.message });
+        res.status(500).json({ error: 'Failed to fetch customer stats: ' + error.message });
     }
 });
 
@@ -455,8 +459,7 @@ app.post('/api/app-settings', async (req, res) => {
         startCronJob();
 
         res.json({ success: true, message: 'App settings updated and cron job restarted.' });
-    } catch (err) 
-{
+    } catch (err) {
         console.error("[App Settings] Failed to update settings:", err);
         res.status(500).json({ error: "Failed to update app settings" });
     }
@@ -477,6 +480,8 @@ app.post('/api/print-settings', async (req, res) => {
         res.status(500).json({ error: 'Failed to save printer settings: ' + err.message });
     }
 });
+
+
 // =================================================================================
 // MAIN PRINTING AND KDS ENDPOINTS (Refactored)
 // =================================================================================
@@ -496,9 +501,8 @@ function printViaLan(printerIp, payload) {
         client.on('error', (err) => {
             console.error('[LAN] Printer connection error:', err);
             client.destroy();
-   
             reject({ error: "Failed to connect to LAN printer", details: err.message });
-});
+        });
         client.on('timeout', () => {
             console.error(`[LAN] Connection to ${printerIp}:${port} timed out.`);
             client.destroy();
@@ -514,8 +518,7 @@ async function testPrinterConnectivity(printerUrl, mode = 'LAN') {
             client.setTimeout(3000);
             client.connect(9100, printerUrl, () => {
                 client.end();
-             
-    resolve({ available: true, message: 'LAN printer is responsive.' });
+                resolve({ available: true, message: 'LAN printer is responsive.' });
             });
             client.on('error', (err) => resolve({ available: false, error: `LAN printer error: ${err.message}` }));
             client.on('timeout', () => {
@@ -534,7 +537,6 @@ async function testPrinterConnectivity(printerUrl, mode = 'LAN') {
             return resolve({ available: false, error: `Invalid URL: ${err.message}` });
         }
 
-       
         const protocol = url.protocol === 'https:' ? https : http;
         const method = mode === 'MOCK' ? 'POST' : 'HEAD';
         const testPayload = mode === 'MOCK' ? JSON.stringify({ test: true, from: 'PrinterStatusCheck' }) : '';
@@ -542,33 +544,31 @@ async function testPrinterConnectivity(printerUrl, mode = 'LAN') {
         const options = {
             hostname: url.hostname,
             port: url.port || (url.protocol === 'https:' ? 443 : 80),
-      
             path: url.pathname + (url.search || ''),
             method,
             timeout: 5000,
             headers: {
                 'User-Agent': 'Node.js Printer Status Check',
                 ...(mode === 'MOCK' ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(testPayload) } : {})
-    
             }
         };
 
         const req = protocol.request(options, (res) => {
             if (res.statusCode >= 200 && res.statusCode < 400) {
                  resolve({ available: true, message: `Endpoint responded with status ${res.statusCode}` });
-} else {
+            } else {
                  resolve({ available: false, error: `Endpoint not available (Status: ${res.statusCode})` });
-}
+            }
         });
 
         req.on('timeout', () => {
             req.destroy();
             resolve({ available: false, error: 'Connection timed out.' });
         });
-req.on('error', (err) => resolve({ available: false, error: `Request error: ${err.message}` }));
-if (method === 'POST') {
+        req.on('error', (err) => resolve({ available: false, error: `Request error: ${err.message}` }));
+        if (method === 'POST') {
             req.write(testPayload);
-}
+        }
         req.end();
     });
 }
@@ -582,19 +582,16 @@ function buildOrderHTML(order) {
     }).join('<br>');
     const timeOrdered = new Date(order.timeOrdered || Date.now()).toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
     const firedAt = new Date().toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-    const utensilLine = order.utensil ?
-`Utensils:     ${order.utensil}\n\n` : '';
-    const totalLine = order.totalCost ?
-`Total:        $${order.totalCost}\n` : '';
-return `<pre style="font-family: 'Courier New', Courier, monospace; font-size: 12pt; width: 80mm; margin: 0; padding: 0; line-height: 1.2;">
+    const utensilLine = order.utensil ? `Utensils:     ${order.utensil}\n\n` : '';
+    const totalLine = order.totalCost ? `Total:        $${order.totalCost}\n` : '';
+
+    return `<pre style="font-family: 'Courier New', Courier, monospace; font-size: 12pt; width: 80mm; margin: 0; padding: 0; line-height: 1.2;">
 --------------------------------
-    ** ORDER #${order.orderNum ||
-'N/A'} **
+    ** ORDER #${order.orderNum || 'N/A'} **
 --------------------------------
 Order Type:   ${order.orderType || 'N/A'}
 Time Ordered: ${timeOrdered}
-Status:       ${order.orderUpdateStatus ||
-'N/A'}
+Status:       ${order.orderUpdateStatus || 'N/A'}
 --------------------------------
 Caller:  ${order.callerName || 'N/A'}
 Phone:   ${order.callerPhone || 'N/A'}
@@ -619,7 +616,6 @@ app.post("/api/fire-order", async (req, res) => {
         let printerSettings;
         try {
             const data = await fsp.readFile(printerSettingsFilePath, 'utf8');
-     
             printerSettings = JSON.parse(data);
         } catch (err) {
             return res.status(400).json({ error: "Printer settings not configured." });
@@ -629,7 +625,6 @@ app.post("/api/fire-order", async (req, res) => {
         const allOrders = await getOrdersFromDB();
         const orderToProcess = allOrders.find(o => o.id === orderId);
         if (!orderToProcess) {
-      
             return res.status(404).json({ error: "Order not found" });
         }
 
@@ -641,20 +636,19 @@ app.post("/api/fire-order", async (req, res) => {
         // Send to printer
         switch (printerSettings.mode) {
             case 'MOCK':
-   
                 try {
                     if (!printerSettings.printerUrl) throw new Error("No URL for MOCK mode");
                     const response = await axios.post(
                         printerSettings.printerUrl,
                         { ...orderToProcess, mode: 'MOCK' },
                         { timeout: 10000 }
-                 
                     );
                     printerResponseData = response.data;
                 } catch (mockErr) {
                     printerError = { error: "Failed to send to MOCK webhook", details: mockErr.message };
                 }
                 break;
+
             case 'LAN':
                 try {
                     if (!printerSettings.printerUrl) throw new Error("No IP address for LAN mode");
@@ -667,6 +661,7 @@ app.post("/api/fire-order", async (req, res) => {
                     printerError = lanErr;
                 }
                 break;
+
             case 'CLOUD':
                 const newJob = {
                     jobId: `job-${Date.now()}`,
@@ -676,9 +671,10 @@ app.post("/api/fire-order", async (req, res) => {
                 cloudPrintJobs.push(newJob);
                 printerResponseData = { status: "CLOUD job staged", jobId: newJob.jobId };
                 break;
+
             default:
                 printerError = { error: `Invalid printer mode: ${printerSettings.mode}` };
-            }
+        }
 
         if (printerError) {
             return res.status(503).json(printerError);
@@ -686,9 +682,8 @@ app.post("/api/fire-order", async (req, res) => {
 
         // Get timestamp in Eastern Time (New York)
         const now = DateTime.now()
-            .setZone(appSettings.timezone) // Rectified: Use appSettings.timezone
-            .toISO();
-        // e.g. 2025-06-23T17:45:00.123-04:00
+            .setZone("America/New_York")
+            .toISO();  // e.g. 2025-06-23T17:45:00.123-04:00
 
         // Update DB: increment count and add timestamp
         const updateQuery = `
@@ -696,13 +691,11 @@ app.post("/api/fire-order", async (req, res) => {
             SET 
                 printed_count = printed_count + 1,
                 printed_timestamps = 
-        
-            CASE
+                    CASE 
                         WHEN printed_timestamps IS NULL THEN ARRAY[$2]::text[]
                         ELSE array_append(printed_timestamps, $2)
                     END
-            
-WHERE id = $1
+            WHERE id = $1
             RETURNING printed_count, printed_timestamps;
         `;
         const { rows } = await pool.query(updateQuery, [orderId, now]);
@@ -714,11 +707,14 @@ WHERE id = $1
             printedCount: rows[0].printed_count,
             printedTimestamps: rows[0].printed_timestamps
         });
-} catch (err) {
+
+    } catch (err) {
         console.error("[🔥 API Error /api/fire-order]", err);
-res.status(500).json({ error: "Failed to process order", details: err.message });
+        res.status(500).json({ error: "Failed to process order", details: err.message });
     }
 });
+
+
 app.get("/api/kds/active-orders", async (req, res) => {
     try {
         const allOrders = await getOrdersFromDB();
@@ -728,7 +724,6 @@ app.get("/api/kds/active-orders", async (req, res) => {
 
         // Fix the id mapping
         const formattedOrders = activeKitchenOrders.map(order => ({
-   
             ...order,
             id: order.id // <-- this ensures frontend gets the DB id
         }));
@@ -740,6 +735,8 @@ app.get("/api/kds/active-orders", async (req, res) => {
         res.status(500).json({ error: "Failed to fetch active kitchen orders", details: err.message });
     }
 });
+
+
 app.post("/api/kds/prep-order/:orderId", async (req, res) => {
     const { orderId } = req.params;
     const { prepTime } = req.body;
@@ -752,19 +749,18 @@ app.post("/api/kds/prep-order/:orderId", async (req, res) => {
         const updateQuery = `
             UPDATE orders
             SET
-       
-            order_update_status = 'Prepped',
+                order_update_status = 'Prepped',
                 food_prep_time = $1
             WHERE id = $2;
         `;
         await pool.query(updateQuery, [prepTime, orderId]);
         res.json({ success: true, message: `Order #${orderId} marked as prepped.` });
     } catch (err) {
-        console.error(`[KDS API] Failed to update 
-order #${orderId}:`, err);
+        console.error(`[KDS API] Failed to update order #${orderId}:`, err);
         res.status(500).json({ error: "Failed to update order in database", details: err.message });
     }
 });
+
 // ADD THIS ENTIRE NEW ENDPOINT to server.cjs
 
 app.get("/api/kds/prepped-orders", async (req, res) => {
@@ -774,7 +770,6 @@ app.get("/api/kds/prepped-orders", async (req, res) => {
         // Filter for orders that are marked as 'Prepped'
         const preppedKitchenOrders = allOrders
             .filter(o => o.orderUpdateStatus === 'Prepped')
-      
             .sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) // Sort newest first
             .slice(0, 20); // Optionally limit to the last 20 prepped orders
 
@@ -782,7 +777,6 @@ app.get("/api/kds/prepped-orders", async (req, res) => {
         const formattedOrders = preppedKitchenOrders.map(order => ({
             ...order,
             id: order.id
-      
         }));
 
         res.json(formattedOrders);
@@ -804,14 +798,14 @@ app.post("/api/cloudprnt", (req, res) => {
     if (cloudPrintJobs.length > 0) {
         const job = cloudPrintJobs[0];
         const host = req.get('host');
-        const 
-protocol = req.get('x-forwarded-proto') || req.protocol;
+        const protocol = req.get('x-forwarded-proto') || req.protocol;
         const getUrl = `${protocol}://${host}/api/cloudprnt-content/${job.jobId}`;
         res.json({ jobReady: true, mediaTypes: [job.contentType], jobToken: job.jobId, get: getUrl });
     } else {
         res.json({ jobReady: false, pollInterval: 30000 });
     }
 });
+
 app.get('/api/cloudprnt-content/:jobId', (req, res) => {
     const job = cloudPrintJobs.find(j => j.jobId === req.params.jobId);
     if (job) {
@@ -820,6 +814,7 @@ app.get('/api/cloudprnt-content/:jobId', (req, res) => {
         res.status(404).send('Job not found.');
     }
 });
+
 app.get('/api/printer-status', async (req, res) => {
     try {
         const data = await fsp.readFile(printerSettingsFilePath, 'utf8');
@@ -828,12 +823,12 @@ app.get('/api/printer-status', async (req, res) => {
             return res.status(400).json({ available: false, mode: settings.mode, error: 'No printer URL configured' });
         }
         const printerCheck = await testPrinterConnectivity(settings.printerUrl, settings.mode);
-        res.status(printerCheck.available ? 200 : 
-503).json({ ...printerCheck, mode: settings.mode });
+        res.status(printerCheck.available ? 200 : 503).json({ ...printerCheck, mode: settings.mode });
     } catch (err) {
         res.status(500).json({ available: false, error: 'Failed to check printer status: ' + err.message });
     }
 });
+
 // =================================================================================
 // SERVER INITIALIZATION
 // =================================================================================
@@ -846,23 +841,17 @@ const startCronJob = () => {
 
     cronJob = cron.schedule(
         appSettings.archiveCronSchedule,
-        async function () { // Renamed for clarity, original was 'archiveOrders'
+        async function archiveOrders() {
             console.log(`[Cron Job] Running archiveOrders at ${new Date().toLocaleTimeString()}`);
 
             try {
-                // Rectified: Use Luxon to get the previous day in the app's timezone for robust comparison.
-                const yesterdayInAppTimezone = DateTime.now().setZone(appSettings.timezone).minus({ days: 1 }).endOf('day');
-                const archiveCutoffISO = yesterdayInAppTimezone.toISO();
-
                 const result = await pool.query(`
                     UPDATE orders
-   
                     SET archived = TRUE
-                    WHERE created_at <= $1 -- Rectified: Compare with a specific timestamp
+                    WHERE created_at < CURRENT_DATE
                       AND archived = FALSE;
-                `, [archiveCutoffISO]); // Rectified: Pass the calculated date as a parameter
-                
-console.log(`[Cron Job] Archived ${result.rowCount} old unprocessed orders.`);
+                `);
+                console.log(`[Cron Job] Archived ${result.rowCount} old unprocessed orders.`);
             } catch (err) {
                 console.error("[Cron Job] Failed to archive orders:", err);
             }
@@ -870,7 +859,6 @@ console.log(`[Cron Job] Archived ${result.rowCount} old unprocessed orders.`);
         {
             scheduled: true,
             timezone: appSettings.timezone
-   
         }
     );
 
@@ -886,7 +874,6 @@ pool.connect()
             console.log(`🚀 Server running at http://localhost:${PORT}`);
             if (process.env.RENDER_URL) {
                 console.log(`✅ Server is publicly available at: ${process.env.RENDER_URL}`);
-           
             }
         });
     })
@@ -894,13 +881,3 @@ pool.connect()
         console.error("❌ Failed to connect to the database and start server:", err.message);
         process.exit(1);
     });
-
-// Utility to save app settings - this function was missing but called by app.post('/api/app-settings')
-const saveAppSettings = async (settings) => {
-    try {
-        await fsp.writeFile(appSettingsFilePath, JSON.stringify(settings, null, 2));
-    } catch (err) {
-        console.error("[App Settings] Failed to save settings to file:", err);
-        throw err;
-    }
-};
