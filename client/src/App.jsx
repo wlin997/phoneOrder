@@ -49,10 +49,14 @@ function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
     }
 
     const formatItem = (item) => {
-        const price = item.total_price_each ? `$${parseFloat(item.total_price_each).toFixed(2)}` : 
-                     item.base_price ? `$${parseFloat(item.base_price).toFixed(2)}` : '$0.00';
-        console.log(`[Debug] Item: ${item.item}, total_price_each: ${item.total_price_each}, base_price: ${item.base_price}, price: ${price}`);
-        return `${price} - ${item.qty} x ${item.item}`;
+        console.log('[Debug] Item Data:', item);
+        const price = item.qty > 1 
+            ? `$${parseFloat(item.total_price_each * item.qty).toFixed(2)}` 
+            : item.base_price 
+                ? `$${parseFloat(item.base_price).toFixed(2)}` 
+                : '$0.00';
+        console.log(`[Debug] Item: ${item.item_name || 'undefined'}, total_price_each: ${item.total_price_each}, base_price: ${item.base_price}, price: ${price}`);
+        return `${price} - ${item.qty} x ${item.item_name || 'undefined'}`; // Use item_name or fallback
     };
 
     return (
@@ -393,19 +397,17 @@ const handleToggle = async (id, orderNum) => {
             if (!response.ok) {
                 throw new Error(`Failed to fetch order details for rowIndex ${id}: ${response.status} ${response.statusText}`);
             }
-            const orderData = await response.json();
-            console.log('[Debug] API Response for handleToggle:', orderData);
+            const text = await response.text();
+            console.log('[Debug] Raw API Response Text for handleToggle:', text);
+            const orderData = JSON.parse(text);
+            console.log('[Debug] Parsed API Response for handleToggle:', orderData);
             setSelectedOrderDetails({
                 ...orderData,
                 viewed: !!viewedOrdersRef.current[orderData.id],
-                items: orderData.items?.map(item => {
-                    const modifierDelta = item.modifiers?.reduce((sum, mod) => sum + (parseFloat(mod.price_delta) || 0), 0) || 0;
-                    const computedPrice = item.base_price ? parseFloat(item.base_price) + modifierDelta : '0.00';
-                    return {
-                        ...item,
-                        total_price_each: item.total_price_each || computedPrice.toFixed(2)
-                    };
-                }) || [] // Default to empty array if items is undefined
+                items: orderData.items?.map(item => ({
+                    ...item,
+                    item_name: item.item_name, // Explicitly map item_name
+                })) || []
             });
         } catch (error) {
             console.error('Error fetching order details:', error);
@@ -423,6 +425,17 @@ const handleToggle = async (id, orderNum) => {
         }))
     );
     saveViewedOrders(viewedOrdersRef.current);
+};
+
+const formatItem = (item) => {
+    console.log('[Debug] Item Data:', item);
+    const price = item.qty > 1 
+        ? `$${parseFloat(item.total_price_each * item.qty).toFixed(2)}` 
+        : item.base_price 
+            ? `$${parseFloat(item.base_price).toFixed(2)}` 
+            : '$0.00';
+    console.log(`[Debug] Item: ${item.item_name || 'undefined'}, total_price_each: ${item.total_price_each}, base_price: ${item.base_price}, price: ${price}`);
+    return `${price} - ${item.qty} x ${item.item_name || 'undefined'}`; // Use item_name or fallback
 };
 
 const handleViewDetails = async (order) => {

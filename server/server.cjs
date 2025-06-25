@@ -269,7 +269,7 @@ app.get("/api/order-by-row/:orderId", async (req, res) => {
         if (isNaN(orderId)) return res.status(400).json({ error: "Invalid orderId." });
         const allOrders = await getOrdersFromDB();
         const order = allOrders.find(o => o.id === orderId);
-        console.log('[Backend] Order data before sending to frontend:', order); // Log the full order object
+        console.log('[Backend] Order data before sending to frontend:', order); // Log to verify item_name
         order ? res.json(order) : res.status(404).json({ error: "Order not found." });
     } catch (err) {
         res.status(500).json({ 
