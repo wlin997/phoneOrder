@@ -188,6 +188,9 @@ export default function Admin() {
 
   const [cronMinute, cronHour] = appSettings.archiveCronSchedule.split(' ');
 
+  // Define a common button class string
+  const commonButtonClasses = "w-full py-2 rounded-lg transition-colors shadow-md focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-opacity-50 bg-cyan-500 text-white hover:bg-cyan-600";
+
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-gray-100 p-6 font-sans antialiased text-gray-800">
@@ -285,7 +288,8 @@ export default function Admin() {
             </div>
             <button
               onClick={handleSaveAppSettings}
-              className="w-full mt-6 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition-colors"
+              // Applied common button classes
+              className={commonButtonClasses + " mt-6"} 
             >
               Save Application Settings
             </button>
@@ -330,6 +334,7 @@ export default function Admin() {
             />
             <button
               onClick={handleSavePrinterSettings}
+              // Retained original specific styling for "Save Printer Settings" as per request
               className="w-full bg-cyan-500 text-white py-2 rounded-lg hover:bg-cyan-600 transition-colors"
             >
               Save Printer Settings
@@ -377,7 +382,8 @@ export default function Admin() {
               <button
                 onClick={handleSaveVapiSettings}
                 type="button"
-                className="w-full mt-6 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition-colors"
+                // Applied common button classes
+                className={commonButtonClasses + " mt-6"}
               >
                 Save VAPI Settings
               </button>

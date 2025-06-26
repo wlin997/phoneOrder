@@ -195,6 +195,9 @@ export default function DailySpecialsManager() {
     }
   }, [dailySpecials]);
 
+  // Define a common button class string
+  const commonButtonClasses = "w-full py-2 rounded-lg transition-colors shadow-md focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-opacity-50 bg-cyan-500 text-white hover:bg-cyan-600";
+
 
   return (
     <ErrorBoundary>
@@ -239,7 +242,8 @@ export default function DailySpecialsManager() {
             )}
             <button
               onClick={fetchFileList} // Refreshes the file list
-              className="w-full mt-4 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+              // Applied common button classes
+              className={commonButtonClasses + " mt-4"}
             >
               Refresh File List
             </button>
@@ -312,14 +316,15 @@ export default function DailySpecialsManager() {
                 <div className="flex justify-between items-center mt-6 gap-4">
                   <button
                     onClick={addSpecial}
-                    className="flex-1 bg-purple-500 text-white py-2 px-4 rounded-lg hover:bg-purple-600 transition-colors shadow-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50"
+                    // Applied common button classes
+                    className={commonButtonClasses}
                   >
                     Add New Special
                   </button>
                   <button
                     onClick={updateSelectedFileContent}
-                    className={`flex-1 bg-green-500 text-white py-2 px-4 rounded-lg hover:bg-green-600 transition-colors shadow-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50
-                               ${!selectedFileId && 'opacity-50 cursor-not-allowed'}`}
+                    // Applied common button classes
+                    className={`${commonButtonClasses} ${!selectedFileId && 'opacity-50 cursor-not-allowed'}`}
                     disabled={!selectedFileId}
                   >
                     Update Selected File
