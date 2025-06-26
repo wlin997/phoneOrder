@@ -16,6 +16,8 @@ const axios = require('axios');
 const { Pool } = require('pg');
 // Import the pg Pool
 const { DateTime } = require('luxon');
+// Import form-data for multipart/form-data uploads
+const FormData = require('form-data'); // Make sure to 'npm install form-data'
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -944,8 +946,10 @@ app.post('/api/daily-specials', async (req, res) => {
     const { api_key, vapi_file_id: old_vapi_file_id } = rows[0];
 
     console.log(`[VAPI Update Flow] Attempting to update daily specials.`);
-    console.log(`[VAPI Update Flow] Old file ID: ${old_vapi_file_id}. Content to upload (stringified): ${JSON.stringify(newContent).substring(0, 200)}...`);
-
+    const fileName = 'daily_specials.json';
+    const fileMimeType = 'application/json';
+    const jsonContentString = JSON.stringify(newContent);
+    const contentBuffer = Buffer.from(jsonContentString, 'utf8');
 
     // Step 1: Delete the old file
     try {
@@ -956,21 +960,27 @@ app.post('/api/daily-specials', async (req, res) => {
         console.log(`[VAPI Update Flow] Old file ${old_vapi_file_id} deleted successfully.`);
     } catch (deleteErr) {
         // Log the error but don't fail the entire process if the file doesn't exist
-        // or if there's a minor issue with deletion, as we're creating a new one anyway.
-        // It's crucial not to block the new file upload.
         console.warn(`[VAPI Update Flow] Warning: Failed to delete old file ${old_vapi_file_id}. Error: ${deleteErr.response ? deleteErr.response.data : deleteErr.message}`);
     }
 
-    // Step 2: Upload the new content as a new file
-    console.log('[VAPI Update Flow] Uploading new file with updated content...');
-    const uploadResponse = await axios.post('https://api.vapi.ai/file', {
-        name: 'daily_specials.json', // Keep the same name
-        content: JSON.stringify(newContent), // Send the new content
-        purpose: 'assistant' // Assuming the purpose is still 'assistant'
-    }, {
+    // Step 2: Upload the new content as a new file using FormData
+    console.log('[VAPI Update Flow] Uploading new file with updated content using FormData...');
+    const formData = new FormData();
+    // Append the file Buffer with filename and contentType
+    formData.append('file', contentBuffer, {
+        filename: fileName,
+        contentType: fileMimeType
+    });
+    // You might also need to append other metadata fields if VAPI requires them for new file creation,
+    // like 'purpose' or 'assistantId' directly to the formData, based on VAPI docs.
+    // Assuming 'purpose' is still needed as a separate field, not part of the file itself.
+    formData.append('purpose', 'assistant'); // Add purpose to form data
+
+
+    const uploadResponse = await axios.post('https://api.vapi.ai/file', formData, {
         headers: {
-            Authorization: `Bearer ${api_key}`,
-            'Content-Type': 'application/json' // Important for VAPI to recognize JSON content
+            ...formData.getHeaders(), // IMPORTANT: Include boundary for multipart/form-data
+            Authorization: `Bearer ${api_key}`
         },
     });
 
