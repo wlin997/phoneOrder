@@ -63,6 +63,15 @@ const NavMenu = ({ isMenuOpen, handleMenuClose }) => {
                            <span>Reports</span>
                         </Link>
                     </li>
+                    {/* New Daily Specials Link */}
+                    <li className="mb-4">
+                        <Link to="/daily-specials" onClick={handleMenuClose} className="flex items-center p-2 text-gray-700 rounded-lg hover:bg-cyan-50 hover:text-cyan-600 transition-colors duration-200">
+                            <svg className="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                            </svg>
+                            <span>Daily Specials</span>
+                        </Link>
+                    </li>
                     {/* Admin Settings Link */}
                     <li className="mb-4">
                         <Link to="/admin" onClick={handleMenuClose} className="flex items-center p-2 text-gray-700 rounded-lg hover:bg-cyan-50 hover:text-cyan-600 transition-colors duration-200">
