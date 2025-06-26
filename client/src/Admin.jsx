@@ -28,6 +28,16 @@ export default function Admin() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
+
+// ---vapi api
+
+  // Add state for VAPI settings
+const [vapiSettings, setVapiSettings] = useState({
+  apiKey: '',
+  assistantId: ''
+});
+
+
   useEffect(() => {
     const loadSettings = async () => {
       try {
@@ -143,6 +153,53 @@ export default function Admin() {
       alert('Failed to save printer settings.');
     }
   };
+
+
+// ---- Vapi api begins here ------------------------------
+
+// Load VAPI settings from backend on mount
+useEffect(() => {
+  const loadVapiSettings = async () => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/vapi-settings`);
+      if (res.ok) {
+        const data = await res.json();
+        setVapiSettings(data);
+      }
+    } catch (err) {
+      console.error('Error loading VAPI settings:', err);
+    }
+  };
+  loadVapiSettings();
+}, []);
+
+
+// Handle VAPI settings input changes
+const handleVapiSettingsChange = (e) => {
+  const { name, value } = e.target;
+  setVapiSettings(prev => ({ ...prev, [name]: value }));
+};
+
+// Save VAPI settings to backend
+const handleSaveVapiSettings = async () => {
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/vapi-settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(vapiSettings),
+    });
+    if (!res.ok) throw new Error('Failed to save VAPI settings');
+    alert('VAPI settings saved successfully!');
+  } catch (err) {
+    console.error('Error saving VAPI settings:', err);
+    alert('Failed to save VAPI settings.');
+  }
+};
+
+
+
+
+
 
   const [cronMinute, cronHour] = appSettings.archiveCronSchedule.split(' ');
 
@@ -270,6 +327,40 @@ export default function Admin() {
                 Save Printer Settings
             </button>
           </div>
+          {/*------------------VPI settig section ------------------*/}
+          // Add this section to the render method, below the Printer Settings section
+          <div className="mb-8 p-4 border rounded-lg bg-gray-50">
+            <h3 className="text-xl font-semibold mb-4 text-gray-700">VAPI Configuration</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block mb-2 font-medium text-gray-600">VAPI API Key</label>
+                <input
+                  name="apiKey"
+                  type="password"
+                  value={vapiSettings.apiKey}
+                  onChange={handleVapiSettingsChange}
+                  className="w-full p-2 border rounded"
+                />
+              </div>
+              <div>
+                <label className="block mb-2 font-medium text-gray-600">Assistant ID</label>
+                <input
+                  name="assistantId"
+                  type="text"
+                  value={vapiSettings.assistantId}
+                  onChange={handleVapiSettingsChange}
+                  className="w-full p-2 border rounded"
+                />
+              </div>
+            </div>
+            <button
+              onClick={handleSaveVapiSettings}
+              className="w-full mt-6 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition-colors"
+            >
+              Save VAPI Settings
+            </button>
+          </div>
+
         </div>
       </div>
     </ErrorBoundary>
