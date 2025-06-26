@@ -329,36 +329,40 @@ const handleSaveVapiSettings = async () => {
           </div>
           {/*------------------VPI settig section ------------------*/}
           // Add this section to the render method, below the Printer Settings section
+          // In Admin.jsx, update the VAPI Configuration section
           <div className="mb-8 p-4 border rounded-lg bg-gray-50">
             <h3 className="text-xl font-semibold mb-4 text-gray-700">VAPI Configuration</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block mb-2 font-medium text-gray-600">VAPI API Key</label>
-                <input
-                  name="apiKey"
-                  type="password"
-                  value={vapiSettings.apiKey}
-                  onChange={handleVapiSettingsChange}
-                  className="w-full p-2 border rounded"
-                />
+            <form>
+              <div className="space-y-4">
+                <div>
+                  <label className="block mb-2 font-medium text-gray-600">VAPI API Key</label>
+                  <input
+                    name="apiKey"
+                    type="password"
+                    value={vapiSettings.apiKey}
+                    onChange={handleVapiSettingsChange}
+                    className="w-full p-2 border rounded"
+                  />
+                </div>
+                <div>
+                  <label className="block mb-2 font-medium text-gray-600">Assistant ID</label>
+                  <input
+                    name="assistantId"
+                    type="text"
+                    value={vapiSettings.assistantId}
+                    onChange={handleVapiSettingsChange}
+                    className="w-full p-2 border rounded"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block mb-2 font-medium text-gray-600">Assistant ID</label>
-                <input
-                  name="assistantId"
-                  type="text"
-                  value={vapiSettings.assistantId}
-                  onChange={handleVapiSettingsChange}
-                  className="w-full p-2 border rounded"
-                />
-              </div>
-            </div>
-            <button
-              onClick={handleSaveVapiSettings}
-              className="w-full mt-6 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition-colors"
-            >
-              Save VAPI Settings
-            </button>
+              <button
+                onClick={handleSaveVapiSettings}
+                type="button" // Prevents form submission
+                className="w-full mt-6 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition-colors"
+              >
+                Save VAPI Settings
+              </button>
+            </form>
           </div>
 
         </div>

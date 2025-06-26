@@ -838,6 +838,95 @@ app.get('/api/printer-status', async (req, res) => {
         res.status(500).json({ available: false, error: 'Failed to check printer status: ' + err.message });
     }
 });
+
+
+
+// =================================================================================
+// VAPI SETTING
+// =================================================================================
+
+// get VAPI settings from Postgre
+app.get('/api/vapi-settings', async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT api_key, assistant_id FROM vapi_settings WHERE id = 1');
+    if (rows.length > 0) {
+      res.json({ apiKey: rows[0].api_key, assistantId: rows[0].assistant_id });
+    } else {
+      res.json({ apiKey: '', assistantId: '' }); // Return empty defaults if no settings exist
+    }
+  } catch (err) {
+    console.error('Error fetching VAPI settings:', err);
+    res.status(500).send('Error fetching VAPI settings');
+  }
+});
+
+// Save VAPI settings from admin.jsx
+app.post('/api/vapi-settings', async (req, res) => {
+  const { apiKey, assistantId } = req.body;
+  try {
+    await pool.query(
+      'INSERT INTO vapi_settings (id, api_key, assistant_id) VALUES (1, $1, $2) ON CONFLICT (id) DO UPDATE SET api_key = $1, assistant_id = $2',
+      [apiKey, assistantId]
+    );
+    res.sendStatus(200);
+  } catch (err) {
+    console.error('Error saving VAPI settings:', err);
+    res.status(500).send('Error saving VAPI settings');
+  }
+});
+
+// Get daily specials from VAPI
+app.get('/api/daily-specials', async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT api_key, assistant_id FROM vapi_settings WHERE id = 1');
+    if (rows.length === 0) {
+      return res.status(404).send('VAPI settings not found');
+    }
+    const { api_key, assistant_id } = rows[0];
+    const response = await axios.get(`https://api.vapi.ai/file?assistantId=${assistant_id}`, {
+      headers: { Authorization: `Bearer ${api_key}` },
+    });
+    const file = response.data.find(f => f.name === 'daily_specials.json');
+    if (file) {
+      const content = await axios.get(`https://api.vapi.ai/file/${file.id}/content`, {
+        headers: { Authorization: `Bearer ${api_key}` },
+      });
+      res.json(content.data);
+    } else {
+      res.status(404).send('No specials found');
+    }
+  } catch (err) {
+    console.error('Error retrieving specials:', err);
+    res.status(500).send('Error retrieving specials');
+  }
+});
+
+// Update daily specials in VAPI
+app.post('/api/daily-specials', async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT api_key, assistant_id FROM vapi_settings WHERE id = 1');
+    if (rows.length === 0) {
+      return res.status(404).send('VAPI settings not found');
+    }
+    const { api_key, assistant_id } = rows[0];
+    const specialsData = req.body;
+    const formData = new FormData();
+    formData.append('file', new Blob([JSON.stringify(specialsData)], { type: 'application/json' }), 'daily_specials.json');
+    formData.append('assistantId', assistant_id);
+    await axios.post('https://api.vapi.ai/file', formData, {
+      headers: { Authorization: `Bearer ${api_key}`, 'Content-Type': 'multipart/form-data' },
+    });
+    res.sendStatus(200);
+  } catch (err) {
+    console.error('Error updating specials:', err);
+    res.status(500).send('Error updating specials');
+  }
+});
+
+app.listen(3000, () => console.log('Server running on port 3000'));
+
+
+
 // =================================================================================
 // SERVER INITIALIZATION
 // =================================================================================
