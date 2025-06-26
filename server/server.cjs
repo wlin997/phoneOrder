@@ -868,7 +868,7 @@ app.get('/api/vapi/files', async (req, res) => {
   }
 });
 
-// NEW ENDPOINT: Get content of a specific file from VAPI
+// NEW ENDPOINT: Get content of a specific file from VAPI (Updated to VAPI spec)
 app.get('/api/vapi/files/:fileId/content', async (req, res) => {
   try {
     const { fileId } = req.params;
@@ -879,38 +879,58 @@ app.get('/api/vapi/files/:fileId/content', async (req, res) => {
     }
     const { api_key } = rows[0];
 
-    // Make request to VAPI to get specific file content
-    const response = await axios.get(`https://api.vapi.ai/file/${fileId}/content`, {
+    // Make request to VAPI using GET /file/:id as per VAPI docs
+    const response = await axios.get(`https://api.vapi.ai/file/${fileId}`, {
       headers: { Authorization: `Bearer ${api_key}` },
     });
-    res.json(response.data); // Send back the file content
+
+    // VAPI's GET /file/:id returns metadata. The content is in a 'content' field.
+    // If the file is not a text file, it might not have a 'content' field directly.
+    if (response.data && response.data.content !== undefined) {
+        res.json(response.data.content); // Send back the content field
+    } else if (response.data) {
+        // If 'content' field is missing but data exists, send the whole data for inspection
+        console.warn(`File ${fileId} data retrieved, but 'content' field is missing. Sending full data.`);
+        res.json(response.data); 
+    } else {
+        res.status(404).send('File content not found or file is not a text-based format.');
+    }
   } catch (err) {
     console.error(`Error retrieving VAPI file content for ${fileId}:`, err.response ? err.response.data : err.message);
     res.status(500).send('Error retrieving VAPI file content.');
   }
 });
 
-// MODIFIED ENDPOINT: Update daily specials in VAPI (uses file_id from DB)
+// MODIFIED ENDPOINT: Update daily specials in VAPI (uses file_id from DB, updated to VAPI PATCH spec)
 // This endpoint now takes the content to save and uses the file_id configured in app settings
 app.post('/api/daily-specials', async (req, res) => {
   try {
     const newContent = req.body; // Expecting the new content as JSON from the frontend
-    const { rows } = await pool.query('SELECT api_key, file_id FROM vapi_settings WHERE id = 1');
-    if (rows.length === 0 || !rows[0].api_key || !rows[0].file_id) {
+    const { rows } = await pool.query('SELECT api_key, file_id AS vapi_file_id FROM vapi_settings WHERE id = 1'); // Renamed file_id to vapi_file_id
+    if (rows.length === 0 || !rows[0].api_key || !rows[0].vapi_file_id) { // Use vapi_file_id
       console.log('VAPI API Key or File ID not configured for daily specials.');
       return res.status(400).send('VAPI API Key or File ID not configured for daily specials.');
     }
-    const { api_key, file_id } = rows[0]; // Get the configured file_id
+    const { api_key, vapi_file_id } = rows[0]; // Get the configured vapi_file_id
 
-    // VAPI API for updating file content typically uses PUT.
-    // If VAPI also supports POST for updates, this is fine.
-    // Assuming the newContent is JSON, set Content-Type accordingly.
-    const response = await axios.put(`https://api.vapi.ai/file/${file_id}/content`, newContent, {
+    console.log(`[VAPI Update] Attempting to update file ${vapi_file_id} with API Key ending in ...${api_key.slice(-4)}`);
+    console.log(`[VAPI Update] Content to send (stringified): ${JSON.stringify(newContent).substring(0, 200)}...`);
+
+
+    // VAPI API for updating file content uses PATCH /file/:id with content in body.
+    // The newContent from frontend is already a parsed JS object (JSON.parse-d).
+    // We need to stringify it again to put it into the 'content' field for VAPI.
+    const payloadForVapi = {
+        content: JSON.stringify(newContent) 
+    };
+
+    const response = await axios.patch(`https://api.vapi.ai/file/${vapi_file_id}`, payloadForVapi, { // Use vapi_file_id
       headers: {
         Authorization: `Bearer ${api_key}`,
-        'Content-Type': 'application/json' // Assuming content is JSON
+        'Content-Type': 'application/json' 
       },
     });
+    console.log('[VAPI Update] Successful VAPI response:', response.data);
     res.json({ success: true, message: 'Daily specials updated in VAPI!', vapiResponse: response.data });
   } catch (err) {
     console.error('Error updating daily specials in VAPI:', err.response ? err.response.data : err.message);
