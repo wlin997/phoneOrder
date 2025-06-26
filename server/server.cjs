@@ -907,37 +907,91 @@ app.get('/api/vapi/files/:fileId/content', async (req, res) => {
   }
 });
 
-// MODIFIED ENDPOINT: Update daily specials in VAPI (uses file_id from DB, updated to VAPI PATCH spec)
-// This endpoint now takes the content to save and uses the file_id configured in app settings
+// NEW ENDPOINT: Delete a file from VAPI
+app.delete('/api/vapi/files/:fileId', async (req, res) => {
+    try {
+        const { fileId } = req.params;
+        const { rows } = await pool.query('SELECT api_key FROM vapi_settings WHERE id = 1');
+        if (rows.length === 0 || !rows[0].api_key) {
+            console.log('VAPI API Key not configured.');
+            return res.status(400).send('VAPI API Key not configured.');
+        }
+        const { api_key } = rows[0];
+
+        console.log(`[VAPI Delete] Attempting to delete file: ${fileId}`);
+        const response = await axios.delete(`https://api.vapi.ai/file/${fileId}`, {
+            headers: { Authorization: `Bearer ${api_key}` },
+        });
+
+        console.log('[VAPI Delete] Successful VAPI delete response:', response.data);
+        res.json({ success: true, message: `File ${fileId} deleted from VAPI!`, vapiResponse: response.data });
+    } catch (err) {
+        console.error(`Error deleting VAPI file ${req.params.fileId}:`, err.response ? err.response.data : err.message);
+        res.status(500).send('Error deleting VAPI file.');
+    }
+});
+
+
+// MODIFIED ENDPOINT: Update daily specials in VAPI (Implements delete and re-upload)
 app.post('/api/daily-specials', async (req, res) => {
   try {
     const newContent = req.body; // Expecting the new content as JSON from the frontend
-    const { rows } = await pool.query('SELECT api_key, file_id AS vapi_file_id FROM vapi_settings WHERE id = 1'); // Renamed file_id to vapi_file_id
-    if (rows.length === 0 || !rows[0].api_key || !rows[0].vapi_file_id) { // Use vapi_file_id
-      console.log('VAPI API Key or File ID not configured for daily specials.');
-      return res.status(400).send('VAPI API Key or File ID not configured for daily specials.');
+    const { rows } = await pool.query('SELECT api_key, file_id AS vapi_file_id FROM vapi_settings WHERE id = 1');
+    if (rows.length === 0 || !rows[0].api_key || !rows[0].vapi_file_id) {
+      console.log('VAPI API Key or File ID not configured for daily specials update.');
+      return res.status(400).send('VAPI API Key or File ID not configured for daily specials update.');
     }
-    const { api_key, vapi_file_id } = rows[0]; // Get the configured vapi_file_id
+    const { api_key, vapi_file_id: old_vapi_file_id } = rows[0];
 
-    console.log(`[VAPI Update] Attempting to update file ${vapi_file_id} with API Key ending in ...${api_key.slice(-4)}`);
-    console.log(`[VAPI Update] Content to send (stringified): ${JSON.stringify(newContent).substring(0, 200)}...`);
+    console.log(`[VAPI Update Flow] Attempting to update daily specials.`);
+    console.log(`[VAPI Update Flow] Old file ID: ${old_vapi_file_id}. Content to upload (stringified): ${JSON.stringify(newContent).substring(0, 200)}...`);
 
 
-    // VAPI API for updating file content uses PATCH /file/:id with content in body.
-    // The newContent from frontend is already a parsed JS object (JSON.parse-d).
-    // We need to stringify it again to put it into the 'content' field for VAPI.
-    const payloadForVapi = {
-        content: JSON.stringify(newContent) 
-    };
+    // Step 1: Delete the old file
+    try {
+        console.log(`[VAPI Update Flow] Deleting old file ${old_vapi_file_id}...`);
+        await axios.delete(`https://api.vapi.ai/file/${old_vapi_file_id}`, {
+            headers: { Authorization: `Bearer ${api_key}` },
+        });
+        console.log(`[VAPI Update Flow] Old file ${old_vapi_file_id} deleted successfully.`);
+    } catch (deleteErr) {
+        // Log the error but don't fail the entire process if the file doesn't exist
+        // or if there's a minor issue with deletion, as we're creating a new one anyway.
+        // It's crucial not to block the new file upload.
+        console.warn(`[VAPI Update Flow] Warning: Failed to delete old file ${old_vapi_file_id}. Error: ${deleteErr.response ? deleteErr.response.data : deleteErr.message}`);
+    }
 
-    const response = await axios.patch(`https://api.vapi.ai/file/${vapi_file_id}`, payloadForVapi, { // Use vapi_file_id
-      headers: {
-        Authorization: `Bearer ${api_key}`,
-        'Content-Type': 'application/json' 
-      },
+    // Step 2: Upload the new content as a new file
+    console.log('[VAPI Update Flow] Uploading new file with updated content...');
+    const uploadResponse = await axios.post('https://api.vapi.ai/file', {
+        name: 'daily_specials.json', // Keep the same name
+        content: JSON.stringify(newContent), // Send the new content
+        purpose: 'assistant' // Assuming the purpose is still 'assistant'
+    }, {
+        headers: {
+            Authorization: `Bearer ${api_key}`,
+            'Content-Type': 'application/json' // Important for VAPI to recognize JSON content
+        },
     });
-    console.log('[VAPI Update] Successful VAPI response:', response.data);
-    res.json({ success: true, message: 'Daily specials updated in VAPI!', vapiResponse: response.data });
+
+    const newVapiFile = uploadResponse.data;
+    console.log('[VAPI Update Flow] New file uploaded successfully:', newVapiFile);
+
+    // Step 3: Update the file_id in your database to the new file's ID
+    console.log(`[VAPI Update Flow] Updating database with new file ID: ${newVapiFile.id}`);
+    await pool.query(
+      'UPDATE vapi_settings SET file_id = $1 WHERE id = 1',
+      [newVapiFile.id]
+    );
+
+    console.log('[VAPI Update Flow] Daily specials updated successfully in VAPI (via re-upload)!');
+    res.json({ 
+        success: true, 
+        message: 'Daily specials updated in VAPI (via re-upload)!', 
+        newFileId: newVapiFile.id,
+        vapiResponse: newVapiFile 
+    });
+
   } catch (err) {
     console.error('Error updating daily specials in VAPI:', err.response ? err.response.data : err.message);
     res.status(500).send('Error updating daily specials.');
