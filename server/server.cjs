@@ -879,21 +879,27 @@ app.get('/api/vapi/files/:fileId/content', async (req, res) => {
     }
     const { api_key } = rows[0];
 
-    // Make request to VAPI using GET /file/:id as per VAPI docs
-    const response = await axios.get(`https://api.vapi.ai/file/${fileId}`, {
+    // Step 1: Get file metadata from VAPI using GET /file/:id
+    const vapiMetadataResponse = await axios.get(`https://api.vapi.ai/file/${fileId}`, {
       headers: { Authorization: `Bearer ${api_key}` },
     });
 
-    // VAPI's GET /file/:id returns metadata. The content is in a 'content' field.
-    // If the file is not a text file, it might not have a 'content' field directly.
-    if (response.data && response.data.content !== undefined) {
-        res.json(response.data.content); // Send back the content field
-    } else if (response.data) {
-        // If 'content' field is missing but data exists, send the whole data for inspection
-        console.warn(`File ${fileId} data retrieved, but 'content' field is missing. Sending full data.`);
-        res.json(response.data); 
+    const fileMetadata = vapiMetadataResponse.data;
+
+    // Check if the file has an external URL for content
+    if (fileMetadata && fileMetadata.url) {
+        console.log(`[VAPI Content] Fetching content from external URL: ${fileMetadata.url}`);
+        // Step 2: Fetch content from the external URL
+        const externalContentResponse = await axios.get(fileMetadata.url);
+        res.json(externalContentResponse.data); // Send back the content from the URL
+    } else if (fileMetadata && fileMetadata.content !== undefined) {
+        // If VAPI returns content directly (e.g., for smaller, directly stored files)
+        console.log(`[VAPI Content] Content found directly in VAPI metadata.`);
+        res.json(fileMetadata.content);
     } else {
-        res.status(404).send('File content not found or file is not a text-based format.');
+        // If neither URL nor direct content is found
+        console.warn(`File ${fileId} data retrieved, but neither 'url' nor 'content' field found. File metadata:`, fileMetadata);
+        res.status(404).send('File content not found or file is not a text-based format accessible via URL/direct content.');
     }
   } catch (err) {
     console.error(`Error retrieving VAPI file content for ${fileId}:`, err.response ? err.response.data : err.message);
