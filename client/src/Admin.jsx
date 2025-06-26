@@ -1,64 +1,57 @@
 import React, { useEffect, useState, useRef } from 'react';
 import NavMenu from './components/NavMenu';
 import ErrorBoundary from './components/ErrorBoundary';
-import.meta.env.VITE_API_URL;
 
-// Helper to generate a range of numbers for dropdowns
 const generateRange = (start, end) => {
-    return Array.from({ length: (end - start + 1) }, (_, i) => start + i);
+  return Array.from({ length: (end - start + 1) }, (_, i) => start + i);
 };
 
-// Helper to format numbers with a leading zero
 const padZero = (num) => String(num).padStart(2, '0');
 
 export default function Admin() {
-  // --- MODIFIED: State is now separated for clarity ---
+  // State separated for clarity
   const [printerSettings, setPrinterSettings] = useState({
     mode: 'LAN',
     url: '',
-    contentType: 'text/html'
+    contentType: 'text/html',
   });
   const [appSettings, setAppSettings] = useState({
     timezone: 'America/New_York',
     reportStartHour: '8',
-    archiveCronSchedule: '0 2 * * *'
+    archiveCronSchedule: '0 2 * * *',
   });
-
   const [printerStatus, setPrinterStatus] = useState('Checking...');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
-
-// ---vapi api
-
-  // Add state for VAPI settings
-const [vapiSettings, setVapiSettings] = useState({
-  apiKey: '',
-  assistantId: ''
-});
-
+  // Updated VAPI settings to include fileId
+  const [vapiSettings, setVapiSettings] = useState({
+    apiKey: '',
+    assistantId: '',
+    fileId: '', // New field for file ID
+  });
 
   useEffect(() => {
     const loadSettings = async () => {
       try {
         const printRes = await fetch(`${import.meta.env.VITE_API_URL}/api/print-settings`);
         if (printRes.ok) {
-            const printData = await printRes.json();
-            setPrinterSettings({
-                mode: printData.mode || 'LAN',
-                url: printData.printerUrl || '',
-                contentType: printData.contentType || 'text/html'
-            });
+          const printData = await printRes.json();
+          setPrinterSettings({
+            mode: printData.mode || 'LAN',
+            url: printData.printerUrl || '',
+            contentType: printData.contentType || 'text/html',
+          });
         } else {
-            console.error(`Failed to fetch printer settings: ${printRes.status}`);
+          console.error(`Failed to fetch printer settings: ${printRes.status}`);
         }
 
         const appRes = await fetch(`${import.meta.env.VITE_API_URL}/api/app-settings`);
         if (appRes.ok) {
-            const appData = await appRes.json();
-            setAppSettings(appData);
+          const appData = await appRes.json();
+          setAppSettings(appData);
         } else {
-             console.error(`Failed to fetch app settings: ${appRes.status}`);
+          console.error(`Failed to fetch app settings: ${appRes.status}`);
         }
       } catch (err) {
         console.error('[Admin.jsx] Could not load initial settings, using defaults.', err.message);
@@ -86,45 +79,43 @@ const [vapiSettings, setVapiSettings] = useState({
     const intervalId = setInterval(checkPrinterStatus, 60000);
     return () => clearInterval(intervalId);
   }, [printerSettings.url]);
-  
-  const handleMenuOpen = () => setIsMenuOpen(prev => !prev);
+
+  const handleMenuOpen = () => setIsMenuOpen((prev) => !prev);
   const handleMenuClose = () => setIsMenuOpen(false);
 
   const handleAppSettingsChange = (e) => {
     const { name, value } = e.target;
-    setAppSettings(prev => ({...prev, [name]: value}));
+    setAppSettings((prev) => ({ ...prev, [name]: value }));
   };
 
   const handlePrinterSettingsChange = (e) => {
     const { name, value } = e.target;
-    // When changing print mode, clear the URL to show the placeholder
     if (name === 'mode') {
-        setPrinterSettings(prev => ({...prev, [name]: value, url: '' }));
+      setPrinterSettings((prev) => ({ ...prev, [name]: value, url: '' }));
     } else {
-        setPrinterSettings(prev => ({...prev, [name]: value }));
+      setPrinterSettings((prev) => ({ ...prev, [name]: value }));
     }
   };
 
   const handleCronChange = (e) => {
     const { name, value } = e.target;
-    const currentCron = appSettings.archiveCronSchedule.split(' ');
-    
+    const [currentMinute, currentHour] = appSettings.archiveCronSchedule.split(' ');
+
     let newCronString = '';
     if (name === 'hour') {
-      newCronString = `${currentCron[0]} ${value} * * *`;
+      newCronString = `${currentMinute} ${value} * * *`;
     } else {
-      newCronString = `${value} ${currentCron[1]} * * *`;
+      newCronString = `${value} ${currentHour} * * *`;
     }
-    setAppSettings(prev => ({...prev, archiveCronSchedule: newCronString }));
+    setAppSettings((prev) => ({ ...prev, archiveCronSchedule: newCronString }));
   };
-  
-  // --- NEW: Separate save handler for App Settings ---
+
   const handleSaveAppSettings = async () => {
     try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/app-settings`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(appSettings),
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/app-settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(appSettings),
       });
       if (!res.ok) throw new Error(`Failed to save app settings: ${res.status}`);
       alert('Application settings saved successfully!\nNote: Some changes require a server restart.');
@@ -133,11 +124,10 @@ const [vapiSettings, setVapiSettings] = useState({
       alert('Failed to save application settings.');
     }
   };
-  
-  // --- NEW: Separate save handler for Printer Settings ---
+
   const handleSavePrinterSettings = async () => {
     try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/print-settings`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/print-settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -154,52 +144,47 @@ const [vapiSettings, setVapiSettings] = useState({
     }
   };
 
-
-// ---- Vapi api begins here ------------------------------
-
-// Load VAPI settings from backend on mount
-useEffect(() => {
-  const loadVapiSettings = async () => {
-    try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/vapi-settings`);
-      if (res.ok) {
-        const data = await res.json();
-        setVapiSettings(data);
+  // Load VAPI settings from backend on mount
+  useEffect(() => {
+    const loadVapiSettings = async () => {
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/vapi-settings`);
+        if (res.ok) {
+          const data = await res.json();
+          setVapiSettings({
+            apiKey: data.api_key || '',
+            assistantId: data.assistant_id || '',
+            fileId: data.file_id || '', // Load file ID from backend
+          });
+        }
+      } catch (err) {
+        console.error('Error loading VAPI settings:', err);
       }
+    };
+    loadVapiSettings();
+  }, []);
+
+  // Handle VAPI settings input changes
+  const handleVapiSettingsChange = (e) => {
+    const { name, value } = e.target;
+    setVapiSettings((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // Save VAPI settings to backend
+  const handleSaveVapiSettings = async () => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/vapi-settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(vapiSettings),
+      });
+      if (!res.ok) throw new Error('Failed to save VAPI settings');
+      alert('VAPI settings saved successfully!');
     } catch (err) {
-      console.error('Error loading VAPI settings:', err);
+      console.error('Error saving VAPI settings:', err);
+      alert('Failed to save VAPI settings.');
     }
   };
-  loadVapiSettings();
-}, []);
-
-
-// Handle VAPI settings input changes
-const handleVapiSettingsChange = (e) => {
-  const { name, value } = e.target;
-  setVapiSettings(prev => ({ ...prev, [name]: value }));
-};
-
-// Save VAPI settings to backend
-const handleSaveVapiSettings = async () => {
-  try {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/vapi-settings`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(vapiSettings),
-    });
-    if (!res.ok) throw new Error('Failed to save VAPI settings');
-    alert('VAPI settings saved successfully!');
-  } catch (err) {
-    console.error('Error saving VAPI settings:', err);
-    alert('Failed to save VAPI settings.');
-  }
-};
-
-
-
-
-
 
   const [cronMinute, cronHour] = appSettings.archiveCronSchedule.split(' ');
 
@@ -211,8 +196,19 @@ const handleSaveVapiSettings = async () => {
           className="fixed top-4 right-4 z-50 text-gray-600 hover:text-gray-800 focus:outline-none p-2 bg-white rounded-full shadow-md"
           aria-label="Open menu"
         >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+          <svg
+            className="w-6 h-6"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M4 6h16M4 12h16M4 18h16"
+            />
           </svg>
         </button>
 
@@ -221,13 +217,13 @@ const handleSaveVapiSettings = async () => {
         <div className="max-w-xl mx-auto p-6 bg-white rounded-xl shadow-lg">
           <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">Admin Settings</h2>
 
-          {/* --- Application Settings Section --- */}
+          {/* Application Settings Section */}
           <div className="mb-8 p-4 border rounded-lg bg-gray-50">
             <h3 className="text-xl font-semibold mb-4 text-gray-700">Application Configuration</h3>
             <div className="space-y-4">
               <div>
                 <label className="block mb-2 font-medium text-gray-600">Timezone</label>
-                <select 
+                <select
                   name="timezone"
                   value={appSettings.timezone}
                   onChange={handleAppSettingsChange}
@@ -250,8 +246,10 @@ const handleSaveVapiSettings = async () => {
                   onChange={handleAppSettingsChange}
                   className="w-full p-2 border rounded bg-white"
                 >
-                  {generateRange(0, 23).map(hour => (
-                    <option key={hour} value={hour}>{padZero(hour)}:00</option>
+                  {generateRange(0, 23).map((hour) => (
+                    <option key={hour} value={hour}>
+                      {padZero(hour)}:00
+                    </option>
                   ))}
                 </select>
               </div>
@@ -264,8 +262,10 @@ const handleSaveVapiSettings = async () => {
                     onChange={handleCronChange}
                     className="w-full p-2 border rounded bg-white"
                   >
-                    {generateRange(0, 23).map(hour => (
-                      <option key={hour} value={hour}>Hour: {padZero(hour)}</option>
+                    {generateRange(0, 23).map((hour) => (
+                      <option key={hour} value={hour}>
+                        Hour: {padZero(hour)}
+                      </option>
                     ))}
                   </select>
                   <select
@@ -274,25 +274,29 @@ const handleSaveVapiSettings = async () => {
                     onChange={handleCronChange}
                     className="w-full p-2 border rounded bg-white"
                   >
-                    {generateRange(0, 59).map(min => (
-                      <option key={min} value={min}>Minute: {padZero(min)}</option>
+                    {generateRange(0, 59).map((min) => (
+                      <option key={min} value={min}>
+                        Minute: {padZero(min)}
+                      </option>
                     ))}
                   </select>
                 </div>
               </div>
             </div>
             <button
-                onClick={handleSaveAppSettings}
-                className="w-full mt-6 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition-colors"
+              onClick={handleSaveAppSettings}
+              className="w-full mt-6 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition-colors"
             >
-                Save Application Settings
+              Save Application Settings
             </button>
-            <p className="text-xs text-amber-600 font-semibold text-center mt-2">Note: Timezone and Archiving changes require a server restart.</p>
+            <p className="text-xs text-amber-600 font-semibold text-center mt-2">
+              Note: Timezone and Archiving changes require a server restart.
+            </p>
           </div>
-          
-          {/* --- Printer Settings Section --- */}
-          <div className="mb-6 p-4 border rounded-lg bg-gray-50">
-             <h3 className="text-xl font-semibold mb-4 text-gray-700">Printer Configuration</h3>
+
+          {/* Printer Settings Section */}
+          <div className="mb-8 p-4 border rounded-lg bg-gray-50">
+            <h3 className="text-xl font-semibold mb-4 text-gray-700">Printer Configuration</h3>
             <label className="block mb-2 font-medium text-gray-600">Select Print Mode:</label>
             <select
               name="mode"
@@ -306,7 +310,9 @@ const handleSaveVapiSettings = async () => {
             </select>
 
             <label className="block mb-2 font-medium text-gray-600">
-              {printerSettings.mode === 'LAN' ? 'Printer IP Address:' : 'Printer/Webhook URL:'}
+              {printerSettings.mode === 'LAN'
+                ? 'Printer IP Address:'
+                : 'Printer/Webhook URL:'}
             </label>
             <input
               name="url"
@@ -315,21 +321,22 @@ const handleSaveVapiSettings = async () => {
               onChange={handlePrinterSettingsChange}
               className="w-full p-2 border rounded mb-4"
               placeholder={
-                printerSettings.mode === 'CLOUD' ? 'e.g., https://your-id.cloudprnt.net/...'
-                : printerSettings.mode === 'MOCK' ? 'e.g., https://n8n.example.com/webhook/...'
-                : 'e.g., 192.168.1.45'
+                printerSettings.mode === 'CLOUD'
+                  ? 'e.g., https://your-id.cloudprnt.net/...'
+                  : printerSettings.mode === 'MOCK'
+                  ? 'e.g., https://n8n.example.com/webhook/...'
+                  : 'e.g., 192.168.1.45'
               }
             />
             <button
-                onClick={handleSavePrinterSettings}
-                className="w-full bg-cyan-500 text-white py-2 rounded-lg hover:bg-cyan-600 transition-colors"
+              onClick={handleSavePrinterSettings}
+              className="w-full bg-cyan-500 text-white py-2 rounded-lg hover:bg-cyan-600 transition-colors"
             >
-                Save Printer Settings
+              Save Printer Settings
             </button>
           </div>
-          {/*------------------VPI settig section ------------------*/}
-          // Add this section to the render method, below the Printer Settings section
-          // In Admin.jsx, update the VAPI Configuration section
+
+          {/* VAPI Configuration Section */}
           <div className="mb-8 p-4 border rounded-lg bg-gray-50">
             <h3 className="text-xl font-semibold mb-4 text-gray-700">VAPI Configuration</h3>
             <form>
@@ -342,7 +349,7 @@ const handleSaveVapiSettings = async () => {
                     value={vapiSettings.apiKey}
                     onChange={handleVapiSettingsChange}
                     className="w-full p-2 border rounded"
-                    autoComplete="current-password" // Added attribute
+                    autoComplete="current-password"
                   />
                 </div>
                 <div>
@@ -355,17 +362,27 @@ const handleSaveVapiSettings = async () => {
                     className="w-full p-2 border rounded"
                   />
                 </div>
+                <div>
+                  <label className="block mb-2 font-medium text-gray-600">File ID</label>
+                  <input
+                    name="fileId"
+                    type="text"
+                    value={vapiSettings.fileId}
+                    onChange={handleVapiSettingsChange}
+                    className="w-full p-2 border rounded"
+                    placeholder="Enter File ID (e.g., cb8a21d2-e264-4791-a0bb-0847d73592d4)..."
+                  />
+                </div>
               </div>
               <button
                 onClick={handleSaveVapiSettings}
-                type="button" // Prevents form submission
+                type="button"
                 className="w-full mt-6 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition-colors"
               >
                 Save VAPI Settings
               </button>
             </form>
           </div>
-
         </div>
       </div>
     </ErrorBoundary>

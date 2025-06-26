@@ -1,0 +1,6 @@
+{
+  "daily_specials": [
+    { "name": "Truffle Pasta", "price": 15.99, "description": "Creamy truffle pasta with mushrooms" },
+    { "name": "Grilled Salmon", "price": 18.99, "description": "Fresh salmon with lemon herb sauce" }
+  ]
+}
