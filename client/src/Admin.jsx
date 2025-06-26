@@ -342,6 +342,7 @@ const handleSaveVapiSettings = async () => {
                     value={vapiSettings.apiKey}
                     onChange={handleVapiSettingsChange}
                     className="w-full p-2 border rounded"
+                    autoComplete="current-password" // Added attribute
                   />
                 </div>
                 <div>
