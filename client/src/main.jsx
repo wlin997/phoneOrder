@@ -5,7 +5,7 @@ import Admin from './Admin.jsx';
 import App from './App.jsx';
 import Report from './Report.jsx';
 import KDS from './KdsComponent.jsx';
-import dailySpecials from './dailySpecials.jsx'; // Note: Incorrect import
+import DailySpecialsManager from './dailySpecials.jsx'; // Corrected import
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -14,7 +14,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <Route path="/" element={<App />} />
       <Route path="/report" element={<Report />} />
       <Route path="/admin" element={<Admin />} />
-      <Route path="/daily-Specials" element={<DailySpecialManager />} /> {/* Path mismatch */}
+      <Route path="/daily-specials" element={<DailySpecialsManager />} /> {/* Fixed path and component */}
       <Route path="/kds" element={<KDS />} />
     </Routes>
   </BrowserRouter>
