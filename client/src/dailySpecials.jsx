@@ -30,10 +30,13 @@ export default function DailySpecialsManager() {
         setStatus({ message: 'VAPI file list retrieved successfully!', type: 'success' });
       } else {
         const errorText = await res.text();
-        setStatus({ message: `Failed to retrieve VAPI file list: ${errorText}`, type: 'error' });
+        // Log the full error response from the server for debugging
+        console.error('Failed to retrieve VAPI file list from backend:', errorText);
+        setStatus({ message: `Failed to retrieve VAPI file list: ${errorText.substring(0, 100)}...`, type: 'error' });
         setFileList([]); // Clear file list on error
       }
     } catch (err) {
+      console.error('Error fetching VAPI file list:', err);
       setStatus({ message: `Error retrieving VAPI file list: ${err.message}`, type: 'error' });
       setFileList([]); // Clear file list on error
     }
@@ -56,10 +59,13 @@ export default function DailySpecialsManager() {
         setStatus({ message: 'File content retrieved successfully!', type: 'success' });
       } else {
         const errorText = await res.text();
-        setStatus({ message: `Failed to retrieve file content: ${errorText}`, type: 'error' });
+        // Log the full error response from the server for debugging
+        console.error('Failed to retrieve file content from backend:', errorText);
+        setStatus({ message: `Failed to retrieve file content: ${errorText.substring(0, 100)}...`, type: 'error' });
         setSelectedFileContent(''); // Clear content on error
       }
     } catch (err) {
+      console.error('Error fetching file content:', err);
       setStatus({ message: `Error retrieving file content: ${err.message}`, type: 'error' });
       setSelectedFileContent(''); // Clear content on error
     }
@@ -95,9 +101,11 @@ export default function DailySpecialsManager() {
         setStatus({ message: 'File content updated successfully!', type: 'success' });
       } else {
         const errorText = await res.text();
-        setStatus({ message: `Failed to update file content: ${errorText}`, type: 'error' });
+        console.error('Failed to update file content from backend:', errorText);
+        setStatus({ message: `Failed to update file content: ${errorText.substring(0, 100)}...`, type: 'error' });
       }
     } catch (err) {
+      console.error('Error updating file content:', err);
       setStatus({ message: `Error updating file content: ${err.message}`, type: 'error' });
     }
   };
