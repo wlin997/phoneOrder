@@ -1045,13 +1045,14 @@ app.post('/api/daily-specials', async (req, res) => {
     // Delete existing specials for the business
     await pool.query('DELETE FROM daily_specials WHERE business_id = $1', [business_id]);
 
-    // Insert new specials
+    // Insert new specials with unique special_id
     const query = `
       INSERT INTO daily_specials (special_id, business_id, special_date, item_name, item_description, price, created_at, updated_at)
       VALUES ($1, $2, CURRENT_DATE, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `;
     for (const special of daily_specials) {
-      await pool.query(query, [special.id || `special-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, business_id, special.name, special.description, special.price]);
+      const specialId = special.id || `special-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      await pool.query(query, [specialId, business_id, special.name, special.description, special.price]);
     }
 
     res.json({ success: true, message: 'Daily specials updated successfully!' });
@@ -1060,7 +1061,6 @@ app.post('/api/daily-specials', async (req, res) => {
     res.status(500).json({ error: 'Failed to update daily specials: ' + err.message });
   }
 });
-
 
 // =================================================================================
 // SERVER INITIALIZATION

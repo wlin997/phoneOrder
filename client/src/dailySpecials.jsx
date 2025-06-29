@@ -175,7 +175,7 @@ export default function DailySpecialsManager() {
       if (res.ok) {
         const responseData = await res.json();
         setStatus({ message: responseData.message || 'Daily specials updated successfully!', type: 'success' });
-        fetchDailySpecials(selectedBusinessId);
+        fetchDailySpecials(selectedBusinessId); // Refresh the list
       } else {
         const errorText = await res.text();
         console.error('Failed to update daily specials from backend:', errorText);
@@ -232,6 +232,20 @@ export default function DailySpecialsManager() {
     if (dataSource === 'vapi') fetchFileContent(fileId);
   };
 
+  // Toggle between VAPI and PostgreSQL
+  const handleToggle = () => {
+    setDataSource(prev => (prev === 'vapi' ? 'postgres' : 'vapi'));
+  };
+
+  // Handle the update button click
+  const handleUpdate = () => {
+    if (dataSource === 'postgres') {
+      updateDailySpecials();
+    } else {
+      updateSelectedFileContent();
+    }
+  };
+
   // Handle menu toggle
   const handleMenuOpen = () => setIsMenuOpen(prev => !prev);
   const handleMenuClose = () => setIsMenuOpen(false);
@@ -286,7 +300,7 @@ export default function DailySpecialsManager() {
                 type="checkbox"
                 id="data-source-toggle"
                 checked={dataSource === 'postgres'}
-                onChange={() => setDataSource(dataSource === 'vapi' ? 'postgres' : 'vapi')}
+                onChange={handleToggle}
                 className="absolute block w-6 h-6 opacity-0 cursor-pointer"
               />
               <label
@@ -298,11 +312,11 @@ export default function DailySpecialsManager() {
                 ></span>
               </label>
             </div>
-            <span className="text-lg font-medium text-gray-700">{dataSource === 'vapi' ? 'VAPI' : 'PostgreSQL'}</span>
+            <span className="text-lg font-medium text-gray-700">{dataSource === 'postgres' ? 'PostgreSQL' : 'VAPI'}</span>
           </div>
 
           {/* VAPI File List or Business Selector */}
-          <div className="mb-8 p-4 border border-gray-200 rounded-lg bg-gray-50 max-h-64 overflow-y2-auto shadow-inner">
+          <div className="mb-8 p-4 border border-gray-200 rounded-lg bg-gray-50 max-h-64 overflow-y-auto shadow-inner">
             <h3 className="text-xl font-semibold mb-4 text-gray-700">
               {dataSource === 'vapi' ? 'Available VAPI Files' : 'Select Business'}
             </h3>
@@ -398,7 +412,7 @@ export default function DailySpecialsManager() {
                           <div className="md:col-span-2">
                             <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                             <textarea
-                              value={special.description || '' }
+                              value={special.description || ''}
                               onChange={(e) => handleSpecialChange(e, index, 'description')}
                               className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                               rows="3"
@@ -430,7 +444,7 @@ export default function DailySpecialsManager() {
                     Add New Special
                   </button>
                   <button
-                    onClick={dataSource === 'vapi' ? updateSelectedFileContent : updateDailySpecials}
+                    onClick={handleUpdate}
                     className={`${commonButtonClasses} ${(!selectedFileId && dataSource === 'vapi' || !selectedBusinessId && dataSource === 'postgres') && 'opacity-50 cursor-not-allowed'}`}
                     disabled={!selectedFileId && dataSource === 'vapi' || !selectedBusinessId && dataSource === 'postgres'}
                   >
