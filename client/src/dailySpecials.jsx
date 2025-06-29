@@ -144,7 +144,7 @@ export default function DailySpecialsManager() {
         const data = await res.json();
         setDailySpecials(data.map(item => ({
           name: item.item_name,
-          price: item.price,
+          price: parseFloat(item.price) || 0, // Ensure price is a number
           description: item.item_description,
           id: item.special_id,
         })));
@@ -302,7 +302,7 @@ export default function DailySpecialsManager() {
           </div>
 
           {/* VAPI File List or Business Selector */}
-          <div className="mb-8 p-4 border border-gray-200 rounded-lg bg-gray-50 max-h-64 overflow-y-auto shadow-inner">
+          <div className="mb-8 p-4 border border-gray-200 rounded-lg bg-gray-50 max-h-64 overflow-y2-auto shadow-inner">
             <h3 className="text-xl font-semibold mb-4 text-gray-700">
               {dataSource === 'vapi' ? 'Available VAPI Files' : 'Select Business'}
             </h3>
@@ -398,7 +398,7 @@ export default function DailySpecialsManager() {
                           <div className="md:col-span-2">
                             <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                             <textarea
-                              value={special.description || ''}
+                              value={special.description || '' }
                               onChange={(e) => handleSpecialChange(e, index, 'description')}
                               className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                               rows="3"
@@ -463,7 +463,7 @@ export default function DailySpecialsManager() {
               <div className="space-y-2">
                 {dailySpecials.map((special, index) => (
                   <div key={special.id || index} className="text-gray-700">
-                    Name: {special.name}, Price: ${special.price.toFixed(2)}, Description: {special.description}
+                    Name: {special.name}, Price: ${(parseFloat(special.price) || 0).toFixed(2)}, Description: {special.description}
                   </div>
                 ))}
               </div>
