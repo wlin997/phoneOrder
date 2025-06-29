@@ -14,6 +14,14 @@ export default function DailySpecialsManager() {
   const [dataSource, setDataSource] = useState('vapi'); // 'vapi' or 'postgres'
   const menuRef = useRef(null);
 
+  // Helper function to generate a simple UUID-like string
+  const generateUUID = () => {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+          var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+      });
+  };
+
   /**
    * Fetches the list of files from VAPI via the backend endpoint `/api/vapi/files`.
    * This endpoint internally retrieves the VAPI API key and assistant ID from the database
@@ -56,7 +64,10 @@ export default function DailySpecialsManager() {
       if (res.ok) {
         const data = await res.json();
         if (data.daily_specials && Array.isArray(data.daily_specials)) {
-          setDailySpecials(data.daily_specials);
+          setDailySpecials(data.daily_specials.map(item => ({
+            ...item,
+            price: item.price !== undefined ? parseFloat(item.price) : '' // Set to empty string if price is 0 or undefined for better UX
+          })));
         } else {
           setDailySpecials([]);
           setStatus({ message: 'Warning: Fetched content is not in expected daily specials format.', type: 'warning' });
@@ -89,7 +100,10 @@ export default function DailySpecialsManager() {
     setStatus({ message: 'Updating selected file content...', type: 'info' });
     try {
       const payloadToSend = {
-        daily_specials: dailySpecials
+        daily_specials: dailySpecials.map(item => ({
+          ...item,
+          price: item.price === '' ? 0 : parseFloat(item.price) || 0 // Ensure price is number for sending
+        }))
       };
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/daily-specials`, {
         method: 'POST',
@@ -144,7 +158,7 @@ export default function DailySpecialsManager() {
         const data = await res.json();
         setDailySpecials(data.map(item => ({
           name: item.item_name,
-          price: parseFloat(item.price) || 0, // Ensure price is a number
+          price: item.price !== undefined ? parseFloat(item.price) : '', // Set to empty string if price is 0 or undefined for better UX
           description: item.item_description,
           id: item.special_id,
         })));
@@ -171,7 +185,13 @@ export default function DailySpecialsManager() {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/daily-specials/postgres`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ business_id: selectedBusinessId, daily_specials: dailySpecials }),
+        body: JSON.stringify({
+          business_id: selectedBusinessId,
+          daily_specials: dailySpecials.map(item => ({
+            ...item,
+            price: item.price === '' ? 0 : parseFloat(item.price) || 0 // Ensure price is number for sending
+          }))
+        }),
       });
       if (res.ok) {
         const responseData = await res.json();
@@ -199,7 +219,8 @@ export default function DailySpecialsManager() {
     const { value } = e.target;
     setDailySpecials(prevSpecials => {
       const newSpecials = [...prevSpecials];
-      newSpecials[index][field] = field === 'price' ? parseFloat(value) || 0 : value;
+      // For price, store as string to allow empty field, convert back to number on save
+      newSpecials[index][field] = field === 'price' ? value : value;
       return newSpecials;
     });
   };
@@ -210,7 +231,7 @@ export default function DailySpecialsManager() {
   const addSpecial = () => {
     setDailySpecials(prevSpecials => [
       ...prevSpecials,
-      { name: '', price: 0.00, description: '', id: Date.now() }
+      { name: '', price: '', description: '', id: generateUUID() } // Price initialized as empty string
     ]);
   };
 
@@ -263,7 +284,10 @@ export default function DailySpecialsManager() {
   // Effect to update the display-only JSON whenever `dailySpecials` changes
   useEffect(() => {
     try {
-      setSelectedFileContent(JSON.stringify({ daily_specials: dailySpecials }, null, 2));
+      setSelectedFileContent(JSON.stringify({ daily_specials: dailySpecials.map(item => ({
+        ...item,
+        price: item.price === '' ? 0 : parseFloat(item.price) || 0 // Ensure price is number for display JSON
+      }))}, null, 2));
     } catch (e) {
       setSelectedFileContent('Error parsing daily specials to JSON.');
     }
@@ -404,7 +428,7 @@ export default function DailySpecialsManager() {
                             <input
                               type="number"
                               step="0.01"
-                              value={special.price || 0}
+                              value={special.price === '' ? '' : parseFloat(special.price)} // Display empty string if price is empty
                               onChange={(e) => handleSpecialChange(e, index, 'price')}
                               className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                               placeholder="e.g., 15.99"
