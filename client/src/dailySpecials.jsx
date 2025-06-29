@@ -167,7 +167,8 @@ export default function DailySpecialsManager() {
     if (!selectedBusinessId || dataSource !== 'postgres') return;
     setStatus({ message: 'Updating daily specials...', type: 'info' });
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/daily-specials`, {
+      // MODIFIED: Changed the endpoint to target the PostgreSQL specific endpoint
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/daily-specials/postgres`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ business_id: selectedBusinessId, daily_specials: dailySpecials }),
@@ -218,7 +219,7 @@ export default function DailySpecialsManager() {
    * @param {number} index The index of the item to delete.
    */
   const deleteSpecial = (indexToDelete) => {
-    setDailySpecials(prevSpecials => 
+    setDailySpecials(prevSpecials =>
       prevSpecials.filter((_, index) => index !== indexToDelete)
     );
   };
@@ -386,7 +387,7 @@ export default function DailySpecialsManager() {
                     {dailySpecials.map((special, index) => (
                       <div key={special.id || index} className="p-4 border border-gray-300 rounded-lg bg-white shadow-sm relative">
                         <h4 className="text-lg font-semibold text-gray-800 mb-3">Special Item #{index + 1}</h4>
-                        
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>

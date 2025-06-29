@@ -935,7 +935,8 @@ app.delete('/api/vapi/files/:fileId', async (req, res) => {
 
 
 // MODIFIED ENDPOINT: Update daily specials in VAPI (Implements delete and re-upload)
-app.post('/api/daily-specials', async (req, res) => {
+// MODIFIED ENDPOINT: Update daily specials in VAPI (Implements delete and re-upload)
+app.post('/api/daily-specials', async (req, res) => { // This remains for VAPI
   try {
     const newContent = req.body; // Expecting the new content as JSON from the frontend
     const { rows } = await pool.query('SELECT api_key, file_id AS vapi_file_id FROM vapi_settings WHERE id = 1');
@@ -971,11 +972,7 @@ app.post('/api/daily-specials', async (req, res) => {
         filename: fileName,
         contentType: fileMimeType
     });
-    // You might also need to append other metadata fields if VAPI requires them for new file creation,
-    // like 'purpose' or 'assistantId' directly to the formData, based on VAPI docs.
-    // Assuming 'purpose' is still needed as a separate field, not part of the file itself.
     formData.append('purpose', 'assistant'); // Add purpose to form data
-
 
     const uploadResponse = await axios.post('https://api.vapi.ai/file', formData, {
         headers: {
@@ -983,25 +980,21 @@ app.post('/api/daily-specials', async (req, res) => {
             Authorization: `Bearer ${api_key}`
         },
     });
-
     const newVapiFile = uploadResponse.data;
     console.log('[VAPI Update Flow] New file uploaded successfully:', newVapiFile);
-
     // Step 3: Update the file_id in your database to the new file's ID
     console.log(`[VAPI Update Flow] Updating database with new file ID: ${newVapiFile.id}`);
     await pool.query(
       'UPDATE vapi_settings SET file_id = $1 WHERE id = 1',
       [newVapiFile.id]
     );
-
     console.log('[VAPI Update Flow] Daily specials updated successfully in VAPI (via re-upload)!');
-    res.json({ 
-        success: true, 
-        message: 'Daily specials updated in VAPI (via re-upload)!', 
+    res.json({
+        success: true,
+        message: 'Daily specials updated in VAPI (via re-upload)!',
         newFileId: newVapiFile.id,
-        vapiResponse: newVapiFile 
+        vapiResponse: newVapiFile
     });
-
   } catch (err) {
     console.error('Error updating daily specials in VAPI:', err.response ? err.response.data : err.message);
     res.status(500).send('Error updating daily specials.');
@@ -1010,7 +1003,7 @@ app.post('/api/daily-specials', async (req, res) => {
 
 
 //=================================================================================
-// get dail special from postgre
+// get daily special from postgre
 //=================================================================================
 app.get('/api/businesses', async (req, res) => {
   try {
@@ -1037,7 +1030,8 @@ app.get('/api/daily-specials', async (req, res) => {
   }
 });
 
-app.post('/api/daily-specials', async (req, res) => {
+// NEW/MODIFIED ENDPOINT: Update daily specials in PostgreSQL
+app.post('/api/daily-specials/postgres', async (req, res) => { // Changed the route here
   try {
     const { business_id, daily_specials } = req.body;
     if (!business_id || !daily_specials) return res.status(400).json({ error: 'business_id and daily_specials are required' });
@@ -1055,10 +1049,10 @@ app.post('/api/daily-specials', async (req, res) => {
       await pool.query(query, [specialId, business_id, special.name, special.description, special.price]);
     }
 
-    res.json({ success: true, message: 'Daily specials updated successfully!' });
+    res.json({ success: true, message: 'Daily specials updated successfully in PostgreSQL!' }); // Added clarity to message
   } catch (err) {
-    console.error('Error updating daily specials:', err);
-    res.status(500).json({ error: 'Failed to update daily specials: ' + err.message });
+    console.error('Error updating daily specials in PostgreSQL:', err); // Added clarity to log
+    res.status(500).json({ error: 'Failed to update daily specials in PostgreSQL: ' + err.message });
   }
 });
 

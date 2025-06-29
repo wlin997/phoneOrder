@@ -1,4 +1,3 @@
-
 // =================================================================================
 // SETUP & CONFIGURATION
 // =================================================================================
@@ -17,6 +16,8 @@ const axios = require('axios');
 const { Pool } = require('pg');
 // Import the pg Pool
 const { DateTime } = require('luxon');
+// Import form-data for multipart/form-data uploads
+const FormData = require('form-data'); // Make sure to 'npm install form-data'
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -65,10 +66,6 @@ app.use(express.json());
 // =================================================================================
 // DATABASE CONNECTION (PostgreSQL)
 // =================================================================================
-// ... your other requires like express, cors, etc.
-
-
-// ADD THIS DEBUGGING LINE:
 console.log('--- DEBUG --- DATABASE_URL is:', process.env.DATABASE_URL);
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -82,9 +79,6 @@ console.log("✅ PostgreSQL client initialized.");
 // HELPER AND UTILITY FUNCTIONS
 // =================================================================================
 let cloudPrintJobs = [];
-// Preserve this from original code
-
-
 // This new function completely replaces getSheetData() and getOrderRows()
  async function getOrdersFromDB() {
     const query = `
@@ -194,11 +188,10 @@ let cloudPrintJobs = [];
 
 async function archiveOrders() {
     console.log(`[Cron Job] Running archiveOrders at ${new Date().toLocaleTimeString()}`);
-// This logic is now handled by querying based on date ranges.
-// Archiving can be a more complex database operation (e.g., moving to another table).
-// For now, we will log that the concept exists.
-console.log("[Cron Job] Archive logic would run here. No action taken in this version.");
-
+    // This logic is now handled by querying based on date ranges.
+    // Archiving can be a more complex database operation (e.g., moving to another table).
+    // For now, we will log that the concept exists.
+    console.log("[Cron Job] Archive logic would run here. No action taken in this version.");
 }
 
 
@@ -209,13 +202,12 @@ console.log("[Cron Job] Archive logic would run here. No action taken in this ve
 app.get("/", (req, res) => res.send("✅ Backend server is alive"));
 const isTodayFilter = (order) => {
     if (!order || !order.timeOrdered) return false;
-// *** CHANGE THIS LINE ***
     // Use fromJSDate() because order.timeOrdered is already a JavaScript Date object from the PG driver.
     const orderDateTime = DateTime.fromJSDate(order.timeOrdered).setZone(appSettings.timezone || 'America/New_York'); // Rectified: Use appSettings.timezone
 
     // Get the current time in the same desired comparison timezone
     const nowDateTime = DateTime.now().setZone(appSettings.timezone || 'America/New_York');
-// Keep your logs for verification (these are very helpful!)
+    // Keep your logs for verification (these are very helpful!)
     console.log(`[isTodayFilter] Checking Order ${order.orderNum}:`);
     console.log(`[isTodayFilter] Order time (${appSettings.timezone || 'America/New_York'}): ${orderDateTime.toISO()}`);
     console.log(`[isTodayFilter] Server's 'now' (${appSettings.timezone || 'America/New_York'}): ${nowDateTime.toISO()}`);
@@ -246,8 +238,7 @@ app.get("/api/updating", async (req, res) => {
             .sort((a, b) => new Date(b.timeOrdered).getTime() - new Date(a.timeOrdered).getTime());
         res.json(updatingOrdersToday);
     } catch (err) {
-       
-res.status(500).json({ error: "Failed to fetch updating orders: " + err.message });
+        res.status(500).json({ error: "Failed to fetch updating orders: " + err.message });
     }
 });
 app.get("/api/printed", async (req, res) => {
@@ -259,7 +250,6 @@ app.get("/api/printed", async (req, res) => {
         res.json(processedOrders);
     } catch (err) {
         res.status(500).json({ error: "Failed to fetch processed orders: " + err.message });
- 
     }
 });
 
@@ -287,7 +277,7 @@ app.get('/api/today-stats', async (req, res) => {
         const nowInNY = DateTime.now().setZone(appSettings.timezone); // Use appSettings.timezone
         const todayNYStart = nowInNY.startOf('day'); // Midnight of today in NY time
         const todayNYEnd = nowInNY.endOf('day'); 
-    // End of day in NY time
+        // End of day in NY time
 
         // Convert these Luxon DateTime objects to ISO strings for PostgreSQL
         // PostgreSQL will correctly interpret these UTC ISO strings as timestamps
@@ -301,18 +291,16 @@ app.get('/api/today-stats', async (req, res) => {
                 COUNT(*) FILTER (WHERE printed_count > 0) AS processed
             FROM orders
             WHERE created_at >= $1 AND created_at <= $2;
-`;
+        `;
         // Pass the calculated start and end dates as parameters
         const { rows } = await pool.query(query, [startDateISO, endDateISO]);
-// <--- New parameters
-
         console.log("[Backend] /api/today-stats - Raw SQL rows response:", rows);
         res.json(rows[0]);
-console.log("[Backend] /api/today-stats - Final JSON sent:", rows[0]);
+        console.log("[Backend] /api/today-stats - Final JSON sent:", rows[0]);
 
     } catch (error) {
         console.error('Error fetching today\'s stats:', error);
-res.status(500).json({ error: 'Failed to fetch today\'s stats: ' + error.message });
+        res.status(500).json({ error: 'Failed to fetch today\'s stats: ' + error.message });
     }
 });
 app.get('/api/order-stats', async (req, res) => {
@@ -346,7 +334,6 @@ app.get('/api/popular-items', async (req, res) => {
             SELECT item_name, SUM(quantity) as count
             FROM order_items
             JOIN orders ON order_items.order_id = orders.id
-  
             WHERE orders.created_at > (NOW() - INTERVAL '${days} days')
             GROUP BY item_name
             ORDER BY count DESC
@@ -354,8 +341,7 @@ app.get('/api/popular-items', async (req, res) => {
         `;
         const { rows } = await pool.query(query);
         const itemCounts = rows.reduce((acc, row) => {
-     
-        acc[row.item_name] = parseInt(row.count, 10);
+            acc[row.item_name] = parseInt(row.count, 10);
             return acc;
         }, {});
         res.json(itemCounts);
@@ -391,8 +377,6 @@ app.get('/api/hourly-orders', async (req, res) => {
             `;
         // Pass the timezone for EXTRACT and the calculated start/end dates
         const { rows } = await pool.query(query, [appSettings.timezone, startDateISO, endDateISO]);
-        // <--- New parameters
-
         // The rest of your Node.js processing logic remains the same,
         // but ensure your initialization loop covers the full range if startHour is 0.
         const hourlyCounts = {};
@@ -405,7 +389,6 @@ app.get('/api/hourly-orders', async (req, res) => {
                     const hourLabel = orderHour < 12 ? `${orderHour === 0 ? 12 : orderHour} AM` : `${orderHour === 12 ? 12 : orderHour - 12} PM`;
                     if (hourlyCounts.hasOwnProperty(hourLabel)) {
                         hourlyCounts[hourLabel] += parseInt(row.count, 10);
-         
                     }
                 });
         console.log("[Backend] /api/hourly-orders - Final hourlyCounts sent:", hourlyCounts);
@@ -429,20 +412,18 @@ app.get('/api/customer-stats', async (req, res) => {
             JOIN orders o ON c.id = o.customer_id
             WHERE o.created_at > (NOW() - INTERVAL '${days} days')
             GROUP BY c.id, c.name, c.phone;
-   
-      `;
+        `;
         const { rows } = await pool.query(query);
         const totalOrders = rows.reduce((sum, row) => sum + parseInt(row.count, 10), 0);
         const repeatCustomers = rows.filter(row => parseInt(row.count, 10) > 1).length;
         const topCustomers = rows
             .sort((a, b) => b.count - a.count)
             .slice(0, 5)
-      
             .map(row => ({ name: row.name, phone: row.phone, count: parseInt(row.count, 10) }));
         res.json({ totalOrders, repeatCustomers, topCustomers });
 } catch (error) {
         console.error('Error fetching customer stats:', error);
-res.status(500).json({ error: 'Failed to fetch customer stats: ' + error.message });
+        res.status(500).json({ error: 'Failed to fetch customer stats: ' + error.message });
     }
 });
 
@@ -500,9 +481,8 @@ function printViaLan(printerIp, payload) {
         client.on('error', (err) => {
             console.error('[LAN] Printer connection error:', err);
             client.destroy();
-   
             reject({ error: "Failed to connect to LAN printer", details: err.message });
-});
+        });
         client.on('timeout', () => {
             console.error(`[LAN] Connection to ${printerIp}:${port} timed out.`);
             client.destroy();
@@ -518,8 +498,7 @@ async function testPrinterConnectivity(printerUrl, mode = 'LAN') {
             client.setTimeout(3000);
             client.connect(9100, printerUrl, () => {
                 client.end();
-             
-    resolve({ available: true, message: 'LAN printer is responsive.' });
+                resolve({ available: true, message: 'LAN printer is responsive.' });
             });
             client.on('error', (err) => resolve({ available: false, error: `LAN printer error: ${err.message}` }));
             client.on('timeout', () => {
@@ -538,7 +517,6 @@ async function testPrinterConnectivity(printerUrl, mode = 'LAN') {
             return resolve({ available: false, error: `Invalid URL: ${err.message}` });
         }
 
-       
         const protocol = url.protocol === 'https:' ? https : http;
         const method = mode === 'MOCK' ? 'POST' : 'HEAD';
         const testPayload = mode === 'MOCK' ? JSON.stringify({ test: true, from: 'PrinterStatusCheck' }) : '';
@@ -546,33 +524,31 @@ async function testPrinterConnectivity(printerUrl, mode = 'LAN') {
         const options = {
             hostname: url.hostname,
             port: url.port || (url.protocol === 'https:' ? 443 : 80),
-      
             path: url.pathname + (url.search || ''),
             method,
             timeout: 5000,
             headers: {
                 'User-Agent': 'Node.js Printer Status Check',
                 ...(mode === 'MOCK' ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(testPayload) } : {})
-    
             }
         };
 
         const req = protocol.request(options, (res) => {
             if (res.statusCode >= 200 && res.statusCode < 400) {
                  resolve({ available: true, message: `Endpoint responded with status ${res.statusCode}` });
-} else {
+            } else {
                  resolve({ available: false, error: `Endpoint not available (Status: ${res.statusCode})` });
-}
+            }
         });
 
         req.on('timeout', () => {
             req.destroy();
             resolve({ available: false, error: 'Connection timed out.' });
         });
-req.on('error', (err) => resolve({ available: false, error: `Request error: ${err.message}` }));
-if (method === 'POST') {
+        req.on('error', (err) => resolve({ available: false, error: `Request error: ${err.message}` }));
+        if (method === 'POST') {
             req.write(testPayload);
-}
+        }
         req.end();
     });
 }
@@ -623,7 +599,6 @@ app.post("/api/fire-order", async (req, res) => {
         let printerSettings;
         try {
             const data = await fsp.readFile(printerSettingsFilePath, 'utf8');
-     
             printerSettings = JSON.parse(data);
         } catch (err) {
             return res.status(400).json({ error: "Printer settings not configured." });
@@ -633,7 +608,6 @@ app.post("/api/fire-order", async (req, res) => {
         const allOrders = await getOrdersFromDB();
         const orderToProcess = allOrders.find(o => o.id === orderId);
         if (!orderToProcess) {
-      
             return res.status(404).json({ error: "Order not found" });
         }
 
@@ -645,14 +619,12 @@ app.post("/api/fire-order", async (req, res) => {
         // Send to printer
         switch (printerSettings.mode) {
             case 'MOCK':
-   
                 try {
                     if (!printerSettings.printerUrl) throw new Error("No URL for MOCK mode");
                     const response = await axios.post(
                         printerSettings.printerUrl,
                         { ...orderToProcess, mode: 'MOCK' },
                         { timeout: 10000 }
-                 
                     );
                     printerResponseData = response.data;
                 } catch (mockErr) {
@@ -700,13 +672,11 @@ app.post("/api/fire-order", async (req, res) => {
             SET 
                 printed_count = printed_count + 1,
                 printed_timestamps = 
-        
             CASE
                         WHEN printed_timestamps IS NULL THEN ARRAY[$2]::text[]
                         ELSE array_append(printed_timestamps, $2)
                     END
-            
-WHERE id = $1
+            WHERE id = $1
             RETURNING printed_count, printed_timestamps;
         `;
         const { rows } = await pool.query(updateQuery, [orderId, now]);
@@ -720,7 +690,7 @@ WHERE id = $1
         });
 } catch (err) {
         console.error("[🔥 API Error /api/fire-order]", err);
-res.status(500).json({ error: "Failed to process order", details: err.message });
+        res.status(500).json({ error: "Failed to process order", details: err.message });
     }
 });
 app.get("/api/kds/active-orders", async (req, res) => {
@@ -732,7 +702,6 @@ app.get("/api/kds/active-orders", async (req, res) => {
 
         // Fix the id mapping
         const formattedOrders = activeKitchenOrders.map(order => ({
-   
             ...order,
             id: order.id // <-- this ensures frontend gets the DB id
         }));
@@ -756,7 +725,6 @@ app.post("/api/kds/prep-order/:orderId", async (req, res) => {
         const updateQuery = `
             UPDATE orders
             SET
-       
             order_update_status = 'Prepped',
                 food_prep_time = $1
             WHERE id = $2;
@@ -778,7 +746,6 @@ app.get("/api/kds/prepped-orders", async (req, res) => {
         // Filter for orders that are marked as 'Prepped'
         const preppedKitchenOrders = allOrders
             .filter(o => o.orderUpdateStatus === 'Prepped')
-      
             .sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) // Sort newest first
             .slice(0, 20); // Optionally limit to the last 20 prepped orders
 
@@ -786,7 +753,6 @@ app.get("/api/kds/prepped-orders", async (req, res) => {
         const formattedOrders = preppedKitchenOrders.map(order => ({
             ...order,
             id: order.id
-      
         }));
 
         res.json(formattedOrders);
@@ -839,94 +805,262 @@ app.get('/api/printer-status', async (req, res) => {
     }
 });
 
-
-
 // =================================================================================
-// VAPI SETTING
+// VAPI SETTING ENDPOINTS (Updated)
 // =================================================================================
 
-// get VAPI settings from Postgre
+// Get VAPI settings from PostgreSQL
 app.get('/api/vapi-settings', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT api_key, assistant_id, file_id FROM vapi_settings WHERE id = 1');
     if (rows.length === 0) {
-      return res.status(404).send('Settings not found');
+      // If no settings exist, return default empty values
+      return res.json({ api_key: '', assistant_id: '', file_id: '' });
     }
     res.json(rows[0]);
   } catch (err) {
-    console.error('Error fetching settings:', err);
-    res.status(500).send('Error fetching settings');
+    console.error('Error fetching VAPI settings:', err);
+    res.status(500).send('Error fetching VAPI settings');
   }
 });
 
-app.put('/api/vapi-settings', async (req, res) => {
+// Save/Update VAPI settings to PostgreSQL (UPSERT logic)
+app.post('/api/vapi-settings', async (req, res) => { // Changed from PUT to POST to match frontend Admin.jsx
   try {
-    const { api_key, assistant_id, file_id } = req.body;
-    await pool.query(
-      'UPDATE vapi_settings SET api_key = $1, assistant_id = $2, file_id = $3 WHERE id = 1',
-      [api_key, assistant_id, file_id]
+    const { apiKey, assistantId, fileId } = req.body; // Use camelCase to match frontend
+    // Attempt to update the existing row with id=1
+    const result = await pool.query(
+      'UPDATE vapi_settings SET api_key = $1, assistant_id = $2, file_id = $3 WHERE id = 1 RETURNING *',
+      [apiKey, assistantId, fileId]
     );
-    res.sendStatus(200);
+
+    // If no row was updated, insert a new one
+    if (result.rowCount === 0) {
+      await pool.query(
+        'INSERT INTO vapi_settings (id, api_key, assistant_id, file_id) VALUES (1, $1, $2, $3)',
+        [apiKey, assistantId, fileId]
+      );
+    }
+    res.json({ success: true, message: 'VAPI settings saved successfully.' });
   } catch (err) {
-    console.error('Error updating settings:', err);
-    res.status(500).send('Error updating settings');
+    console.error('Error saving VAPI settings:', err);
+    res.status(500).send('Error saving VAPI settings');
   }
 });
 
-// Get daily specials from VAPI
-app.get('/api/daily-specials', async (req, res) => {
+// NEW ENDPOINT: Get list of files from VAPI
+app.get('/api/vapi/files', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT api_key, assistant_id FROM vapi_settings WHERE id = 1');
-    if (rows.length === 0) {
-      return res.status(404).send('VAPI settings not found');
+    if (rows.length === 0 || !rows[0].api_key || !rows[0].assistant_id) {
+      console.log('VAPI API Key or Assistant ID not configured.');
+      // Return empty array if settings are missing so frontend can display "No files found"
+      return res.json([]); 
     }
     const { api_key, assistant_id } = rows[0];
+
+    // Make request to VAPI to get file list
     const response = await axios.get(`https://api.vapi.ai/file?assistantId=${assistant_id}`, {
       headers: { Authorization: `Bearer ${api_key}` },
     });
-    const file = response.data.find(f => f.name === 'daily_specials.json');
-    if (file) {
-      const content = await axios.get(`https://api.vapi.ai/file/${file.id}/content`, {
-        headers: { Authorization: `Bearer ${api_key}` },
-      });
-      res.json(content.data);
-    } else {
-      res.status(404).send('No specials found');
-    }
+    res.json(response.data); // Send back the array of files from VAPI
   } catch (err) {
-    console.error('Error retrieving specials:', err);
-    res.status(500).send('Error retrieving specials');
+    console.error('Error listing VAPI files:', err.response ? err.response.data : err.message);
+    res.status(500).send('Error listing VAPI files.');
   }
 });
 
-// Update daily specials in VAPI
-app.get('/api/daily-specials', async (req, res) => {
+// NEW ENDPOINT: Get content of a specific file from VAPI (Updated to VAPI spec)
+app.get('/api/vapi/files/:fileId/content', async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT api_key, file_id FROM vapi_settings WHERE id = 1');
-    if (rows.length === 0) {
-      console.log('No VAPI settings found in database');
-      return res.status(404).send('VAPI settings not found');
+    const { fileId } = req.params;
+    const { rows } = await pool.query('SELECT api_key FROM vapi_settings WHERE id = 1');
+    if (rows.length === 0 || !rows[0].api_key) {
+      console.log('VAPI API Key not configured.');
+      return res.status(400).send('VAPI API Key not configured.');
     }
-    const { api_key, file_id } = rows[0];
-    if (!file_id) {
-      console.log('No file_id configured in database');
-      return res.status(400).send('File ID not configured');
-    }
-    console.log(`Using api_key: ${api_key.substring(0, 4)}... and file_id: ${file_id}`);
+    const { api_key } = rows[0];
 
-    const response = await axios.get(`https://api.vapi.ai/file/${file_id}`, {
+    // Step 1: Get file metadata from VAPI using GET /file/:id
+    const vapiMetadataResponse = await axios.get(`https://api.vapi.ai/file/${fileId}`, {
       headers: { Authorization: `Bearer ${api_key}` },
     });
-    console.log('File content retrieved:', response.data);
-    res.json(response.data);
+
+    const fileMetadata = vapiMetadataResponse.data;
+
+    // Check if the file has an external URL for content
+    if (fileMetadata && fileMetadata.url) {
+        console.log(`[VAPI Content] Fetching content from external URL: ${fileMetadata.url}`);
+        // Step 2: Fetch content from the external URL
+        const externalContentResponse = await axios.get(fileMetadata.url);
+        res.json(externalContentResponse.data); // Send back the content from the URL
+    } else if (fileMetadata && fileMetadata.content !== undefined) {
+        // If VAPI returns content directly (e.g., for smaller, directly stored files)
+        console.log(`[VAPI Content] Content found directly in VAPI metadata.`);
+        res.json(fileMetadata.content);
+    } else {
+        // If neither URL nor direct content is found
+        console.warn(`File ${fileId} data retrieved, but neither 'url' nor 'content' field found. File metadata:`, fileMetadata);
+        res.status(404).send('File content not found or file is not a text-based format accessible via URL/direct content.');
+    }
   } catch (err) {
-    console.error('Error retrieving specials:', err.message);
-    res.status(500).send('Error retrieving specials');
+    console.error(`Error retrieving VAPI file content for ${fileId}:`, err.response ? err.response.data : err.message);
+    res.status(500).send('Error retrieving VAPI file content.');
   }
 });
-app.listen(3000, () => console.log('Server running on port 3000'));
+
+// NEW ENDPOINT: Delete a file from VAPI
+app.delete('/api/vapi/files/:fileId', async (req, res) => {
+    try {
+        const { fileId } = req.params;
+        const { rows } = await pool.query('SELECT api_key FROM vapi_settings WHERE id = 1');
+        if (rows.length === 0 || !rows[0].api_key) {
+            console.log('VAPI API Key not configured.');
+            return res.status(400).send('VAPI API Key not configured.');
+        }
+        const { api_key } = rows[0];
+
+        console.log(`[VAPI Delete] Attempting to delete file: ${fileId}`);
+        const response = await axios.delete(`https://api.vapi.ai/file/${fileId}`, {
+            headers: { Authorization: `Bearer ${api_key}` },
+        });
+
+        console.log('[VAPI Delete] Successful VAPI delete response:', response.data);
+        res.json({ success: true, message: `File ${fileId} deleted from VAPI!`, vapiResponse: response.data });
+    } catch (err) {
+        console.error(`Error deleting VAPI file ${req.params.fileId}:`, err.response ? err.response.data : err.message);
+        res.status(500).send('Error deleting VAPI file.');
+    }
+});
 
 
+// MODIFIED ENDPOINT: Update daily specials in VAPI (Implements delete and re-upload)
+app.post('/api/daily-specials', async (req, res) => {
+  try {
+    const newContent = req.body; // Expecting the new content as JSON from the frontend
+    const { rows } = await pool.query('SELECT api_key, file_id AS vapi_file_id FROM vapi_settings WHERE id = 1');
+    if (rows.length === 0 || !rows[0].api_key || !rows[0].vapi_file_id) {
+      console.log('VAPI API Key or File ID not configured for daily specials update.');
+      return res.status(400).send('VAPI API Key or File ID not configured for daily specials update.');
+    }
+    const { api_key, vapi_file_id: old_vapi_file_id } = rows[0];
+
+    console.log(`[VAPI Update Flow] Attempting to update daily specials.`);
+    const fileName = 'daily_specials.json';
+    const fileMimeType = 'application/json';
+    const jsonContentString = JSON.stringify(newContent);
+    const contentBuffer = Buffer.from(jsonContentString, 'utf8');
+
+    // Step 1: Delete the old file
+    try {
+        console.log(`[VAPI Update Flow] Deleting old file ${old_vapi_file_id}...`);
+        await axios.delete(`https://api.vapi.ai/file/${old_vapi_file_id}`, {
+            headers: { Authorization: `Bearer ${api_key}` },
+        });
+        console.log(`[VAPI Update Flow] Old file ${old_vapi_file_id} deleted successfully.`);
+    } catch (deleteErr) {
+        // Log the error but don't fail the entire process if the file doesn't exist
+        console.warn(`[VAPI Update Flow] Warning: Failed to delete old file ${old_vapi_file_id}. Error: ${deleteErr.response ? deleteErr.response.data : deleteErr.message}`);
+    }
+
+    // Step 2: Upload the new content as a new file using FormData
+    console.log('[VAPI Update Flow] Uploading new file with updated content using FormData...');
+    const formData = new FormData();
+    // Append the file Buffer with filename and contentType
+    formData.append('file', contentBuffer, {
+        filename: fileName,
+        contentType: fileMimeType
+    });
+    // You might also need to append other metadata fields if VAPI requires them for new file creation,
+    // like 'purpose' or 'assistantId' directly to the formData, based on VAPI docs.
+    // Assuming 'purpose' is still needed as a separate field, not part of the file itself.
+    formData.append('purpose', 'assistant'); // Add purpose to form data
+
+
+    const uploadResponse = await axios.post('https://api.vapi.ai/file', formData, {
+        headers: {
+            ...formData.getHeaders(), // IMPORTANT: Include boundary for multipart/form-data
+            Authorization: `Bearer ${api_key}`
+        },
+    });
+
+    const newVapiFile = uploadResponse.data;
+    console.log('[VAPI Update Flow] New file uploaded successfully:', newVapiFile);
+
+    // Step 3: Update the file_id in your database to the new file's ID
+    console.log(`[VAPI Update Flow] Updating database with new file ID: ${newVapiFile.id}`);
+    await pool.query(
+      'UPDATE vapi_settings SET file_id = $1 WHERE id = 1',
+      [newVapiFile.id]
+    );
+
+    console.log('[VAPI Update Flow] Daily specials updated successfully in VAPI (via re-upload)!');
+    res.json({ 
+        success: true, 
+        message: 'Daily specials updated in VAPI (via re-upload)!', 
+        newFileId: newVapiFile.id,
+        vapiResponse: newVapiFile 
+    });
+
+  } catch (err) {
+    console.error('Error updating daily specials in VAPI:', err.response ? err.response.data : err.message);
+    res.status(500).send('Error updating daily specials.');
+  }
+});
+
+
+//=================================================================================
+// get dail special from postgre
+//=================================================================================
+app.get('/api/businesses', async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT business_id, business_name FROM businesses');
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching businesses:', err);
+    res.status(500).json({ error: 'Failed to fetch businesses: ' + err.message });
+  }
+});
+
+app.get('/api/daily-specials', async (req, res) => {
+  try {
+    const { business_id } = req.query;
+    if (!business_id) return res.status(400).json({ error: 'business_id is required' });
+    const { rows } = await pool.query(
+      'SELECT special_id, business_id, special_date, item_name, item_description, price FROM daily_specials WHERE business_id = $1',
+      [business_id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching daily specials:', err);
+    res.status(500).json({ error: 'Failed to fetch daily specials: ' + err.message });
+  }
+});
+
+app.post('/api/daily-specials', async (req, res) => {
+  try {
+    const { business_id, daily_specials } = req.body;
+    if (!business_id || !daily_specials) return res.status(400).json({ error: 'business_id and daily_specials are required' });
+
+    // Delete existing specials for the business
+    await pool.query('DELETE FROM daily_specials WHERE business_id = $1', [business_id]);
+
+    // Insert new specials with unique special_id
+    const query = `
+      INSERT INTO daily_specials (special_id, business_id, special_date, item_name, item_description, price, created_at, updated_at)
+      VALUES ($1, $2, CURRENT_DATE, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    `;
+    for (const special of daily_specials) {
+      const specialId = special.id || `special-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      await pool.query(query, [specialId, business_id, special.name, special.description, special.price]);
+    }
+
+    res.json({ success: true, message: 'Daily specials updated successfully!' });
+  } catch (err) {
+    console.error('Error updating daily specials:', err);
+    res.status(500).json({ error: 'Failed to update daily specials: ' + err.message });
+  }
+});
 
 // =================================================================================
 // SERVER INITIALIZATION
@@ -950,13 +1084,12 @@ const startCronJob = () => {
 
                 const result = await pool.query(`
                     UPDATE orders
-   
                     SET archived = TRUE
                     WHERE created_at <= $1 -- Rectified: Compare with a specific timestamp
                       AND archived = FALSE;
                 `, [archiveCutoffISO]); // Rectified: Pass the calculated date as a parameter
                 
-console.log(`[Cron Job] Archived ${result.rowCount} old unprocessed orders.`);
+                console.log(`[Cron Job] Archived ${result.rowCount} old unprocessed orders.`);
             } catch (err) {
                 console.error("[Cron Job] Failed to archive orders:", err);
             }
@@ -964,7 +1097,6 @@ console.log(`[Cron Job] Archived ${result.rowCount} old unprocessed orders.`);
         {
             scheduled: true,
             timezone: appSettings.timezone
-   
         }
     );
 
@@ -980,7 +1112,6 @@ pool.connect()
             console.log(`🚀 Server running at http://localhost:${PORT}`);
             if (process.env.RENDER_URL) {
                 console.log(`✅ Server is publicly available at: ${process.env.RENDER_URL}`);
-           
             }
         });
     })
@@ -998,7 +1129,3 @@ const saveAppSettings = async (settings) => {
         throw err;
     }
 };
-
-
-
-
