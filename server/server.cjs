@@ -1009,6 +1009,59 @@ app.post('/api/daily-specials', async (req, res) => {
 });
 
 
+//=================================================================================
+// get dail special from postgre
+//=================================================================================
+app.get('/api/businesses', async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT business_id, business_name FROM businesses');
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching businesses:', err);
+    res.status(500).json({ error: 'Failed to fetch businesses: ' + err.message });
+  }
+});
+
+app.get('/api/daily-specials', async (req, res) => {
+  try {
+    const { business_id } = req.query;
+    if (!business_id) return res.status(400).json({ error: 'business_id is required' });
+    const { rows } = await pool.query(
+      'SELECT special_id, business_id, special_date, item_name, item_description, price FROM daily_specials WHERE business_id = $1',
+      [business_id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching daily specials:', err);
+    res.status(500).json({ error: 'Failed to fetch daily specials: ' + err.message });
+  }
+});
+
+app.post('/api/daily-specials', async (req, res) => {
+  try {
+    const { business_id, daily_specials } = req.body;
+    if (!business_id || !daily_specials) return res.status(400).json({ error: 'business_id and daily_specials are required' });
+
+    // Delete existing specials for the business
+    await pool.query('DELETE FROM daily_specials WHERE business_id = $1', [business_id]);
+
+    // Insert new specials
+    const query = `
+      INSERT INTO daily_specials (special_id, business_id, special_date, item_name, item_description, price, created_at, updated_at)
+      VALUES ($1, $2, CURRENT_DATE, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    `;
+    for (const special of daily_specials) {
+      await pool.query(query, [special.id || `special-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, business_id, special.name, special.description, special.price]);
+    }
+
+    res.json({ success: true, message: 'Daily specials updated successfully!' });
+  } catch (err) {
+    console.error('Error updating daily specials:', err);
+    res.status(500).json({ error: 'Failed to update daily specials: ' + err.message });
+  }
+});
+
+
 // =================================================================================
 // SERVER INITIALIZATION
 // =================================================================================
