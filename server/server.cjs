@@ -717,22 +717,37 @@ app.get("/api/kds/active-orders", async (req, res) => {
 });
 app.post("/api/kds/prep-order/:orderId", async (req, res) => {
     const { orderId } = req.params;
-    const { prepTimeMs, prepTimestamp } = req.body; // Expect prepTimeMs and prepTimestamp
+    const { prepTimeMs, prepTimestamp } = req.body; // Destructure prepTimeMs and prepTimestamp
 
-    if (!orderId || prepTimeMs === undefined || !prepTimestamp) { // Validate new fields
+    console.log(`[KDS API] Received prep request for Order #${orderId}`); // Add this log
+    console.log(`[KDS API] prepTimeMs: ${prepTimeMs}, type: ${typeof prepTimeMs}`); // Add this log
+    console.log(`[KDS API] prepTimestamp: ${prepTimestamp}, type: ${typeof prepTimestamp}`); // Add this log
+
+    if (!orderId || prepTimeMs === undefined || prepTimeMs === null || !prepTimestamp) {
+        console.error(`[KDS API] Missing required fields for order #${orderId}: prepTimeMs=${prepTimeMs}, prepTimestamp=${prepTimestamp}`); // Log missing fields
         return res.status(400).json({ error: "Missing orderId, prepTimeMs, or prepTimestamp" });
     }
+
+    // Crucial: Ensure prepTimeMs is a number before using it in the query
+    // Although pg-node typically handles this, explicit parsing can guard against subtle issues
+    const finalPrepTime = typeof prepTimeMs === 'string' ? parseInt(prepTimeMs, 10) : prepTimeMs;
+    if (isNaN(finalPrepTime)) {
+        console.error(`[KDS API] Invalid prepTimeMs for order #${orderId}: ${prepTimeMs}`);
+        return res.status(400).json({ error: "Invalid prepTimeMs format" });
+    }
+
 
     try {
         const updateQuery = `
             UPDATE orders
             SET
                 order_update_status = 'Prepped',
-                food_prep_time = $1,
-                prepped_at_timestamp = $2 -- NEW: Update the timestamp
+                food_prep_time = $1, -- This expects a number
+                prepped_at_timestamp = $2
             WHERE id = $3;
         `;
-        await pool.query(updateQuery, [prepTimeMs, prepTimestamp, orderId]); // Pass prepTimeMs and prepTimestamp
+        // Pass the parsed finalPrepTime
+        await pool.query(updateQuery, [finalPrepTime, prepTimestamp, orderId]);
         res.json({ success: true, message: `Order #${orderId} marked as prepped.` });
     } catch (err) {
         console.error(`[KDS API] Failed to update order #${orderId}:`, err);

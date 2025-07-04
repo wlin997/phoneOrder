@@ -228,8 +228,9 @@ export default function KDS() {
         setModalReadOnly(false); // Reset read-only state
     };
 
-    const handlePrepOrder = async (order, prepTime) => {
+    const handlePrepOrder = async (order, prepTimeMs) => { // CHANGED: Renamed 'prepTime' to 'prepTimeMs' for clarity
         console.log('Prepping order:', order);
+        console.log('Prep time in MS (from frontend):', prepTimeMs); // Add this log
 
         if (!order?.id) {
             alert("Order is missing ID and cannot be prepped.");
@@ -237,17 +238,16 @@ export default function KDS() {
         }
 
         try {
-            // Send prepTime as a number (milliseconds) and also send a timestamp of when it was prepped
-            const prepTimestamp = new Date().toISOString(); // Current time in ISO format for backend
+            const prepTimestamp = new Date().toISOString();
             const res = await fetch(`${import.meta.env.VITE_API_URL}/api/kds/prep-order/${order.id}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prepTimeMs: prepTime, prepTimestamp: prepTimestamp }), // Use prepTimeMs for clarity
+                body: JSON.stringify({ prepTimeMs: prepTimeMs, prepTimestamp: prepTimestamp }), // Ensure correct variable name
             });
 
             if (!res.ok) throw new Error("Failed to mark order as prepped");
 
-            await fetchData(); // ✅ ensures UI syncs with DB
+            await fetchData();
             setSelectedOrder(null);
 
         } catch (error) {
