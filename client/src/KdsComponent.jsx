@@ -258,7 +258,8 @@ export default function KDS() {
     
     return (
         <ErrorBoundary>
-            <div className="min-h-screen bg-gray-100 text-gray-800 font-sans flex flex-row-reverse">
+            {/* Ensure the parent flex container takes full width */}
+            <div className="min-h-screen w-full bg-gray-100 text-gray-800 font-sans flex flex-row-reverse">
                 <button
                     onClick={handleMenuOpen}
                     className="fixed top-4 right-4 z-50 text-gray-600 hover:text-gray-800 focus:outline-none p-2 bg-white rounded-full shadow-md"
@@ -268,10 +269,8 @@ export default function KDS() {
                 </button>
                 <NavMenu isMenuOpen={isMenuOpen} handleMenuClose={handleMenuClose} />
                 
-                {/* Right Panel: Recently Prepped */}
-                {/* Setting to w-1/4 to maintain a consistent proportion, but the min-w ensures content is not squished.
-                    You can adjust w-1/4 to w-1/3 if you prefer it wider, or even a fixed width like w-80 or w-96 */}
-                <div className="w-1/4 bg-white p-4 border-l border-gray-200 flex flex-col min-w-[18rem]"> {/* Adjusted min-w slightly for potential better fit */}
+                {/* Right Panel: Recently Prepped - Give it a fixed, generous width */}
+                <div className="flex-shrink-0 w-80 bg-white p-4 border-l border-gray-200 flex flex-col"> {/* Increased to w-80 (20rem) for more space */}
                     <h2 className="text-xl font-bold mb-4 text-center">Recently Prepped</h2>
                     <div className="overflow-y-auto flex-grow">
                         {preppedOrders.length === 0 && <p className="text-center text-gray-500 mt-8">No orders prepped yet.</p>}
@@ -281,9 +280,8 @@ export default function KDS() {
                     </div>
                 </div>
 
-                {/* Left Panel: Active Orders */}
-                {/* This is the key change: Add a min-w to ensure it maintains a substantial width */}
-                <div className="flex-grow p-6 overflow-y-auto min-w-[70%]"> {/* Changed to min-w-[70%] to ensure it occupies sufficient space. Adjust as needed. */}
+                {/* Left Panel: Active Orders - Let it take all remaining space */}
+                <div className="flex-grow p-6 overflow-y-auto">
                     <h2 className="text-3xl font-bold mb-6 text-center">Active Orders</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {activeOrders.length === 0 && <p className="text-center text-gray-400 col-span-full mt-12">No active orders in the kitchen.</p>}
