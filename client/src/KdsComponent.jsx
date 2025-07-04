@@ -74,26 +74,40 @@ const OrderCard = ({ order, onSwipe }) => {
 };
 
 // --- Order Details Modal Component ---
-// Added a 'readOnly' prop to control the visibility of the "Mark as Prepped" toggle
+// We need to pass the *actual time elapsed* from the moment the order appeared
+// to the modal, and then use that same time when marking as prepped.
+// The 'initialTime' prop already carries this.
 const OrderDetailsModal = ({ order, onClose, onPrep, initialTime, readOnly = false }) => {
     if (!order) return null;
 
-    // If readOnly, we don't need a live timer, just format the initialTime or preppedTime
-    const { formattedTime, start, stop } = useTimer(initialTime);
+    // We still use a timer hook for displaying the time in the modal
+    // but the 'prepTime' passed to onPrep will be 'initialTime'
+    const { formattedTime, start, stop } = useTimer(initialTime); // This timer displays the elapsed time
 
     useEffect(() => {
-        if (!readOnly) { // Only start timer if not in read-only mode
+        if (!readOnly) {
             start();
         }
         return () => stop();
     }, [start, stop, readOnly]);
     
     const handlePrep = () => {
-        onPrep(order, formattedTime);
+        // IMPORTANT CHANGE HERE: Pass 'initialTime' (the time from the card)
+        // to onPrep, not the modal's elapsedTime which just started counting.
+        onPrep(order, initialTime); // Pass the initialTime passed to the modal
+    };
+
+    const formatTime = (timeInMs) => {
+        const totalSeconds = Math.floor(timeInMs / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     };
 
     // Determine the time to display in the modal header
-    const displayTime = readOnly && order.timePrepped ? order.timePrepped : formattedTime;
+    const displayTime = readOnly && order.foodPrepTime !== undefined && order.foodPrepTime !== null 
+                        ? formatTime(order.foodPrepTime) 
+                        : formattedTime; // For active orders, use the live timer formatted time
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -114,7 +128,6 @@ const OrderDetailsModal = ({ order, onClose, onPrep, initialTime, readOnly = fal
                         ))}
                     </ul>
                 </div>
-                {/* Conditionally render the "Mark as Prepped" toggle */}
                 {!readOnly && (
                     <div className="p-4 bg-gray-100 rounded-b-xl flex items-center justify-center">
                         <label htmlFor="prep-toggle" className="flex items-center cursor-pointer">
@@ -131,6 +144,7 @@ const OrderDetailsModal = ({ order, onClose, onPrep, initialTime, readOnly = fal
         </div>
     );
 };
+
 
 // --- Prepped Order Display Component ---
 // This new component will display prepped order details and be clickable.
@@ -161,13 +175,14 @@ const PreppedOrderDisplay = ({ order, onClick }) => {
 
 
 // --- Main KDS Page Component ---
+// --- Main KDS Page Component --- (No changes needed here for logic related to passing initialModalTime, it's correct)
 export default function KDS() {
     const [activeOrders, setActiveOrders] = useState([]);
     const [preppedOrders, setPreppedOrders] = useState([]);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [initialModalTime, setInitialModalTime] = useState(0);
-    const [modalReadOnly, setModalReadOnly] = useState(false); // New state for read-only modal
+    const [modalReadOnly, setModalReadOnly] = useState(false);
 
     const fetchData = useCallback(async () => {
         try {
@@ -180,15 +195,13 @@ export default function KDS() {
             const activeData = await activeRes.json();
             const preppedData = await preppedRes.json();
 
-            // Filter prepped orders to disappear after an hour
             const oneHourAgo = Date.now() - (60 * 60 * 1000);
             const filteredPreppedData = preppedData.filter(order => {
-                // Ensure preppedTimestamp exists and is a valid date
                 if (order.preppedTimestamp) {
                     const preppedTime = new Date(order.preppedTimestamp).getTime();
                     return preppedTime > oneHourAgo;
                 }
-                return false; // If no preppedTimestamp, filter it out
+                return false;
             });
 
             setActiveOrders(activeData);
@@ -201,7 +214,7 @@ export default function KDS() {
 
     useEffect(() => {
         fetchData();
-        const intervalId = setInterval(fetchData, 15000); // Refresh every 15 seconds
+        const intervalId = setInterval(fetchData, 15000);
         return () => clearInterval(intervalId);
     }, [fetchData]);
     
@@ -210,27 +223,25 @@ export default function KDS() {
 
     const handleSwipe = (order, time) => {
         setSelectedOrder(order);
-        setInitialModalTime(time);
-        setModalReadOnly(false); // Active orders are not read-only
+        setInitialModalTime(time); // This time is correct from the OrderCard
+        setModalReadOnly(false);
     };
 
     const handlePreppedOrderClick = (order) => {
         setSelectedOrder(order);
-        // For prepped orders, initialTime isn't a live timer, but rather the prep duration
-        // We'll pass the foodPrepTime to the modal, which can then format it as the "initial time" to display.
-        setInitialModalTime(order.foodPrepTime || 0); // Pass the total prep time
-        setModalReadOnly(true); // Prepped orders are read-only in the modal
+        setInitialModalTime(order.foodPrepTime || 0);
+        setModalReadOnly(true);
     };
     
     const handleCloseModal = () => {
         setSelectedOrder(null);
         setInitialModalTime(0);
-        setModalReadOnly(false); // Reset read-only state
+        setModalReadOnly(false);
     };
 
-    const handlePrepOrder = async (order, prepTimeMs) => { // CHANGED: Renamed 'prepTime' to 'prepTimeMs' for clarity
+    const handlePrepOrder = async (order, prepTimeMs) => { // This function receives the correct elapsedTime
         console.log('Prepping order:', order);
-        console.log('Prep time in MS (from frontend):', prepTimeMs); // Add this log
+        console.log('Prep time in MS (from frontend):', prepTimeMs); // This log will now show the correct duration
 
         if (!order?.id) {
             alert("Order is missing ID and cannot be prepped.");
@@ -242,7 +253,7 @@ export default function KDS() {
             const res = await fetch(`${import.meta.env.VITE_API_URL}/api/kds/prep-order/${order.id}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prepTimeMs: prepTimeMs, prepTimestamp: prepTimestamp }), // Ensure correct variable name
+                body: JSON.stringify({ prepTimeMs: prepTimeMs, prepTimestamp: prepTimestamp }),
             });
 
             if (!res.ok) throw new Error("Failed to mark order as prepped");
@@ -258,7 +269,6 @@ export default function KDS() {
     
     return (
         <ErrorBoundary>
-            {/* Main container: flex, full height and width */}
             <div className="min-h-screen w-screen bg-gray-100 text-gray-800 font-sans flex flex-row-reverse">
                 <button
                     onClick={handleMenuOpen}
@@ -269,8 +279,7 @@ export default function KDS() {
                 </button>
                 <NavMenu isMenuOpen={isMenuOpen} handleMenuClose={handleMenuClose} />
                 
-                {/* Right Panel: Recently Prepped - Fixed width, no shrinking */}
-                <div className="flex-none w-80 bg-white p-4 border-l border-gray-200 flex flex-col"> {/* Use flex-none to prevent shrinking */}
+                <div className="flex-none w-80 bg-white p-4 border-l border-gray-200 flex flex-col">
                     <h2 className="text-xl font-bold mb-4 text-center">Recently Prepped</h2>
                     <div className="overflow-y-auto flex-grow">
                         {preppedOrders.length === 0 && <p className="text-center text-gray-500 mt-8">No orders prepped yet.</p>}
@@ -280,8 +289,7 @@ export default function KDS() {
                     </div>
                 </div>
 
-                {/* Left Panel: Active Orders - Takes all remaining space, always */}
-                <div className="flex-grow bg-gray-100 p-6 overflow-y-auto"> {/* Removed min-w and explicitly assigned background */}
+                <div className="flex-grow bg-gray-100 p-6 overflow-y-auto">
                     <h2 className="text-3xl font-bold mb-6 text-center">Active Orders</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {activeOrders.length === 0 && <p className="text-center text-gray-400 col-span-full mt-12">No active orders in the kitchen.</p>}
@@ -296,7 +304,7 @@ export default function KDS() {
                     onClose={handleCloseModal} 
                     onPrep={handlePrepOrder} 
                     initialTime={initialModalTime}
-                    readOnly={modalReadOnly} // Pass the readOnly state
+                    readOnly={modalReadOnly}
                 />
             </div>
             <style>{`
