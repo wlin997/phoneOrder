@@ -106,7 +106,9 @@ const OrderDetailsModal = ({ order, onClose, onPrep, initialTime }) => {
                     <ul>
                         {order.items.map((item, index) => (
                             <li key={index} className="mb-2 p-2 bg-gray-50 rounded">
-                                <span className="font-bold text-gray-800">{item.qty}x {item.item}</span>
+                                {/* MODIFICATION HERE: Change item.item to item.item_name */}
+                                <span className="font-bold text-gray-800">{item.qty}x {item.item_name}</span>
+                                {/* MODIFICATION HERE: Keep item.modifier as it's pre-processed in backend */}
                                 {item.modifier && <p className="text-sm text-red-600 pl-4">Mod: {item.modifier}</p>}
                             </li>
                         ))}
@@ -201,8 +203,6 @@ export default function KDS() {
             alert("Could not mark order as prepped. Please try again.");
         }
     };
-
-
 
     
     return (
