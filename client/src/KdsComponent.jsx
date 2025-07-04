@@ -258,8 +258,8 @@ export default function KDS() {
     
     return (
         <ErrorBoundary>
-            {/* Ensure the parent flex container takes full width */}
-            <div className="min-h-screen w-full bg-gray-100 text-gray-800 font-sans flex flex-row-reverse">
+            {/* Main container: flex, full height and width */}
+            <div className="min-h-screen w-screen bg-gray-100 text-gray-800 font-sans flex flex-row-reverse">
                 <button
                     onClick={handleMenuOpen}
                     className="fixed top-4 right-4 z-50 text-gray-600 hover:text-gray-800 focus:outline-none p-2 bg-white rounded-full shadow-md"
@@ -269,8 +269,8 @@ export default function KDS() {
                 </button>
                 <NavMenu isMenuOpen={isMenuOpen} handleMenuClose={handleMenuClose} />
                 
-                {/* Right Panel: Recently Prepped - Give it a fixed, generous width */}
-                <div className="flex-shrink-0 w-80 bg-white p-4 border-l border-gray-200 flex flex-col"> {/* Increased to w-80 (20rem) for more space */}
+                {/* Right Panel: Recently Prepped - Fixed width, no shrinking */}
+                <div className="flex-none w-80 bg-white p-4 border-l border-gray-200 flex flex-col"> {/* Use flex-none to prevent shrinking */}
                     <h2 className="text-xl font-bold mb-4 text-center">Recently Prepped</h2>
                     <div className="overflow-y-auto flex-grow">
                         {preppedOrders.length === 0 && <p className="text-center text-gray-500 mt-8">No orders prepped yet.</p>}
@@ -280,8 +280,8 @@ export default function KDS() {
                     </div>
                 </div>
 
-                {/* Left Panel: Active Orders - Let it take all remaining space */}
-                <div className="flex-grow p-6 overflow-y-auto">
+                {/* Left Panel: Active Orders - Takes all remaining space, always */}
+                <div className="flex-grow bg-gray-100 p-6 overflow-y-auto"> {/* Removed min-w and explicitly assigned background */}
                     <h2 className="text-3xl font-bold mb-6 text-center">Active Orders</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {activeOrders.length === 0 && <p className="text-center text-gray-400 col-span-full mt-12">No active orders in the kitchen.</p>}
