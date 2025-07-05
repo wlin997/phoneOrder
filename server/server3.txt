@@ -80,7 +80,7 @@ console.log("✅ PostgreSQL client initialized.");
 // =================================================================================
 let cloudPrintJobs = [];
 // This new function completely replaces getSheetData() and getOrderRows()
- async function getOrdersFromDB() {
+async function getOrdersFromDB() {
     const query = `
         SELECT
             o.id AS order_id,
@@ -108,7 +108,8 @@ let cloudPrintJobs = [];
             i.total_price AS total_price_each,
             m.id AS modifier_id,
             m.modifier_name,
-            m.price_delta
+            m.price_delta,
+            o.prepped_at_timestamp -- ADDED: Select the new column
         FROM orders o
         JOIN customers c ON o.customer_id = c.id
         LEFT JOIN order_items i ON o.id = i.order_id
@@ -119,8 +120,6 @@ let cloudPrintJobs = [];
 
     const { rows } = await pool.query(query);
     console.log("[Backend] Raw rows from DB query:", rows);
-
-    // Restructure the flat SQL result into the nested JSON the frontend expects
     const ordersMap = new Map();
     for (const row of rows) {
         if (!ordersMap.has(row.order_id)) {
@@ -146,6 +145,8 @@ let cloudPrintJobs = [];
                 email: row.customer_email,
                 callerAddress: row.customer_address,
                 items: [],
+                foodPrepTime: row.food_prep_time, // ADDED: Pass this from DB
+                preppedTimestamp: row.prepped_at_timestamp // ADDED: Pass this from DB
             });
         }
 
@@ -185,6 +186,7 @@ let cloudPrintJobs = [];
     console.log("[Backend] ordersMap values (pre-filter):", Array.from(ordersMap.values()));
     return Array.from(ordersMap.values());
 }
+
 
 async function archiveOrders() {
     console.log(`[Cron Job] Running archiveOrders at ${new Date().toLocaleTimeString()}`);
@@ -715,25 +717,40 @@ app.get("/api/kds/active-orders", async (req, res) => {
 });
 app.post("/api/kds/prep-order/:orderId", async (req, res) => {
     const { orderId } = req.params;
-    const { prepTime } = req.body;
+    const { prepTimeMs, prepTimestamp } = req.body; // Destructure prepTimeMs and prepTimestamp
 
-    if (!orderId || prepTime === undefined) {
-        return res.status(400).json({ error: "Missing orderId or prepTime" });
+    console.log(`[KDS API] Received prep request for Order #${orderId}`); // Add this log
+    console.log(`[KDS API] prepTimeMs: ${prepTimeMs}, type: ${typeof prepTimeMs}`); // Add this log
+    console.log(`[KDS API] prepTimestamp: ${prepTimestamp}, type: ${typeof prepTimestamp}`); // Add this log
+
+    if (!orderId || prepTimeMs === undefined || prepTimeMs === null || !prepTimestamp) {
+        console.error(`[KDS API] Missing required fields for order #${orderId}: prepTimeMs=${prepTimeMs}, prepTimestamp=${prepTimestamp}`); // Log missing fields
+        return res.status(400).json({ error: "Missing orderId, prepTimeMs, or prepTimestamp" });
     }
+
+    // Crucial: Ensure prepTimeMs is a number before using it in the query
+    // Although pg-node typically handles this, explicit parsing can guard against subtle issues
+    const finalPrepTime = typeof prepTimeMs === 'string' ? parseInt(prepTimeMs, 10) : prepTimeMs;
+    if (isNaN(finalPrepTime)) {
+        console.error(`[KDS API] Invalid prepTimeMs for order #${orderId}: ${prepTimeMs}`);
+        return res.status(400).json({ error: "Invalid prepTimeMs format" });
+    }
+
 
     try {
         const updateQuery = `
             UPDATE orders
             SET
-            order_update_status = 'Prepped',
-                food_prep_time = $1
-            WHERE id = $2;
+                order_update_status = 'Prepped',
+                food_prep_time = $1, -- This expects a number
+                prepped_at_timestamp = $2
+            WHERE id = $3;
         `;
-        await pool.query(updateQuery, [prepTime, orderId]);
+        // Pass the parsed finalPrepTime
+        await pool.query(updateQuery, [finalPrepTime, prepTimestamp, orderId]);
         res.json({ success: true, message: `Order #${orderId} marked as prepped.` });
     } catch (err) {
-        console.error(`[KDS API] Failed to update 
-order #${orderId}:`, err);
+        console.error(`[KDS API] Failed to update order #${orderId}:`, err);
         res.status(500).json({ error: "Failed to update order in database", details: err.message });
     }
 });
@@ -746,8 +763,8 @@ app.get("/api/kds/prepped-orders", async (req, res) => {
         // Filter for orders that are marked as 'Prepped'
         const preppedKitchenOrders = allOrders
             .filter(o => o.orderUpdateStatus === 'Prepped')
-            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) // Sort newest first
-            .slice(0, 20); // Optionally limit to the last 20 prepped orders
+            .sort((a, b) => new Date(b.preppedTimestamp || b.created_at) - new Date(a.preppedTimestamp || a.created_at)) // Sort by preppedTimestamp if available, otherwise by created_at
+            // .slice(0, 20); // Optionally limit to the last 20 prepped orders - The frontend will handle the 1-hour filter
 
         // Format the data for the frontend (id vs order_id)
         const formattedOrders = preppedKitchenOrders.map(order => ({
