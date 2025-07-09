@@ -3,6 +3,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import NavMenu from './components/NavMenu';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useSwipeable } from 'react-swipeable';
+import { useAuth } from './AuthContext'; // Import useAuth
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
 
 // --- Timer Hook ---
 const useTimer = (initialElapsedTime = 0) => {
@@ -28,7 +30,7 @@ const useTimer = (initialElapsedTime = 0) => {
         stop();
         setElapsedTime(0);
     }, [stop]);
-    
+
     const formatTime = (timeInMs) => {
         const totalSeconds = Math.floor(timeInMs / 1000);
         const minutes = Math.floor(totalSeconds / 60);
@@ -42,7 +44,7 @@ const useTimer = (initialElapsedTime = 0) => {
 // --- Order Card Component ---
 const OrderCard = ({ order, onSwipe }) => {
     const { elapsedTime, formattedTime, start } = useTimer();
-    
+
     useEffect(() => {
         start();
     }, [start]);
@@ -74,15 +76,10 @@ const OrderCard = ({ order, onSwipe }) => {
 };
 
 // --- Order Details Modal Component ---
-// We need to pass the *actual time elapsed* from the moment the order appeared
-// to the modal, and then use that same time when marking as prepped.
-// The 'initialTime' prop already carries this.
 const OrderDetailsModal = ({ order, onClose, onPrep, initialTime, readOnly = false }) => {
     if (!order) return null;
 
-    // We still use a timer hook for displaying the time in the modal
-    // but the 'prepTime' passed to onPrep will be 'initialTime'
-    const { formattedTime, start, stop } = useTimer(initialTime); // This timer displays the elapsed time
+    const { formattedTime, start, stop } = useTimer(initialTime);
 
     useEffect(() => {
         if (!readOnly) {
@@ -90,11 +87,9 @@ const OrderDetailsModal = ({ order, onClose, onPrep, initialTime, readOnly = fal
         }
         return () => stop();
     }, [start, stop, readOnly]);
-    
+
     const handlePrep = () => {
-        // IMPORTANT CHANGE HERE: Pass 'initialTime' (the time from the card)
-        // to onPrep, not the modal's elapsedTime which just started counting.
-        onPrep(order, initialTime); // Pass the initialTime passed to the modal
+        onPrep(order, initialTime);
     };
 
     const formatTime = (timeInMs) => {
@@ -104,10 +99,9 @@ const OrderDetailsModal = ({ order, onClose, onPrep, initialTime, readOnly = fal
         return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     };
 
-    // Determine the time to display in the modal header
-    const displayTime = readOnly && order.foodPrepTime !== undefined && order.foodPrepTime !== null 
-                        ? formatTime(order.foodPrepTime) 
-                        : formattedTime; // For active orders, use the live timer formatted time
+    const displayTime = readOnly && order.foodPrepTime !== undefined && order.foodPrepTime !== null
+                        ? formatTime(order.foodPrepTime)
+                        : formattedTime;
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -147,7 +141,6 @@ const OrderDetailsModal = ({ order, onClose, onPrep, initialTime, readOnly = fal
 
 
 // --- Prepped Order Display Component ---
-// This new component will display prepped order details and be clickable.
 const PreppedOrderDisplay = ({ order, onClick }) => {
     // Format prepped timestamp and prep duration for display
     const formatTime = (timeInMs) => {
@@ -158,7 +151,7 @@ const PreppedOrderDisplay = ({ order, onClick }) => {
     };
 
     const preppedTimestamp = order.preppedTimestamp ? new Date(order.preppedTimestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : 'N/A';
-    const totalPrepTime = order.foodPrepTime ? formatTime(order.foodPrepTime) : 'N/A'; // Assuming foodPrepTime is in milliseconds
+    const totalPrepTime = order.foodPrepTime ? formatTime(order.foodPrepTime) : 'N/A';
 
     return (
         <div
@@ -175,7 +168,6 @@ const PreppedOrderDisplay = ({ order, onClick }) => {
 
 
 // --- Main KDS Page Component ---
-// --- Main KDS Page Component --- (No changes needed here for logic related to passing initialModalTime, it's correct)
 export default function KDS() {
     const [activeOrders, setActiveOrders] = useState([]);
     const [preppedOrders, setPreppedOrders] = useState([]);
@@ -184,14 +176,44 @@ export default function KDS() {
     const [initialModalTime, setInitialModalTime] = useState(0);
     const [modalReadOnly, setModalReadOnly] = useState(false);
 
+    const { isAuthenticated, logout } = useAuth(); // Use useAuth hook
+    const navigate = useNavigate();
+
+    // Redirect if not authenticated
+    useEffect(() => {
+        if (!isAuthenticated) {
+            navigate('/login');
+        }
+    }, [isAuthenticated, navigate]);
+
+
     const fetchData = useCallback(async () => {
+        const accessToken = localStorage.getItem('accessToken');
+        if (!accessToken) {
+            console.log("No access token found for KDS fetch, logging out.");
+            logout();
+            return;
+        }
+
         try {
             const [activeRes, preppedRes] = await Promise.all([
-                fetch(`${import.meta.env.VITE_API_URL}/api/kds/active-orders`),
-                fetch(`${import.meta.env.VITE_API_URL}/api/kds/prepped-orders`),
+                fetch(`${import.meta.env.VITE_API_URL}/api/kds/active-orders`, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                }),
+                fetch(`${import.meta.env.VITE_API_URL}/api/kds/prepped-orders`, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                }),
             ]);
-            if (!activeRes.ok || !preppedRes.ok) throw new Error("Failed to fetch KDS data");
-            
+
+            if (!activeRes.ok || !preppedRes.ok) {
+                if (activeRes.status === 401 || activeRes.status === 403 || preppedRes.status === 401 || preppedRes.status === 403) {
+                    console.error("Auth error fetching KDS data, logging out.");
+                    logout();
+                    return;
+                }
+                throw new Error("Failed to fetch KDS data");
+            }
+
             const activeData = await activeRes.json();
             const preppedData = await preppedRes.json();
 
@@ -210,20 +232,22 @@ export default function KDS() {
         } catch (error) {
             console.error("Error fetching KDS data:", error);
         }
-    }, []);
+    }, [logout]); // Depend on logout
 
     useEffect(() => {
+        if (!isAuthenticated) return; // Don't fetch if not authenticated
+
         fetchData();
         const intervalId = setInterval(fetchData, 15000);
         return () => clearInterval(intervalId);
-    }, [fetchData]);
-    
+    }, [fetchData, isAuthenticated]);
+
     const handleMenuOpen = () => setIsMenuOpen(true);
     const handleMenuClose = () => setIsMenuOpen(false);
 
     const handleSwipe = (order, time) => {
         setSelectedOrder(order);
-        setInitialModalTime(time); // This time is correct from the OrderCard
+        setInitialModalTime(time);
         setModalReadOnly(false);
     };
 
@@ -232,19 +256,26 @@ export default function KDS() {
         setInitialModalTime(order.foodPrepTime || 0);
         setModalReadOnly(true);
     };
-    
+
     const handleCloseModal = () => {
         setSelectedOrder(null);
         setInitialModalTime(0);
         setModalReadOnly(false);
     };
 
-    const handlePrepOrder = async (order, prepTimeMs) => { // This function receives the correct elapsedTime
+    const handlePrepOrder = async (order, prepTimeMs) => {
         console.log('Prepping order:', order);
-        console.log('Prep time in MS (from frontend):', prepTimeMs); // This log will now show the correct duration
+        console.log('Prep time in MS (from frontend):', prepTimeMs);
 
         if (!order?.id) {
             alert("Order is missing ID and cannot be prepped.");
+            return;
+        }
+
+        const accessToken = localStorage.getItem('accessToken');
+        if (!accessToken) {
+            alert("Authentication token missing. Please log in again.");
+            logout();
             return;
         }
 
@@ -252,11 +283,21 @@ export default function KDS() {
             const prepTimestamp = new Date().toISOString();
             const res = await fetch(`${import.meta.env.VITE_API_URL}/api/kds/prep-order/${order.id}`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${accessToken}`
+                },
                 body: JSON.stringify({ prepTimeMs: prepTimeMs, prepTimestamp: prepTimestamp }),
             });
 
-            if (!res.ok) throw new Error("Failed to mark order as prepped");
+            if (!res.ok) {
+                if (res.status === 401 || res.status === 403) {
+                    alert("Authentication expired or unauthorized. Please log in again.");
+                    logout();
+                    return;
+                }
+                throw new Error("Failed to mark order as prepped");
+            }
 
             await fetchData();
             setSelectedOrder(null);
@@ -266,7 +307,7 @@ export default function KDS() {
             alert("Could not mark order as prepped. Please try again.");
         }
     };
-    
+
     return (
         <ErrorBoundary>
             <div className="min-h-screen w-screen bg-gray-100 text-gray-800 font-sans flex flex-row-reverse">
@@ -278,7 +319,7 @@ export default function KDS() {
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
                 </button>
                 <NavMenu isMenuOpen={isMenuOpen} handleMenuClose={handleMenuClose} />
-                
+
                 <div className="flex-none w-80 bg-white p-4 border-l border-gray-200 flex flex-col">
                     <h2 className="text-xl font-bold mb-4 text-center">Recently Prepped</h2>
                     <div className="overflow-y-auto flex-grow">
@@ -299,10 +340,10 @@ export default function KDS() {
                     </div>
                 </div>
 
-                <OrderDetailsModal 
-                    order={selectedOrder} 
-                    onClose={handleCloseModal} 
-                    onPrep={handlePrepOrder} 
+                <OrderDetailsModal
+                    order={selectedOrder}
+                    onClose={handleCloseModal}
+                    onPrep={handlePrepOrder}
                     initialTime={initialModalTime}
                     readOnly={modalReadOnly}
                 />

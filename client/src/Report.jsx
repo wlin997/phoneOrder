@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom'; // Import useNavigate
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
   LabelList
 } from 'recharts';
 import ErrorBoundary from './components/ErrorBoundary';
 import NavMenu from './components/NavMenu';
+import { useAuth } from './AuthContext'; // Import useAuth
 
 // The main component for displaying order reports.
 function Report() {
@@ -25,6 +26,16 @@ function Report() {
     processed: 0
   });
 
+  const { isAuthenticated, logout } = useAuth(); // Use useAuth hook
+  const navigate = useNavigate();
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/login');
+    }
+  }, [isAuthenticated, navigate]);
+
   // Generates a date range array starting from yesterday.
   const generateDateRange = (days) => {
     const dates = [];
@@ -40,65 +51,112 @@ function Report() {
   };
 
   // Fetches data for the "Today's Activities by Hour" chart.
-  const fetchHourlyData = async () => {
+  const fetchHourlyData = useCallback(async () => {
+    const accessToken = localStorage.getItem('accessToken');
+    if (!accessToken) {
+      console.log("No access token found for hourly data, logging out.");
+      logout();
+      return;
+    }
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/hourly-orders`);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/hourly-orders`, {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          console.error("Auth error fetching hourly data, logging out.");
+          logout();
+          return;
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       const data = await response.json();
       const formattedData = Object.entries(data).map(([hour, count]) => ({ hour, count }));
       setHourlyData(formattedData);
     } catch (err) {
       console.error('Failed to fetch hourly data:', err);
     }
-  };
+  }, [logout]); // Depend on logout
 
   // Fetches statistics for the "Today's Orders" card.
-  const fetchTodayStats = async () => {
+  const fetchTodayStats = useCallback(async () => {
+    const accessToken = localStorage.getItem('accessToken');
+    if (!accessToken) {
+      console.log("No access token found for today stats, logging out.");
+      logout();
+      return;
+    }
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/today-stats`);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/today-stats`, {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          console.error("Auth error fetching today's stats, logging out.");
+          logout();
+          return;
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       const data = await response.json();
       setTodayStats(data);
     } catch (err) {
       console.error('Failed to fetch today\'s stats:', err);
     }
-  };
+  }, [logout]); // Depend on logout
 
 
   // Main data fetching effect, runs when the date range changes.
   useEffect(() => {
+    if (!isAuthenticated) return; // Don't fetch if not authenticated
+
     const fetchData = async () => {
+      const accessToken = localStorage.getItem('accessToken');
+      if (!accessToken) {
+        console.log("No access token found for report data, logging out.");
+        logout();
+        return;
+      }
+
       try {
+        const headers = { 'Authorization': `Bearer ${accessToken}` };
         const statsUrl = `${import.meta.env.VITE_API_URL}/api/order-stats?range=${range}`;
         const itemsUrl = `${import.meta.env.VITE_API_URL}/api/popular-items?range=${range}`;
         const customerStatsUrl = `${import.meta.env.VITE_API_URL}/api/customer-stats?range=${range}`;
 
         const [statsRes, itemsRes, customerStatsRes] = await Promise.all([
-          fetch(statsUrl),
-          fetch(itemsUrl),
-          fetch(customerStatsUrl)
+          fetch(statsUrl, { headers }),
+          fetch(itemsUrl, { headers }),
+          fetch(customerStatsUrl, { headers })
         ]);
 
         if (!statsRes.ok || !itemsRes.ok || !customerStatsRes.ok) {
+            if (statsRes.status === 401 || statsRes.status === 403 ||
+                itemsRes.status === 401 || itemsRes.status === 403 ||
+                customerStatsRes.status === 401 || customerStatsRes.status === 403) {
+                console.error("Auth error fetching report data, logging out.");
+                logout();
+                return;
+            }
             throw new Error('Failed to fetch all report data.');
         }
 
         const statsJson = await statsRes.json();
         const itemsJson = await itemsRes.json();
         const customerStatsJson = await customerStatsRes.json();
-        
+
         setCustomerStats(customerStatsJson);
 
         const dateRange = generateDateRange(parseInt(range, 10) || 7);
         const formattedDateData = dateRange.map(date => ({ date, count: statsJson[date] || 0 }));
         setDateData(formattedDateData);
-        
+
         const formattedItems = Object.entries(itemsJson)
           .map(([name, count]) => ({ name, count }))
           .sort((a, b) => b.count - a.count)
           .slice(0, 10);
         setPopularItems(formattedItems);
-        
+
       } catch (err) {
         console.error('Failed to fetch report data:', err);
       }
@@ -106,16 +164,15 @@ function Report() {
 
     fetchData();
     fetchHourlyData();
-    fetchTodayStats(); // Fetch today's stats on load and range change
-    
-    // Set up an interval to refresh real-time data every 5 minutes.
+    fetchTodayStats();
+
     const intervalId = setInterval(() => {
         fetchHourlyData();
         fetchTodayStats();
-    }, 5 * 60 * 1000); 
+    }, 5 * 60 * 1000);
 
     return () => clearInterval(intervalId);
-  }, [range]);
+  }, [range, fetchHourlyData, fetchTodayStats, isAuthenticated, logout]); // Add isAuthenticated and logout to dependencies
 
 
   const handleMenuOpen = () => setIsMenuOpen(true);
@@ -140,7 +197,7 @@ function Report() {
           <div className="bg-white rounded-xl shadow-md p-6 mb-6">
             <main className="space-y-8">
               <h2 className="text-2xl font-bold text-gray-800">Order Report</h2>
-              
+
               {/* Date Range Selection Buttons */}
               <div className="flex gap-4 mb-6">
                 {['7', '14', '30', '60', '90', 'YTD'].map(option => (
@@ -183,7 +240,7 @@ function Report() {
                     <p className="text-4xl font-bold text-gray-800">{customerStats.totalOrders}</p>
                     <p className="text-sm text-gray-500 mt-1">in selected range</p>
                 </div>
-                
+
                 {/* Repeat Customers Card */}
                 <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center text-center border">
                     <div className="text-gray-600 mb-2">
@@ -233,7 +290,7 @@ function Report() {
                     </ResponsiveContainer>
                   </div>
                 </div>
-                
+
                 {/* Hourly Activity Chart */}
                 <div className="bg-white p-4 rounded-xl shadow min-w-0">
                   <h3 className="text-xl font-semibold mb-4">Today's Activities by Hour</h3>
