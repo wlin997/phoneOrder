@@ -7,7 +7,9 @@ import Report from './Report.jsx';
 import KDS from './KdsComponent.jsx';
 import DailySpecialsManager from './dailySpecials.jsx';
 import './index.css';
-import { AuthProvider, useAuth, LoginPage } from './AuthContext.jsx'; // Import AuthProvider and useAuth
+import { AuthProvider } from './AuthContext'; // Only AuthProvider is exported from AuthContext
+import Login from './components/Login.jsx'; // Login component is imported from its own file
+import ProtectedRoute from './components/ProtectedRoute'; // ProtectedRoute is also from its own file
 
 // A wrapper component to protect routes
 const ProtectedRoute = ({ children, allowedRoles }) => {

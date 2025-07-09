@@ -1,0 +1,378 @@
+Adapting your user authentication to use PostgreSQL directly instead of Firebase for authentication is more extensive and complex than using Firebase Authentication.
+
+Here's a breakdown of the difficulty and a detailed "attack plan" to implement it:
+
+Difficulty Assessment (PostgreSQL Authentication vs. Firebase Authentication):
+
+Firebase Authentication (Previous Plan):
+
+Pros: Handles almost all security complexities (password hashing, token issuance, token verification, brute-force protection, email verification, password reset flows). Provides a managed service. Easy to integrate with Firestore for role storage.
+
+Cons: Introduces a dependency on Firebase. Costs can apply beyond the free tier.
+
+Difficulty: Moderate (mainly integration and security rule setup).
+
+PostgreSQL Authentication (Your Request):
+
+Pros: Full control over your data and authentication logic. No external service dependency for core auth. Leverages your existing PostgreSQL database.
+
+Cons: You are responsible for all security aspects. This includes:
+
+Secure Password Hashing: You must correctly implement strong, one-way password hashing (e.g., bcrypt) and salt generation.
+
+Token Management: You need to generate, sign, and verify JSON Web Tokens (JWTs) securely.
+
+Session Management: If not using JWTs, you'd need server-side session management.
+
+Vulnerability Mitigation: Protecting against common attacks (SQL injection, XSS, CSRF, brute-force, timing attacks).
+
+User Management Flows: Building registration, password reset, email verification, and account recovery features from scratch.
+
+Scalability: Managing your own database and authentication service scaling.
+
+Difficulty: High (significant security and development effort).
+
+Given your existing PostgreSQL backend, it's certainly doable, but it requires a deep understanding of security best practices.
+
+Attack Plan: Multi-User Auth & Role-Based Access with PostgreSQL
+Goal: Implement a secure authentication and authorization system using your Node.js backend and PostgreSQL database.
+
+Phase 1: Backend Database Schema (PostgreSQL)
+You'll need new tables to store user information and roles.
+
+users Table:
+
+SQL
+
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL, -- Stores the hashed password
+    role VARCHAR(50) NOT NULL DEFAULT 'customer', -- 'admin', 'manager', 'employee', 'customer'
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Optional: Add an index for faster lookups by email
+CREATE INDEX idx_users_email ON users (email);
+refresh_tokens Table (Optional, for more robust JWT security):
+
+SQL
+
+CREATE TABLE refresh_tokens (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token VARCHAR(500) UNIQUE NOT NULL, -- The refresh token itself
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+Reason: This table is for storing refresh tokens, which allow users to get new access tokens without re-logging in, while keeping access tokens short-lived for better security.
+
+Phase 2: Backend Development (Node.js/Express - Modifying server3.txt)
+This is the most significant part.
+
+Install Dependencies:
+
+npm install bcryptjs jsonwebtoken dotenv
+
+bcryptjs: For secure password hashing.
+
+jsonwebtoken: For creating and verifying JWTs.
+
+dotenv: For managing environment variables (like JWT secret).
+
+Environment Variables (.env file):
+
+Action: Create a .env file in your backend root (and add it to .gitignore!).
+
+Content:
+
+JWT_SECRET=your_very_strong_and_random_secret_key_here
+ACCESS_TOKEN_EXPIRY=15m # e.g., 15 minutes
+REFRESH_TOKEN_EXPIRY=7d # e.g., 7 days
+Action: Load these in server3.txt: require('dotenv').config(); at the very top.
+
+Reason: Secrets should never be hardcoded.
+
+Authentication Functions (in server3.txt):
+
+Password Hashing:
+
+JavaScript
+
+const bcrypt = require('bcryptjs'); // Add this at the top
+
+async function hashPassword(password) {
+    const salt = await bcrypt.genSalt(10); // Generate a salt
+    return bcrypt.hash(password, salt); // Hash the password with the salt
+}
+
+async function comparePassword(password, hash) {
+    return bcrypt.compare(password, hash);
+}
+JWT Generation:
+
+JavaScript
+
+const jwt = require('jsonwebtoken'); // Add this at the top
+
+function generateAccessToken(user) {
+    return jwt.sign({ id: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: process.env.ACCESS_TOKEN_EXPIRY });
+}
+
+function generateRefreshToken(user) {
+    return jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: process.env.REFRESH_TOKEN_EXPIRY });
+}
+New Authentication Endpoints:
+
+User Registration (/api/register):
+
+JavaScript
+
+app.post('/api/register', async (req, res) => {
+    const { email, password, role } = req.body; // Role might be default or set by admin
+    if (!email || !password) {
+        return res.status(400).json({ error: "Email and password are required." });
+    }
+    try {
+        const hashedPassword = await hashPassword(password);
+        const result = await pool.query(
+            'INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING id, email, role',
+            [email, hashedPassword, role || 'customer'] // Default role
+        );
+        const user = result.rows[0];
+        const accessToken = generateAccessToken(user);
+        // For simplicity, we'll omit refresh tokens for now, but consider adding them.
+        res.status(201).json({ message: "User registered successfully.", accessToken, user: { id: user.id, email: user.email, role: user.role } });
+    } catch (err) {
+        if (err.code === '23505') { // Unique violation for email
+            return res.status(409).json({ error: "Email already registered." });
+        }
+        console.error("Registration error:", err);
+        res.status(500).json({ error: "Failed to register user." });
+    }
+});
+User Login (/api/login):
+
+JavaScript
+
+app.post('/api/login', async (req, res) => {
+    const { email, password } = req.body;
+    if (!email || !password) {
+        return res.status(400).json({ error: "Email and password are required." });
+    }
+    try {
+        const result = await pool.query('SELECT id, email, password_hash, role FROM users WHERE email = $1', [email]);
+        const user = result.rows[0];
+
+        if (!user) {
+            return res.status(401).json({ error: "Invalid credentials." });
+        }
+
+        const isPasswordValid = await comparePassword(password, user.password_hash);
+        if (!isPasswordValid) {
+            return res.status(401).json({ error: "Invalid credentials." });
+        }
+
+        const accessToken = generateAccessToken(user);
+        // If using refresh tokens:
+        // const refreshToken = generateRefreshToken(user);
+        // await pool.query('INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)', [user.id, refreshToken, new Date(Date.now() + JWT_REFRESH_TOKEN_EXPIRY_MS)]);
+
+        res.json({ accessToken, user: { id: user.id, email: user.email, role: user.role } });
+    } catch (err) {
+        console.error("Login error:", err);
+        res.status(500).json({ error: "Failed to log in." });
+    }
+});
+Authentication Middleware (Updated for JWT):
+
+Action: Replace the authenticateToken middleware from the Firebase plan with this:
+
+JavaScript
+
+const authenticateToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+    if (token == null) {
+        return res.status(401).json({ error: "Authentication required." });
+    }
+
+    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+        if (err) {
+            console.error("[Auth Middleware] JWT verification failed:", err.message);
+            return res.status(403).json({ error: "Invalid or expired token." });
+        }
+        req.user = user; // user object will contain { id, email, role } from JWT payload
+        next();
+    });
+};
+Authorization Middleware (Optional, but good practice):
+
+Action: Create a separate middleware for role-based checks.
+
+JavaScript
+
+const authorizeRoles = (roles) => {
+    return (req, res, next) => {
+        if (!req.user || !req.user.role || !roles.includes(req.user.role)) {
+            return res.status(403).json({ error: "Forbidden: Insufficient permissions." });
+        }
+        next();
+    };
+};
+Reason: This separates authentication (who you are) from authorization (what you can do).
+
+Apply Middleware to Protected Routes:
+
+Action: Apply authenticateToken to all routes that require a logged-in user.
+
+Action: Apply authorizeRoles to routes that require specific roles.
+
+JavaScript
+
+// Example: Only admins and managers can view app settings
+app.get('/api/app-settings', authenticateToken, authorizeRoles(['admin', 'manager']), (req, res) => { /* ... */ });
+
+// Example: Employees, managers, and admins can fire orders
+app.post("/api/fire-order", authenticateToken, authorizeRoles(['admin', 'manager', 'employee']), async (req, res) => {
+    // Access user info: req.user.id, req.user.email, req.user.role
+    // ... existing fire-order logic
+});
+
+// Example: All authenticated users can view incoming orders
+app.get("/api/list", authenticateToken, async (req, res) => { /* ... */ });
+Action: Update all relevant API endpoints in server3.txt with these middleware functions.
+
+Phase 3: Frontend Integration (React - Modifying App.jsx and auth-portal logic)
+The auth-portal code needs to be adapted to communicate with your new Node.js authentication endpoints.
+
+Adapt AuthProvider for Custom Backend:
+
+Action: Modify the AuthContext and AuthProvider in the auth-portal code.
+
+Remove Firebase Auth: You will no longer use signInWithCustomToken, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, or signOut from firebase/auth.
+
+Replace with Custom Login/Logout:
+
+The signIn function in AuthContext will now make a fetch call to your /api/login endpoint.
+
+Upon successful login, it will store the accessToken (e.g., in localStorage) and the user object (containing id, email, role).
+
+The signOut function will clear the stored token and user data.
+
+You'll need a mechanism to check for an existing token on app load (e.g., useEffect in AuthProvider) and validate it with your backend if necessary (or just trust it until it expires/fails verification on a protected route).
+
+Example AuthProvider changes (simplified):
+
+JavaScript
+
+// ... (imports, context setup)
+
+const AuthProvider = ({ children }) => {
+    const [currentUser, setCurrentUser] = useState(null);
+    const [userRole, setUserRole] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        // Check for existing token in localStorage on app load
+        const storedToken = localStorage.getItem('accessToken');
+        const storedUser = localStorage.getItem('user'); // Store user data too
+
+        if (storedToken && storedUser) {
+            try {
+                const parsedUser = JSON.parse(storedUser);
+                // You might want to send this token to a backend /verify endpoint
+                // to ensure it's still valid, or just trust it until an API call fails.
+                setCurrentUser(parsedUser);
+                setUserRole(parsedUser.role);
+            } catch (e) {
+                console.error("Error parsing stored user data:", e);
+                localStorage.clear(); // Clear invalid data
+            }
+        }
+        setLoading(false);
+    }, []);
+
+    const login = async (email, password) => {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Login failed');
+        }
+        const data = await response.json();
+        localStorage.setItem('accessToken', data.accessToken);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        setCurrentUser(data.user);
+        setUserRole(data.user.role);
+    };
+
+    const logout = () => {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('user');
+        setCurrentUser(null);
+        setUserRole(null);
+    };
+
+    const authContextValue = {
+        currentUser,
+        userRole,
+        loading,
+        signIn: login, // Rename to login
+        signOut: logout,
+        // No db, appId from Firebase needed here if not using Firestore for roles
+    };
+
+    return (
+        <AuthContext.Provider value={authContextValue}>
+            {children}
+        </AuthContext.Provider>
+    );
+};
+Update API Calls in KDSApp.jsx:
+
+Action: In your KDSApp.jsx (the refactored App.jsx), retrieve the accessToken from localStorage (or AuthContext if you store it there).
+
+Action: Attach this accessToken to the Authorization header of all your fetch requests to your Node.js backend.
+
+JavaScript
+
+const accessToken = localStorage.getItem('accessToken'); // Or from useAuth()
+const response = await fetch(`${import.meta.env.VITE_API_URL}/api/list`, {
+    headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}` // <-- Use your backend's JWT
+    },
+    signal: controller.signal
+});
+Frontend Role-Based UI Adjustments:
+
+Action: This part remains largely the same as in the Firebase plan. Use the userRole from your AuthContext to conditionally render or disable UI elements in KDSApp.jsx.
+
+Phase 4: Security Best Practices (Crucial for PostgreSQL Auth)
+HTTPS Everywhere: Always use HTTPS for all communication between your frontend and backend.
+
+Input Validation: Strictly validate all input on both the frontend and backend to prevent SQL injection and other vulnerabilities.
+
+Error Handling: Implement robust error handling. Avoid sending sensitive error messages to the frontend.
+
+Rate Limiting: Implement rate limiting on login and registration endpoints to prevent brute-force attacks.
+
+JWT Security:
+
+Keep your JWT_SECRET highly secure and rotate it periodically.
+
+Use short expiry times for access tokens (e.g., 15 minutes).
+
+Consider using refresh tokens for long-lived sessions (as hinted in Phase 1).
+
+Store tokens securely (e.g., localStorage is common for single-page apps, but more secure options exist like HTTP-only cookies if you manage sessions).
+
+CORS: Ensure your CORS configuration (server3.txt) is correctly set up to only allow requests from your frontend domain.
+
+This comprehensive plan details how to implement multi-user authentication and role-based access using your existing PostgreSQL database and Node.js backend. It's a significant undertaking due to the security responsibilities you take on, but it offers full control over your authentication system.
