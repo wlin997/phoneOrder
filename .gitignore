@@ -1,4 +1,10 @@
 ## .gitignore
+
+# Password hash generation files
+hash_output.txt
+generateHash.cjs
+
+
 # Ignore the .env file inside the 'server' directory
 server/.env
 
