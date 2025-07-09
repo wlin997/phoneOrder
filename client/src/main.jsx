@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'; // CORRECTED: Added Navigate
 // --- NEW AUTH IMPORTS ---
 import { AuthProvider, useAuth } from './AuthContext';  // Import AuthProvider and useAuth
 import Login from './components/Login.jsx';  // Import the new Login component
