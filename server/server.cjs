@@ -2,9 +2,7 @@
 // SETUP & CONFIGURATION
 // =================================================================================
 process.env.TZ = 'America/New_York'; // Set default timezone
-require('dotenv').config();
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+
 const express = require("express");
 const fs = require("fs");
 const fsp = require("fs").promises;
@@ -76,58 +74,6 @@ const pool = new Pool({
   }
 });
 console.log("✅ PostgreSQL client initialized.");
-
-// =================================================================================
-// AUTHENTICATION FUNCTIONS (NEW)
-// =================================================================================
-
-async function hashPassword(password) {
-    const salt = await bcrypt.genSalt(10); // Generate a salt
-    return bcrypt.hash(password, salt); // Hash the password with the salt
-}
-
-async function comparePassword(password, hash) {
-    return bcrypt.compare(password, hash);
-}
-
-function generateAccessToken(user) {
-    return jwt.sign({ id: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: process.env.ACCESS_TOKEN_EXPIRY });
-}
-
-function generateRefreshToken(user) {
-    return jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: process.env.REFRESH_TOKEN_EXPIRY });
-}
-
-// =================================================================================
-// AUTHENTICATION MIDDLEWARE (UPDATED AND NEW)
-// =================================================================================
-
-const authenticateToken = (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-
-    if (token == null) {
-        return res.status(401).json({ error: "Authentication required." });
-    }
-
-    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-        if (err) {
-            console.error("[Auth Middleware] JWT verification failed:", err.message);
-            return res.status(403).json({ error: "Invalid or expired token." });
-        }
-        req.user = user; // user object will contain { id, email, role } from JWT payload
-        next();
-    });
-};
-
-const authorizeRoles = (roles) => {
-    return (req, res, next) => {
-        if (!req.user || !req.user.role || !roles.includes(req.user.role)) {
-            return res.status(403).json({ error: "Forbidden: Insufficient permissions." });
-        }
-        next();
-    };
-};
 
 // =================================================================================
 // HELPER AND UTILITY FUNCTIONS
@@ -252,67 +198,6 @@ async function archiveOrders() {
 
 
 // =================================================================================
-// AUTHENTICATION ENDPOINTS (NEW)
-// =================================================================================
-
-// User Registration
-app.post('/api/register', async (req, res) => {
-    const { email, password, role } = req.body; // Role might be default or set by admin
-    if (!email || !password) {
-        return res.status(400).json({ error: "Email and password are required." });
-    }
-    try {
-        const hashedPassword = await hashPassword(password);
-        const result = await pool.query(
-            'INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING id, email, role',
-            [email, hashedPassword, role || 'customer'] // Default role
-        );
-        const user = result.rows[0];
-        const accessToken = generateAccessToken(user);
-        // For simplicity, we'll omit refresh tokens for now, but consider adding them.
-        res.status(201).json({ message: "User registered successfully.", accessToken, user: { id: user.id, email: user.email, role: user.role } });
-    } catch (err) {
-        if (err.code === '23505') { // Unique violation for email
-            return res.status(409).json({ error: "Email already registered." });
-        }
-        console.error("Registration error:", err);
-        res.status(500).json({ error: "Failed to register user." });
-    }
-});
-
-// User Login
-app.post('/api/login', async (req, res) => {
-    const { email, password } = req.body;
-    if (!email || !password) {
-        return res.status(400).json({ error: "Email and password are required." });
-    }
-    try {
-        const result = await pool.query('SELECT id, email, password_hash, role FROM users WHERE email = $1', [email]);
-        const user = result.rows[0];
-
-        if (!user) {
-            return res.status(401).json({ error: "Invalid credentials." });
-        }
-
-        const isPasswordValid = await comparePassword(password, user.password_hash);
-        if (!isPasswordValid) {
-            return res.status(401).json({ error: "Invalid credentials." });
-        }
-
-        const accessToken = generateAccessToken(user);
-        // If using refresh tokens:
-        // const refreshToken = generateRefreshToken(user);
-        // await pool.query('INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)', [user.id, refreshToken, new Date(Date.now() + JWT_REFRESH_TOKEN_EXPIRY_MS)]);
-
-        res.json({ accessToken, user: { id: user.id, email: user.email, role: user.role } });
-    } catch (err) {
-        console.error("Login error:", err);
-        res.status(500).json({ error: "Failed to log in." });
-    }
-});
-
-
-// =================================================================================
 // EXPRESS API ENDPOINTS (Refactored for PostgreSQL)
 // =================================================================================
 
@@ -332,7 +217,8 @@ const isTodayFilter = (order) => {
     console.log(`[isTodayFilter] Result: ${orderDateTime.toISODate() === nowDateTime.toISODate()}`);
     return orderDateTime.toISODate() === nowDateTime.toISODate();
 };
-app.get("/api/list", authenticateToken, async (req, res) => { // ADDED authenticateToken
+
+app.get("/api/list", async (req, res) => {
   try {
     const allOrders = await getOrdersFromDB();
     const incomingOrdersToday = allOrders
@@ -346,7 +232,7 @@ app.get("/api/list", authenticateToken, async (req, res) => { // ADDED authentic
   }
 });
 
-app.get("/api/updating", authenticateToken, async (req, res) => { // ADDED authenticateToken
+app.get("/api/updating", async (req, res) => {
     try {
         const allOrders = await getOrdersFromDB();
         const updatingOrdersToday = allOrders
@@ -357,7 +243,7 @@ app.get("/api/updating", authenticateToken, async (req, res) => { // ADDED authe
         res.status(500).json({ error: "Failed to fetch updating orders: " + err.message });
     }
 });
-app.get("/api/printed", authenticateToken, async (req, res) => { // ADDED authenticateToken
+app.get("/api/printed", async (req, res) => {
     try {
         const allOrders = await getOrdersFromDB();
         const processedOrders = allOrders
@@ -369,7 +255,7 @@ app.get("/api/printed", authenticateToken, async (req, res) => { // ADDED authen
     }
 });
 
-app.get("/api/order-by-row/:orderId", authenticateToken, async (req, res) => { // ADDED authenticateToken
+app.get("/api/order-by-row/:orderId", async (req, res) => {
     try {
         const orderId = parseInt(req.params.orderId, 10);
         if (isNaN(orderId)) return res.status(400).json({ error: "Invalid orderId." });
@@ -378,21 +264,21 @@ app.get("/api/order-by-row/:orderId", authenticateToken, async (req, res) => { /
         console.log('[Backend] Order data before sending to frontend:', order); // Log to verify item_name
         order ? res.json(order) : res.status(404).json({ error: "Order not found." });
     } catch (err) {
-        res.status(500).json({
-            error: "Failed to fetch order by ID: " + err.message
+        res.status(500).json({ 
+            error: "Failed to fetch order by ID: " + err.message 
         });
     }
 });
 // =================================================================================
 // REPORTING AND SETTINGS ENDPOINTS (Refactored for PostgreSQL)
 // =================================================================================
-app.get('/api/today-stats', authenticateToken, async (req, res) => { // ADDED authenticateToken
+app.get('/api/today-stats', async (req, res) => {
     try {
         // Get the current date in the specific timezone (America/New_York)
         // using Luxon to ensure precise start and end of the day.
         const nowInNY = DateTime.now().setZone(appSettings.timezone); // Use appSettings.timezone
         const todayNYStart = nowInNY.startOf('day'); // Midnight of today in NY time
-        const todayNYEnd = nowInNY.endOf('day');
+        const todayNYEnd = nowInNY.endOf('day'); 
         // End of day in NY time
 
         // Convert these Luxon DateTime objects to ISO strings for PostgreSQL
@@ -401,6 +287,7 @@ app.get('/api/today-stats', authenticateToken, async (req, res) => { // ADDED au
         const endDateISO = todayNYEnd.toISO();     // e.g., '2025-06-25T03:59:59.999Z'
 
         const query = `
+            
             SELECT
                 COUNT(*) AS total,
                 COUNT(*) FILTER (WHERE printed_count > 0) AS processed
@@ -412,12 +299,13 @@ app.get('/api/today-stats', authenticateToken, async (req, res) => { // ADDED au
         console.log("[Backend] /api/today-stats - Raw SQL rows response:", rows);
         res.json(rows[0]);
         console.log("[Backend] /api/today-stats - Final JSON sent:", rows[0]);
+
     } catch (error) {
         console.error('Error fetching today\'s stats:', error);
         res.status(500).json({ error: 'Failed to fetch today\'s stats: ' + error.message });
     }
 });
-app.get('/api/order-stats', authenticateToken, authorizeRoles(['admin', 'manager']), async (req, res) => { // ADDED authenticateToken & authorizeRoles
+app.get('/api/order-stats', async (req, res) => {
     try {
         const { range } = req.query;
         const days = range === 'YTD' ? 365 : parseInt(range, 10);
@@ -440,7 +328,7 @@ app.get('/api/order-stats', authenticateToken, authorizeRoles(['admin', 'manager
         res.status(500).json({ error: 'Failed to fetch order stats: ' + error.message });
     }
 });
-app.get('/api/popular-items', authenticateToken, authorizeRoles(['admin', 'manager']), async (req, res) => { // ADDED authenticateToken & authorizeRoles
+app.get('/api/popular-items', async (req, res) => {
     try {
         const { range } = req.query;
         const days = range === 'YTD' ? 365 : parseInt(range, 10);
@@ -463,7 +351,7 @@ app.get('/api/popular-items', authenticateToken, authorizeRoles(['admin', 'manag
         res.status(500).json({ error: 'Failed to fetch popular items: ' + error.message });
     }
 });
-app.get('/api/hourly-orders', authenticateToken, authorizeRoles(['admin', 'manager']), async (req, res) => { // ADDED authenticateToken & authorizeRoles
+app.get('/api/hourly-orders', async (req, res) => {
     try {
         const startHour = parseInt(appSettings.reportStartHour, 10) || 0; // It's best to set this to 0 for a full 24-hour daily report
         const endHour = 23; // End of the day
@@ -479,15 +367,16 @@ app.get('/api/hourly-orders', authenticateToken, authorizeRoles(['admin', 'manag
         const startDateISO = todayNYStart.toISO(); // e.g., '2025-06-24T04:00:00.000Z'
         const endDateISO = todayNYEnd.toISO();   // e.g., '2025-06-25T03:59:59.999Z'
 
-        const query = `
+        const query = 
+            `
             SELECT
                 EXTRACT(HOUR FROM created_at AT TIME ZONE $1) as hour,
                 COUNT(*) as count
             FROM orders
-            WHERE created_at >= $2 AND created_at <= $3
+            WHERE created_at >= $2 AND created_at <= $3  
             GROUP BY hour
             ORDER BY hour;
-        `;
+            `;
         // Pass the timezone for EXTRACT and the calculated start/end dates
         const { rows } = await pool.query(query, [appSettings.timezone, startDateISO, endDateISO]);
         // The rest of your Node.js processing logic remains the same,
@@ -496,22 +385,22 @@ app.get('/api/hourly-orders', authenticateToken, authorizeRoles(['admin', 'manag
         for (let h = 0; h <= 23; h++) { // Loop from 0 to 23 for a full day's report
             const hourLabel = h < 12 ? `${h === 0 ? 12 : h} AM` : `${h === 12 ? 12 : h - 12} PM`;
             hourlyCounts[hourLabel] = 0;
-        }
-        rows.forEach(row => {
-            const orderHour = parseInt(row.hour, 10);
-            const hourLabel = orderHour < 12 ? `${orderHour === 0 ? 12 : orderHour} AM` : `${orderHour === 12 ? 12 : orderHour - 12} PM`;
-            if (hourlyCounts.hasOwnProperty(hourLabel)) {
-                hourlyCounts[hourLabel] += parseInt(row.count, 10);
+            }
+                rows.forEach(row => {
+                    const orderHour = parseInt(row.hour, 10);
+                    const hourLabel = orderHour < 12 ? `${orderHour === 0 ? 12 : orderHour} AM` : `${orderHour === 12 ? 12 : orderHour - 12} PM`;
+                    if (hourlyCounts.hasOwnProperty(hourLabel)) {
+                        hourlyCounts[hourLabel] += parseInt(row.count, 10);
+                    }
+                });
+        console.log("[Backend] /api/hourly-orders - Final hourlyCounts sent:", hourlyCounts);
+                res.json(hourlyCounts);
+            } catch (error) {
+                console.error('Error fetching hourly orders:', error);
+        res.status(500).json({ error: 'Failed to fetch hourly orders: ' + error.message });
             }
         });
-        console.log("[Backend] /api/hourly-orders - Final hourlyCounts sent:", hourlyCounts);
-        res.json(hourlyCounts);
-    } catch (error) {
-        console.error('Error fetching hourly orders:', error);
-        res.status(500).json({ error: 'Failed to fetch hourly orders: ' + error.message });
-    }
-});
-app.get('/api/customer-stats', authenticateToken, authorizeRoles(['admin', 'manager']), async (req, res) => { // ADDED authenticateToken & authorizeRoles
+app.get('/api/customer-stats', async (req, res) => {
     try {
         const { range } = req.query;
         const days = range === 'YTD' ? 365 : parseInt(range, 10);
@@ -534,15 +423,15 @@ app.get('/api/customer-stats', authenticateToken, authorizeRoles(['admin', 'mana
             .slice(0, 5)
             .map(row => ({ name: row.name, phone: row.phone, count: parseInt(row.count, 10) }));
         res.json({ totalOrders, repeatCustomers, topCustomers });
-    } catch (error) {
+} catch (error) {
         console.error('Error fetching customer stats:', error);
         res.status(500).json({ error: 'Failed to fetch customer stats: ' + error.message });
     }
 });
 
 // Settings Endpoints
-app.get('/api/app-settings', authenticateToken, authorizeRoles(['admin', 'manager']), (req, res) => res.json(appSettings)); // ADDED authenticateToken & authorizeRoles
-app.post('/api/app-settings', authenticateToken, authorizeRoles(['admin', 'manager']), async (req, res) => { // ADDED authenticateToken & authorizeRoles
+app.get('/api/app-settings', (req, res) => res.json(appSettings));
+app.post('/api/app-settings', async (req, res) => {
     try {
         const newSettings = req.body;
         await saveAppSettings(newSettings);
@@ -553,12 +442,13 @@ app.post('/api/app-settings', authenticateToken, authorizeRoles(['admin', 'manag
         startCronJob();
 
         res.json({ success: true, message: 'App settings updated and cron job restarted.' });
-    } catch (err) {
+    } catch (err) 
+{
         console.error("[App Settings] Failed to update settings:", err);
         res.status(500).json({ error: "Failed to update app settings" });
     }
 });
-app.get('/api/print-settings', authenticateToken, authorizeRoles(['admin', 'manager', 'employee']), async (req, res) => { // ADDED authenticateToken & authorizeRoles
+app.get('/api/print-settings', async (req, res) => {
     try {
         const data = await fsp.readFile(printerSettingsFilePath, 'utf8');
         res.json(JSON.parse(data));
@@ -566,7 +456,7 @@ app.get('/api/print-settings', authenticateToken, authorizeRoles(['admin', 'mana
         res.status(404).json({ error: 'Printer settings not found.' });
     }
 });
-app.post('/api/print-settings', authenticateToken, authorizeRoles(['admin', 'manager']), async (req, res) => { // ADDED authenticateToken & authorizeRoles
+app.post('/api/print-settings', async (req, res) => {
     try {
         await fsp.writeFile(printerSettingsFilePath, JSON.stringify(req.body, null, 2));
         res.json(req.body);
@@ -674,15 +564,19 @@ function buildOrderHTML(order) {
     }).join('<br>');
     const timeOrdered = new Date(order.timeOrdered || Date.now()).toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
     const firedAt = new Date().toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-    const utensilLine = order.utensil ? `Utensils:     ${order.utensil}\n\n` : '';
-    const totalLine = order.totalCost ? `Total:        $${order.totalCost}\n` : '';
-    return `<pre style="font-family: 'Courier New', Courier, monospace; font-size: 12pt; width: 80mm; margin: 0; padding: 0; line-height: 1.2;">
+    const utensilLine = order.utensil ?
+`Utensils:     ${order.utensil}\n\n` : '';
+    const totalLine = order.totalCost ?
+`Total:        $${order.totalCost}\n` : '';
+return `<pre style="font-family: 'Courier New', Courier, monospace; font-size: 12pt; width: 80mm; margin: 0; padding: 0; line-height: 1.2;">
 --------------------------------
-    ** ORDER #${order.orderNum || 'N/A'} **
+    ** ORDER #${order.orderNum ||
+'N/A'} **
 --------------------------------
 Order Type:   ${order.orderType || 'N/A'}
 Time Ordered: ${timeOrdered}
-Status:       ${order.orderUpdateStatus || 'N/A'}
+Status:       ${order.orderUpdateStatus ||
+'N/A'}
 --------------------------------
 Caller:  ${order.callerName || 'N/A'}
 Phone:   ${order.callerPhone || 'N/A'}
@@ -696,7 +590,7 @@ ${totalLine}Fired at: ${firedAt}
 </pre>`;
 }
 
-app.post("/api/fire-order", authenticateToken, authorizeRoles(['admin', 'manager', 'employee']), async (req, res) => { // ADDED authenticateToken & authorizeRoles
+app.post("/api/fire-order", async (req, res) => {
     const { rowIndex: orderId } = req.body;
     if (!orderId || typeof orderId !== "number") {
         return res.status(400).json({ error: "Invalid order ID" });
@@ -727,7 +621,7 @@ app.post("/api/fire-order", authenticateToken, authorizeRoles(['admin', 'manager
         // Send to printer
         switch (printerSettings.mode) {
             case 'MOCK':
-              try {
+                try {
                     if (!printerSettings.printerUrl) throw new Error("No URL for MOCK mode");
                     const response = await axios.post(
                         printerSettings.printerUrl,
@@ -762,7 +656,7 @@ app.post("/api/fire-order", authenticateToken, authorizeRoles(['admin', 'manager
                 break;
             default:
                 printerError = { error: `Invalid printer mode: ${printerSettings.mode}` };
-        }
+            }
 
         if (printerError) {
             return res.status(503).json(printerError);
@@ -777,9 +671,9 @@ app.post("/api/fire-order", authenticateToken, authorizeRoles(['admin', 'manager
         // Update DB: increment count and add timestamp
         const updateQuery = `
             UPDATE orders
-            SET
+            SET 
                 printed_count = printed_count + 1,
-                printed_timestamps =
+                printed_timestamps = 
             CASE
                         WHEN printed_timestamps IS NULL THEN ARRAY[$2]::text[]
                         ELSE array_append(printed_timestamps, $2)
@@ -788,6 +682,7 @@ app.post("/api/fire-order", authenticateToken, authorizeRoles(['admin', 'manager
             RETURNING printed_count, printed_timestamps;
         `;
         const { rows } = await pool.query(updateQuery, [orderId, now]);
+
         res.json({
             success: true,
             printerResponse: printerResponseData,
@@ -795,12 +690,12 @@ app.post("/api/fire-order", authenticateToken, authorizeRoles(['admin', 'manager
             printedCount: rows[0].printed_count,
             printedTimestamps: rows[0].printed_timestamps
         });
-    } catch (err) {
+} catch (err) {
         console.error("[🔥 API Error /api/fire-order]", err);
         res.status(500).json({ error: "Failed to process order", details: err.message });
     }
 });
-app.get("/api/kds/active-orders", authenticateToken, authorizeRoles(['admin', 'manager', 'employee']), async (req, res) => { // ADDED authenticateToken & authorizeRoles
+app.get("/api/kds/active-orders", async (req, res) => {
     try {
         const allOrders = await getOrdersFromDB();
         const activeKitchenOrders = allOrders
@@ -820,7 +715,7 @@ app.get("/api/kds/active-orders", authenticateToken, authorizeRoles(['admin', 'm
         res.status(500).json({ error: "Failed to fetch active kitchen orders", details: err.message });
     }
 });
-app.post("/api/kds/prep-order/:orderId", authenticateToken, authorizeRoles(['admin', 'manager', 'employee']), async (req, res) => { // ADDED authenticateToken & authorizeRoles
+app.post("/api/kds/prep-order/:orderId", async (req, res) => {
     const { orderId } = req.params;
     const { prepTimeMs, prepTimestamp } = req.body; // Destructure prepTimeMs and prepTimestamp
 
@@ -861,7 +756,7 @@ app.post("/api/kds/prep-order/:orderId", authenticateToken, authorizeRoles(['adm
 });
 // ADD THIS ENTIRE NEW ENDPOINT to server.cjs
 
-app.get("/api/kds/prepped-orders", authenticateToken, authorizeRoles(['admin', 'manager', 'employee']), async (req, res) => { // ADDED authenticateToken & authorizeRoles
+app.get("/api/kds/prepped-orders", async (req, res) => {
     try {
         const allOrders = await getOrdersFromDB(); // This function should already exist in your file
         console.log("🔎 Raw orders from DB:", allOrders);
@@ -884,8 +779,10 @@ app.get("/api/kds/prepped-orders", authenticateToken, authorizeRoles(['admin', '
         res.status(500).json({ error: "Failed to fetch prepped orders", details: err.message });
     }
 });
+
+
 // ** PRESERVED PRINTER AND SETTINGS CODE **
-app.post("/api/cloudprnt", authenticateToken, authorizeRoles(['admin', 'manager', 'employee']), (req, res) => { // ADDED authenticateToken & authorizeRoles
+app.post("/api/cloudprnt", (req, res) => {
     if (req.body && req.body.jobToken) {
         const jobIndex = cloudPrintJobs.findIndex(job => job.jobId === req.body.jobToken);
         if (jobIndex > -1) cloudPrintJobs.splice(jobIndex, 1);
@@ -894,14 +791,15 @@ app.post("/api/cloudprnt", authenticateToken, authorizeRoles(['admin', 'manager'
     if (cloudPrintJobs.length > 0) {
         const job = cloudPrintJobs[0];
         const host = req.get('host');
-        const protocol = req.get('x-forwarded-proto') || req.protocol;
+        const 
+protocol = req.get('x-forwarded-proto') || req.protocol;
         const getUrl = `${protocol}://${host}/api/cloudprnt-content/${job.jobId}`;
         res.json({ jobReady: true, mediaTypes: [job.contentType], jobToken: job.jobId, get: getUrl });
     } else {
         res.json({ jobReady: false, pollInterval: 30000 });
     }
 });
-app.get('/api/cloudprnt-content/:jobId', authenticateToken, authorizeRoles(['admin', 'manager', 'employee']), (req, res) => { // ADDED authenticateToken & authorizeRoles
+app.get('/api/cloudprnt-content/:jobId', (req, res) => {
     const job = cloudPrintJobs.find(j => j.jobId === req.params.jobId);
     if (job) {
         res.type(job.contentType).send(job.content);
@@ -909,7 +807,7 @@ app.get('/api/cloudprnt-content/:jobId', authenticateToken, authorizeRoles(['adm
         res.status(404).send('Job not found.');
     }
 });
-app.get('/api/printer-status', authenticateToken, authorizeRoles(['admin', 'manager', 'employee']), async (req, res) => { // ADDED authenticateToken & authorizeRoles
+app.get('/api/printer-status', async (req, res) => {
     try {
         const data = await fsp.readFile(printerSettingsFilePath, 'utf8');
         const settings = JSON.parse(data);
@@ -917,17 +815,19 @@ app.get('/api/printer-status', authenticateToken, authorizeRoles(['admin', 'mana
             return res.status(400).json({ available: false, mode: settings.mode, error: 'No printer URL configured' });
         }
         const printerCheck = await testPrinterConnectivity(settings.printerUrl, settings.mode);
-        res.status(printerCheck.available ? 200 : 503).json({ ...printerCheck, mode: settings.mode });
+        res.status(printerCheck.available ? 200 : 
+503).json({ ...printerCheck, mode: settings.mode });
     } catch (err) {
         res.status(500).json({ available: false, error: 'Failed to check printer status: ' + err.message });
     }
 });
+
 // =================================================================================
 // VAPI SETTING ENDPOINTS (Updated)
 // =================================================================================
 
 // Get VAPI settings from PostgreSQL
-app.get('/api/vapi-settings', authenticateToken, authorizeRoles(['admin']), async (req, res) => { // ADDED authenticateToken & authorizeRoles
+app.get('/api/vapi-settings', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT api_key, assistant_id, file_id FROM vapi_settings WHERE id = 1');
     if (rows.length === 0) {
@@ -942,7 +842,7 @@ app.get('/api/vapi-settings', authenticateToken, authorizeRoles(['admin']), asyn
 });
 
 // Save/Update VAPI settings to PostgreSQL (UPSERT logic)
-app.post('/api/vapi-settings', authenticateToken, authorizeRoles(['admin']), async (req, res) => { // Changed from PUT to POST to match frontend Admin.jsx // ADDED authenticateToken & authorizeRoles
+app.post('/api/vapi-settings', async (req, res) => { // Changed from PUT to POST to match frontend Admin.jsx
   try {
     const { apiKey, assistantId, fileId } = req.body; // Use camelCase to match frontend
     // Attempt to update the existing row with id=1
@@ -966,13 +866,13 @@ app.post('/api/vapi-settings', authenticateToken, authorizeRoles(['admin']), asy
 });
 
 // NEW ENDPOINT: Get list of files from VAPI
-app.get('/api/vapi/files', authenticateToken, authorizeRoles(['admin']), async (req, res) => { // ADDED authenticateToken & authorizeRoles
+app.get('/api/vapi/files', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT api_key, assistant_id FROM vapi_settings WHERE id = 1');
     if (rows.length === 0 || !rows[0].api_key || !rows[0].assistant_id) {
       console.log('VAPI API Key or Assistant ID not configured.');
       // Return empty array if settings are missing so frontend can display "No files found"
-      return res.json([]);
+      return res.json([]); 
     }
     const { api_key, assistant_id } = rows[0];
 
@@ -986,8 +886,9 @@ app.get('/api/vapi/files', authenticateToken, authorizeRoles(['admin']), async (
     res.status(500).send('Error listing VAPI files.');
   }
 });
+
 // NEW ENDPOINT: Get content of a specific file from VAPI (Updated to VAPI spec)
-app.get('/api/vapi/files/:fileId/content', authenticateToken, authorizeRoles(['admin']), async (req, res) => { // ADDED authenticateToken & authorizeRoles
+app.get('/api/vapi/files/:fileId/content', async (req, res) => {
   try {
     const { fileId } = req.params;
     const { rows } = await pool.query('SELECT api_key FROM vapi_settings WHERE id = 1');
@@ -1026,7 +927,7 @@ app.get('/api/vapi/files/:fileId/content', authenticateToken, authorizeRoles(['a
 });
 
 // NEW ENDPOINT: Delete a file from VAPI
-app.delete('/api/vapi/files/:fileId', authenticateToken, authorizeRoles(['admin']), async (req, res) => { // ADDED authenticateToken & authorizeRoles
+app.delete('/api/vapi/files/:fileId', async (req, res) => {
     try {
         const { fileId } = req.params;
         const { rows } = await pool.query('SELECT api_key FROM vapi_settings WHERE id = 1');
@@ -1052,7 +953,7 @@ app.delete('/api/vapi/files/:fileId', authenticateToken, authorizeRoles(['admin'
 
 // MODIFIED ENDPOINT: Update daily specials in VAPI (Implements delete and re-upload)
 // MODIFIED ENDPOINT: Update daily specials in VAPI (Implements delete and re-upload)
-app.post('/api/daily-specials', authenticateToken, authorizeRoles(['admin']), async (req, res) => { // This remains for VAPI // ADDED authenticateToken & authorizeRoles
+app.post('/api/daily-specials', async (req, res) => { // This remains for VAPI
   try {
     const newContent = req.body; // Expecting the new content as JSON from the frontend
     const { rows } = await pool.query('SELECT api_key, file_id AS vapi_file_id FROM vapi_settings WHERE id = 1');
@@ -1121,7 +1022,7 @@ app.post('/api/daily-specials', authenticateToken, authorizeRoles(['admin']), as
 //=================================================================================
 // get daily special from postgre
 //=================================================================================
-app.get('/api/businesses', authenticateToken, authorizeRoles(['admin', 'manager', 'employee']), async (req, res) => { // ADDED authenticateToken & authorizeRoles
+app.get('/api/businesses', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT business_id, business_name FROM businesses');
     res.json(rows);
@@ -1130,7 +1031,8 @@ app.get('/api/businesses', authenticateToken, authorizeRoles(['admin', 'manager'
     res.status(500).json({ error: 'Failed to fetch businesses: ' + err.message });
   }
 });
-app.get('/api/daily-specials', authenticateToken, authorizeRoles(['admin', 'manager', 'employee', 'customer']), async (req, res) => { // ADDED authenticateToken & authorizeRoles, allowing 'customer'
+
+app.get('/api/daily-specials', async (req, res) => {
   try {
     const { business_id } = req.query;
     if (!business_id) return res.status(400).json({ error: 'business_id is required' });
@@ -1146,7 +1048,7 @@ app.get('/api/daily-specials', authenticateToken, authorizeRoles(['admin', 'mana
 });
 
 // NEW/MODIFIED ENDPOINT: Update daily specials in PostgreSQL
-app.post('/api/daily-specials/postgres', authenticateToken, authorizeRoles(['admin', 'manager']), async (req, res) => { // Changed the route here // ADDED authenticateToken & authorizeRoles
+app.post('/api/daily-specials/postgres', async (req, res) => { // Changed the route here
   try {
     const { business_id, daily_specials } = req.body;
     if (!business_id || !daily_specials) return res.status(400).json({ error: 'business_id and daily_specials are required' });
@@ -1194,10 +1096,10 @@ const startCronJob = () => {
                 const result = await pool.query(`
                     UPDATE orders
                     SET archived = TRUE
-                    WHERE created_at <= $1
+                    WHERE created_at <= $1 -- Rectified: Compare with a specific timestamp
                       AND archived = FALSE;
-                `, [archiveCutoffISO]);
-
+                `, [archiveCutoffISO]); // Rectified: Pass the calculated date as a parameter
+                
                 console.log(`[Cron Job] Archived ${result.rowCount} old unprocessed orders.`);
             } catch (err) {
                 console.error("[Cron Job] Failed to archive orders:", err);
@@ -1208,8 +1110,11 @@ const startCronJob = () => {
             timezone: appSettings.timezone
         }
     );
+
     console.log(`[Cron Job] Scheduled to run at: ${appSettings.archiveCronSchedule} in timezone ${appSettings.timezone}`);
 };
+
+
 pool.connect()
     .then(() => {
         console.log("✅ Database connection successful.");
@@ -1225,6 +1130,7 @@ pool.connect()
         console.error("❌ Failed to connect to the database and start server:", err.message);
         process.exit(1);
     });
+
 // Utility to save app settings - this function was missing but called by app.post('/api/app-settings')
 const saveAppSettings = async (settings) => {
     try {
