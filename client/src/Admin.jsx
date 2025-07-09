@@ -1,8 +1,6 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import NavMenu from './components/NavMenu';
 import ErrorBoundary from './components/ErrorBoundary';
-import { useAuth } from './AuthContext'; // Import useAuth
-import { useNavigate } from 'react-router-dom'; // Import useNavigate
 
 const generateRange = (start, end) => {
   return Array.from({ length: (end - start + 1) }, (_, i) => start + i);
@@ -33,102 +31,54 @@ export default function Admin() {
     fileId: '', // New field for file ID
   });
 
-  const { isAuthenticated, logout } = useAuth(); // Use useAuth hook
-  const navigate = useNavigate();
-
-  // Redirect if not authenticated
   useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login');
-    }
-  }, [isAuthenticated, navigate]);
-
-  const loadSettings = useCallback(async () => {
-    const accessToken = localStorage.getItem('accessToken');
-    if (!accessToken) {
-      console.log("No access token found for loading settings, logging out.");
-      logout();
-      return;
-    }
-    const headers = { 'Authorization': `Bearer ${accessToken}` };
-
-    try {
-      const printRes = await fetch(`${import.meta.env.VITE_API_URL}/api/print-settings`, { headers });
-      if (printRes.ok) {
-        const printData = await printRes.json();
-        setPrinterSettings({
-          mode: printData.mode || 'LAN',
-          url: printData.printerUrl || '',
-          contentType: printData.contentType || 'text/html',
-        });
-      } else {
-        if (printRes.status === 401 || printRes.status === 403) {
-          console.error("Auth error fetching printer settings, logging out.");
-          logout();
-          return;
+    const loadSettings = async () => {
+      try {
+        const printRes = await fetch(`${import.meta.env.VITE_API_URL}/api/print-settings`);
+        if (printRes.ok) {
+          const printData = await printRes.json();
+          setPrinterSettings({
+            mode: printData.mode || 'LAN',
+            url: printData.printerUrl || '',
+            contentType: printData.contentType || 'text/html',
+          });
+        } else {
+          console.error(`Failed to fetch printer settings: ${printRes.status}`);
         }
-        console.error(`Failed to fetch printer settings: ${printRes.status}`);
-      }
 
-      const appRes = await fetch(`${import.meta.env.VITE_API_URL}/api/app-settings`, { headers });
-      if (appRes.ok) {
-        const appData = await appRes.json();
-        setAppSettings(appData);
-      } else {
-        if (appRes.status === 401 || appRes.status === 403) {
-          console.error("Auth error fetching app settings, logging out.");
-          logout();
-          return;
+        const appRes = await fetch(`${import.meta.env.VITE_API_URL}/api/app-settings`);
+        if (appRes.ok) {
+          const appData = await appRes.json();
+          setAppSettings(appData);
+        } else {
+          console.error(`Failed to fetch app settings: ${appRes.status}`);
         }
-        console.error(`Failed to fetch app settings: ${appRes.status}`);
+      } catch (err) {
+        console.error('[Admin.jsx] Could not load initial settings, using defaults.', err.message);
       }
-    } catch (err) {
-      console.error('[Admin.jsx] Could not load initial settings, using defaults.', err.message);
-    }
-  }, [logout]); // Depend on logout
-
-  useEffect(() => {
-    if (!isAuthenticated) return; // Don't load if not authenticated
+    };
     loadSettings();
-  }, [loadSettings, isAuthenticated]); // Add isAuthenticated to dependencies
-
-  const checkPrinterStatus = useCallback(async () => {
-    const accessToken = localStorage.getItem('accessToken');
-    if (!accessToken) {
-      setPrinterStatus('No URL configured (Auth Error)');
-      logout();
-      return;
-    }
-    if (!printerSettings.url) {
-      setPrinterStatus('No URL configured');
-      return;
-    }
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/printer-status`, {
-        headers: { 'Authorization': `Bearer ${accessToken}` }
-      });
-      if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
-          setPrinterStatus('Not Available (Auth Error)');
-          logout();
-          return;
-        }
-        throw new Error(`Status check failed: ${response.status}`);
-      }
-      const data = await response.json();
-      setPrinterStatus(data.available ? 'Online' : `Not Available (${data.error || 'Unknown error'})`);
-    } catch (err) {
-      setPrinterStatus(`Offline or Unreachable`);
-      console.error('Error checking printer status:', err);
-    }
-  }, [printerSettings.url, logout]); // Depend on printerSettings.url and logout
+  }, []);
 
   useEffect(() => {
-    if (!isAuthenticated) return; // Don't check if not authenticated
+    const checkPrinterStatus = async () => {
+      if (!printerSettings.url) {
+        setPrinterStatus('No URL configured');
+        return;
+      }
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/printer-status`);
+        if (!response.ok) throw new Error(`Status check failed: ${response.status}`);
+        const data = await response.json();
+        setPrinterStatus(data.available ? 'Online' : `Not Available (${data.error || 'Unknown error'})`);
+      } catch (err) {
+        setPrinterStatus(`Offline or Unreachable`);
+      }
+    };
     checkPrinterStatus();
     const intervalId = setInterval(checkPrinterStatus, 60000);
     return () => clearInterval(intervalId);
-  }, [checkPrinterStatus, isAuthenticated]);
+  }, [printerSettings.url]);
 
   const handleMenuOpen = () => setIsMenuOpen((prev) => !prev);
   const handleMenuClose = () => setIsMenuOpen(false);
@@ -161,29 +111,13 @@ export default function Admin() {
   };
 
   const handleSaveAppSettings = async () => {
-    const accessToken = localStorage.getItem('accessToken');
-    if (!accessToken) {
-        alert("Authentication token missing. Please log in again.");
-        logout();
-        return;
-    }
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/app-settings`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}`
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(appSettings),
       });
-      if (!res.ok) {
-        if (res.status === 401 || res.status === 403) {
-            alert("Authentication expired or unauthorized. Please log in again.");
-            logout();
-            return;
-        }
-        throw new Error(`Failed to save app settings: ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`Failed to save app settings: ${res.status}`);
       alert('Application settings saved successfully!\nNote: Some changes require a server restart.');
     } catch (err) {
       console.error('[Admin.jsx] Error saving app settings:', err.message);
@@ -192,33 +126,17 @@ export default function Admin() {
   };
 
   const handleSavePrinterSettings = async () => {
-    const accessToken = localStorage.getItem('accessToken');
-    if (!accessToken) {
-        alert("Authentication token missing. Please log in again.");
-        logout();
-        return;
-    }
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/print-settings`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}`
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: printerSettings.mode,
           printerUrl: printerSettings.url.trim(),
           contentType: printerSettings.contentType,
         }),
       });
-      if (!res.ok) {
-        if (res.status === 401 || res.status === 403) {
-            alert("Authentication expired or unauthorized. Please log in again.");
-            logout();
-            return;
-        }
-        throw new Error(`Failed to save printer settings: ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`Failed to save printer settings: ${res.status}`);
       alert('Printer settings saved successfully!');
     } catch (err) {
       console.error('[Admin.jsx] Error saving printer settings:', err.message);
@@ -227,40 +145,24 @@ export default function Admin() {
   };
 
   // Load VAPI settings from backend on mount
-  const loadVapiSettings = useCallback(async () => {
-    const accessToken = localStorage.getItem('accessToken');
-    if (!accessToken) {
-        console.log("No access token found for VAPI settings, logging out.");
-        logout();
-        return;
-    }
-    try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/vapi-settings`, {
-        headers: { 'Authorization': `Bearer ${accessToken}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setVapiSettings({
-          apiKey: data.api_key || '',
-          assistantId: data.assistant_id || '',
-          fileId: data.file_id || '', // Load file ID from backend
-        });
-      } else {
-        if (res.status === 401 || res.status === 403) {
-            console.error("Auth error fetching VAPI settings, logging out.");
-            logout();
-            return;
-        }
-      }
-    } catch (err) {
-      console.error('Error loading VAPI settings:', err);
-    }
-  }, [logout]); // Depend on logout
-
   useEffect(() => {
-    if (!isAuthenticated) return; // Don't load if not authenticated
+    const loadVapiSettings = async () => {
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/vapi-settings`);
+        if (res.ok) {
+          const data = await res.json();
+          setVapiSettings({
+            apiKey: data.api_key || '',
+            assistantId: data.assistant_id || '',
+            fileId: data.file_id || '', // Load file ID from backend
+          });
+        }
+      } catch (err) {
+        console.error('Error loading VAPI settings:', err);
+      }
+    };
     loadVapiSettings();
-  }, [loadVapiSettings, isAuthenticated]); // Add isAuthenticated to dependencies
+  }, []);
 
   // Handle VAPI settings input changes
   const handleVapiSettingsChange = (e) => {
@@ -270,29 +172,13 @@ export default function Admin() {
 
   // Save VAPI settings to backend
   const handleSaveVapiSettings = async () => {
-    const accessToken = localStorage.getItem('accessToken');
-    if (!accessToken) {
-        alert("Authentication token missing. Please log in again.");
-        logout();
-        return;
-    }
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/vapi-settings`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}`
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(vapiSettings),
       });
-      if (!res.ok) {
-        if (res.status === 401 || res.status === 403) {
-            alert("Authentication expired or unauthorized. Please log in again.");
-            logout();
-            return;
-        }
-        throw new Error('Failed to save VAPI settings');
-      }
+      if (!res.ok) throw new Error('Failed to save VAPI settings');
       alert('VAPI settings saved successfully!');
     } catch (err) {
       console.error('Error saving VAPI settings:', err);
@@ -403,7 +289,7 @@ export default function Admin() {
             <button
               onClick={handleSaveAppSettings}
               // Applied common button classes
-              className={commonButtonClasses + " mt-6"}
+              className={commonButtonClasses + " mt-6"} 
             >
               Save Application Settings
             </button>

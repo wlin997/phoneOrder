@@ -1,8 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import NavMenu from './components/NavMenu';
 import ErrorBoundary from './components/ErrorBoundary';
-import { useAuth } from './AuthContext'; // Import useAuth
-import { useNavigate } from 'react-router-dom'; // Import useNavigate
 
 export default function DailySpecialsManager() {
   const [fileList, setFileList] = useState([]);
@@ -15,16 +13,6 @@ export default function DailySpecialsManager() {
   const [selectedBusinessId, setSelectedBusinessId] = useState(null);
   const [dataSource, setDataSource] = useState('vapi'); // 'vapi' or 'postgres'
   const menuRef = useRef(null);
-
-  const { isAuthenticated, logout } = useAuth(); // Use useAuth hook
-  const navigate = useNavigate();
-
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login');
-    }
-  }, [isAuthenticated, navigate]);
 
   // Helper function to generate a simple UUID-like string
   const generateUUID = () => {
@@ -39,20 +27,10 @@ export default function DailySpecialsManager() {
    * This endpoint internally retrieves the VAPI API key and assistant ID from the database
    * and then calls the VAPI API to get the list of files.
    */
-  const fetchFileList = useCallback(async () => {
+  const fetchFileList = async () => {
     setStatus({ message: 'Fetching VAPI file list...', type: 'info' });
-    const accessToken = localStorage.getItem('accessToken');
-    if (!accessToken) {
-      console.log("No access token found for VAPI file list, logging out.");
-      logout();
-      setStatus({ message: `Authentication required to fetch VAPI files.`, type: 'error' });
-      setFileList([]);
-      return;
-    }
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/vapi/files`, {
-        headers: { 'Authorization': `Bearer ${accessToken}` }
-      });
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/vapi/files`);
       if (res.ok) {
         const data = await res.json();
         setFileList(data);
@@ -62,13 +40,6 @@ export default function DailySpecialsManager() {
         }
         setStatus({ message: 'VAPI file list retrieved successfully!', type: 'success' });
       } else {
-        if (res.status === 401 || res.status === 403) {
-          console.error("Auth error fetching VAPI file list, logging out.");
-          logout();
-          setStatus({ message: `Authentication expired or unauthorized.`, type: 'error' });
-          setFileList([]);
-          return;
-        }
         const errorText = await res.text();
         console.error('Failed to retrieve VAPI file list from backend:', errorText);
         setStatus({ message: `Failed to retrieve VAPI file list: ${errorText.substring(0, 100)}...`, type: 'error' });
@@ -79,34 +50,23 @@ export default function DailySpecialsManager() {
       setStatus({ message: `Error retrieving VAPI file list: ${err.message}`, type: 'error' });
       setFileList([]);
     }
-  }, [selectedFileId, dataSource, logout]); // Add logout to dependencies
+  };
 
   /**
    * Fetches the content of a specific file from VAPI via the backend endpoint
    * `/api/vapi/files/:fileId/content`.
    * @param {string} fileId The ID of the file whose content is to be fetched.
    */
-  const fetchFileContent = useCallback(async (fileId) => {
+  const fetchFileContent = async (fileId) => {
     setStatus({ message: 'Fetching selected file content...', type: 'info' });
-    const accessToken = localStorage.getItem('accessToken');
-    if (!accessToken) {
-      console.log("No access token found for VAPI file content, logging out.");
-      logout();
-      setStatus({ message: `Authentication required to fetch file content.`, type: 'error' });
-      setSelectedFileContent('');
-      setDailySpecials([]);
-      return;
-    }
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/vapi/files/${fileId}/content`, {
-        headers: { 'Authorization': `Bearer ${accessToken}` }
-      });
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/vapi/files/${fileId}/content`);
       if (res.ok) {
         const data = await res.json();
         if (data.daily_specials && Array.isArray(data.daily_specials)) {
           setDailySpecials(data.daily_specials.map(item => ({
             ...item,
-            price: item.price !== undefined ? parseFloat(item.price) : ''
+            price: item.price !== undefined ? parseFloat(item.price) : '' // Set to empty string if price is 0 or undefined for better UX
           })));
         } else {
           setDailySpecials([]);
@@ -116,14 +76,6 @@ export default function DailySpecialsManager() {
         setSelectedFileId(fileId);
         setStatus({ message: 'File content retrieved successfully!', type: 'success' });
       } else {
-        if (res.status === 401 || res.status === 403) {
-          console.error("Auth error fetching VAPI file content, logging out.");
-          logout();
-          setStatus({ message: `Authentication expired or unauthorized.`, type: 'error' });
-          setSelectedFileContent('');
-          setDailySpecials([]);
-          return;
-        }
         const errorText = await res.text();
         console.error('Failed to retrieve file content from backend:', errorText);
         setStatus({ message: `Failed to retrieve file content: ${errorText.substring(0, 100)}...`, type: 'error' });
@@ -136,7 +88,7 @@ export default function DailySpecialsManager() {
       setSelectedFileContent('');
       setDailySpecials([]);
     }
-  }, [logout]); // Add logout to dependencies
+  };
 
   /**
    * Updates the content of the currently selected VAPI file via the backend endpoint
@@ -146,37 +98,23 @@ export default function DailySpecialsManager() {
   const updateSelectedFileContent = async () => {
     if (!selectedFileId || dataSource !== 'vapi') return;
     setStatus({ message: 'Updating selected file content...', type: 'info' });
-    const accessToken = localStorage.getItem('accessToken');
-    if (!accessToken) {
-      alert("Authentication token missing. Please log in again.");
-      logout();
-      return;
-    }
     try {
       const payloadToSend = {
         daily_specials: dailySpecials.map(item => ({
           ...item,
-          price: item.price === '' ? 0 : parseFloat(item.price) || 0
+          price: item.price === '' ? 0 : parseFloat(item.price) || 0 // Ensure price is number for sending
         }))
       };
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/daily-specials`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}`
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payloadToSend),
       });
       if (res.ok) {
         const responseData = await res.json();
         setStatus({ message: responseData.message || 'File content updated successfully!', type: 'success' });
-        fetchFileList(); // Refresh the file list after update
+        fetchFileList();
       } else {
-        if (res.status === 401 || res.status === 403) {
-            alert("Authentication expired or unauthorized. Please log in again.");
-            logout();
-            return;
-        }
         const errorText = await res.text();
         console.error('Failed to update file content from backend:', errorText);
         setStatus({ message: `Failed to update file content: ${errorText.substring(0, 100)}...`, type: 'error' });
@@ -187,20 +125,10 @@ export default function DailySpecialsManager() {
     }
   };
 
-  const fetchBusinesses = useCallback(async () => {
+  const fetchBusinesses = async () => {
     setStatus({ message: 'Fetching businesses...', type: 'info' });
-    const accessToken = localStorage.getItem('accessToken');
-    if (!accessToken) {
-      console.log("No access token found for businesses, logging out.");
-      logout();
-      setStatus({ message: `Authentication required to fetch businesses.`, type: 'error' });
-      setBusinesses([]);
-      return;
-    }
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/businesses`, {
-        headers: { 'Authorization': `Bearer ${accessToken}` }
-      });
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/businesses`);
       if (res.ok) {
         const data = await res.json();
         setBusinesses(data);
@@ -210,13 +138,6 @@ export default function DailySpecialsManager() {
         }
         setStatus({ message: 'Businesses retrieved successfully!', type: 'success' });
       } else {
-        if (res.status === 401 || res.status === 403) {
-          console.error("Auth error fetching businesses, logging out.");
-          logout();
-          setStatus({ message: `Authentication expired or unauthorized.`, type: 'error' });
-          setBusinesses([]);
-          return;
-        }
         const errorText = await res.text();
         console.error('Failed to retrieve businesses from backend:', errorText);
         setStatus({ message: `Failed to retrieve businesses: ${errorText.substring(0, 100)}...`, type: 'error' });
@@ -227,40 +148,23 @@ export default function DailySpecialsManager() {
       setStatus({ message: `Error retrieving businesses: ${err.message}`, type: 'error' });
       setBusinesses([]);
     }
-  }, [selectedBusinessId, logout]); // Add logout to dependencies
+  };
 
-  const fetchDailySpecials = useCallback(async (businessId) => {
+  const fetchDailySpecials = async (businessId) => {
     setStatus({ message: 'Fetching daily specials...', type: 'info' });
-    const accessToken = localStorage.getItem('accessToken');
-    if (!accessToken) {
-      console.log("No access token found for daily specials, logging out.");
-      logout();
-      setStatus({ message: `Authentication required to fetch daily specials.`, type: 'error' });
-      setDailySpecials([]);
-      return;
-    }
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/daily-specials?business_id=${businessId}`, {
-        headers: { 'Authorization': `Bearer ${accessToken}` }
-      });
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/daily-specials?business_id=${businessId}`);
       if (res.ok) {
         const data = await res.json();
         setDailySpecials(data.map(item => ({
           name: item.item_name,
-          price: item.price !== undefined ? parseFloat(item.price) : '',
+          price: item.price !== undefined ? parseFloat(item.price) : '', // Set to empty string if price is 0 or undefined for better UX
           description: item.item_description,
           id: item.special_id,
         })));
         setSelectedFileContent(JSON.stringify({ daily_specials: data }, null, 2));
         setStatus({ message: 'Daily specials retrieved successfully!', type: 'success' });
       } else {
-        if (res.status === 401 || res.status === 403) {
-          console.error("Auth error fetching daily specials, logging out.");
-          logout();
-          setStatus({ message: `Authentication expired or unauthorized.`, type: 'error' });
-          setDailySpecials([]);
-          return;
-        }
         const errorText = await res.text();
         console.error('Failed to retrieve daily specials from backend:', errorText);
         setStatus({ message: `Failed to retrieve daily specials: ${errorText.substring(0, 100)}...`, type: 'error' });
@@ -271,30 +175,21 @@ export default function DailySpecialsManager() {
       setStatus({ message: `Error retrieving daily specials: ${err.message}`, type: 'error' });
       setDailySpecials([]);
     }
-  }, [logout]); // Add logout to dependencies
+  };
 
   const updateDailySpecials = async () => {
     if (!selectedBusinessId || dataSource !== 'postgres') return;
     setStatus({ message: 'Updating daily specials...', type: 'info' });
-    const accessToken = localStorage.getItem('accessToken');
-    if (!accessToken) {
-      alert("Authentication token missing. Please log in again.");
-      logout();
-      return;
-    }
     try {
       // MODIFIED: Changed the endpoint to target the PostgreSQL specific endpoint
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/daily-specials/postgres`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}`
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           business_id: selectedBusinessId,
           daily_specials: dailySpecials.map(item => ({
             ...item,
-            price: item.price === '' ? 0 : parseFloat(item.price) || 0
+            price: item.price === '' ? 0 : parseFloat(item.price) || 0 // Ensure price is number for sending
           }))
         }),
       });
@@ -303,11 +198,6 @@ export default function DailySpecialsManager() {
         setStatus({ message: responseData.message || 'Daily specials updated successfully!', type: 'success' });
         fetchDailySpecials(selectedBusinessId); // Refresh the list
       } else {
-        if (res.status === 401 || res.status === 403) {
-            alert("Authentication expired or unauthorized. Please log in again.");
-            logout();
-            return;
-        }
         const errorText = await res.text();
         console.error('Failed to update daily specials from backend:', errorText);
         setStatus({ message: `Failed to update daily specials: ${errorText.substring(0, 100)}...`, type: 'error' });
@@ -384,21 +274,19 @@ export default function DailySpecialsManager() {
 
   // Effect to load file list or businesses on component mount based on data source
   useEffect(() => {
-    if (!isAuthenticated) return; // Don't fetch if not authenticated
-
     if (dataSource === 'vapi') {
       fetchFileList();
     } else {
       fetchBusinesses();
     }
-  }, [dataSource, isAuthenticated, fetchFileList, fetchBusinesses]); // Add isAuthenticated and new fetch callbacks to dependencies
+  }, [dataSource]);
 
   // Effect to update the display-only JSON whenever `dailySpecials` changes
   useEffect(() => {
     try {
       setSelectedFileContent(JSON.stringify({ daily_specials: dailySpecials.map(item => ({
         ...item,
-        price: item.price === '' ? 0 : parseFloat(item.price) || 0
+        price: item.price === '' ? 0 : parseFloat(item.price) || 0 // Ensure price is number for display JSON
       }))}, null, 2));
     } catch (e) {
       setSelectedFileContent('Error parsing daily specials to JSON.');
@@ -540,7 +428,7 @@ export default function DailySpecialsManager() {
                             <input
                               type="number"
                               step="0.01"
-                              value={special.price === '' ? '' : parseFloat(special.price)}
+                              value={special.price === '' ? '' : parseFloat(special.price)} // Display empty string if price is empty
                               onChange={(e) => handleSpecialChange(e, index, 'price')}
                               className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                               placeholder="e.g., 15.99"
