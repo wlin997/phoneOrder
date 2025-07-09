@@ -33,7 +33,7 @@ const PORT = process.env.PORT || 3001;
 // =================================================================================
 
 async function hashPassword(password) {
-    const salt = await bcrypt.genGenSalt(10); // Generate a salt
+    const salt = await bcrypt.genSalt(10); // Generate a salt
     return bcrypt.hash(password, salt); // Hash the password with the salt
 }
 
@@ -53,18 +53,6 @@ function generateRefreshToken(user) {
 // REMINDER: NO AUTHENTICATION ENDPOINTS OR MIDDLEWARE YET.
 // These will be added later once the core setup is working.
 // =================================================================================
-
-// ... rest of your existing server3.txt code (Express API Endpoints, SERVER INITIALIZATION, etc.) ...
-
-// Utility to save app settings - this function was missing but called by app.post('/api/app-settings')
-const saveAppSettings = async (settings) => {
-    try {
-        await fsp.writeFile(appSettingsFilePath, JSON.stringify(settings, null, 2));
-    } catch (err) {
-        console.error("[App Settings] Failed to save settings to file:", err);
-        throw err;
-    }
-};
 
 
 
@@ -1235,13 +1223,4 @@ pool.connect()
         console.error("❌ Failed to connect to the database and start server:", err.message);
         process.exit(1);
     });
-
-// Utility to save app settings - this function was missing but called by app.post('/api/app-settings')
-const saveAppSettings = async (settings) => {
-    try {
-        await fsp.writeFile(appSettingsFilePath, JSON.stringify(settings, null, 2));
-    } catch (err) {
-        console.error("[App Settings] Failed to save settings to file:", err);
-        throw err;
-    }
-};
+ 
