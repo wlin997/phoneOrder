@@ -75,7 +75,7 @@ const RootApp = () => {
                 </Route>
 
                 {/* NEW: Fallback for unknown routes: Redirects authenticated users to /app, others to /login */}
-                <Route path="*" element={<Navigate to={currentUser ? "/app" : "/login"} replace />} />
+               <Route path="*" element={<Navigate to={currentUser ? "/app" : "/login"} replace />} />
             </Routes>
         </div>
     );
