@@ -50,8 +50,7 @@ const RootApp = () => {
 
                 {/* Root path: Redirects to /kds if authenticated, otherwise to /login */}
                 {/* This route needs to be outside a ProtectedRoute to handle the initial redirect */}
-                <Route path="/" element={currentUser ? <Navigate to="/kds" replace /> : <Navigate to="/login" replace />} /> 
-
+                <Route path="/" element={currentUser ? <Navigate to="/app" replace /> : <Navigate to="/login" replace />} />
                 {/* Protected Routes using the imported ProtectedRoute component */}
                 {/* These routes require authentication and specific roles */}
 
@@ -73,8 +72,8 @@ const RootApp = () => {
                 </Route>
 
                 {/* Fallback for unknown routes: Redirects authenticated users to /kds, others to /login */}
-                <Route path="*" element={<Navigate to={currentUser ? "/kds" : "/login"} replace />} /> 
-            </Routes>
+                <Route path="*" element={<Navigate to={currentUser ? "/app" : "/login"} replace />} />
+            </Routes> 
         </div>
     );
 };
