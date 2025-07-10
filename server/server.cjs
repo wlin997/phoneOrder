@@ -315,7 +315,7 @@ app.post('/api/login', async (req, res) => {
         // const refreshToken = generateRefreshToken(user);
         // await pool.query('INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)', [user.id, refreshToken, new Date(Date.now() + JWT_REFRESH_TOKEN_EXPIRY_MS)]);
 
-        res.json({ accessToken, user: { id: user.id, email: user.email, role: user.role } });
+        res.json({ accessToken, user: { id: user.id, email: user.email, role_id: user.role_id } });
     } catch (err) {
         console.error("Login error:", err);
         res.status(500).json({ error: "Failed to log in." });
