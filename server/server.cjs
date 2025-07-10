@@ -42,6 +42,16 @@ async function comparePassword(password, hash) {
 }
 
 function generateAccessToken(user) {
+    console.log("[Backend] generateAccessToken: User object received:", user); // NEW LOG
+    console.log("[Backend] generateAccessToken: User ID:", user.id, "Email:", user.email, "Role ID:", user.role_id); // NEW LOG
+
+    // Ensure user.role_id is numeric and valid if expected
+    if (typeof user.role_id !== 'number' || user.role_id < 1) {
+        console.warn("[Backend] generateAccessToken: role_id is not a valid number. JWT payload might be incorrect.");
+    }
+
+    // The 'role' property in the JWT payload is what AuthContext currently reads as 'user.role' from the JWT.
+    // So, we MUST put user.role_id here.
     return jwt.sign({ id: user.id, email: user.email, role: user.role_id }, process.env.JWT_SECRET, { expiresIn: process.env.ACCESS_TOKEN_EXPIRY });
 }
 
@@ -259,10 +269,12 @@ app.post('/api/register', async (req, res) => {
             [email, hashedPassword, roleId] // Use the fetched roleId
         );
         const user = result.rows[0];
+        console.log("[Backend Register] User inserted into DB:", user); // NEW LOG
         // Note: generateAccessToken still expects 'user.role' but will temporarily get 'user.role_id'.
         // This will be fixed in the next phase of dynamic RBAC.
         const accessToken = generateAccessToken(user); // JWT will have role_id for now
-
+        console.log("[Backend Register] User inserted into DB:", user); // NEW LOG
+        
         res.status(201).json({
             message: "User registered successfully.",
             accessToken,
@@ -286,6 +298,7 @@ app.post('/api/login', async (req, res) => {
     try {
         const result = await pool.query('SELECT id, email, password_hash, role_id FROM users WHERE email = $1', [email]);
         const user = result.rows[0];
+        console.log("[Backend Login] User fetched from DB:", user); // NEW LOG
 
         if (!user) {
             return res.status(401).json({ error: "Invalid credentials." });
@@ -297,6 +310,7 @@ app.post('/api/login', async (req, res) => {
         }
 
         const accessToken = generateAccessToken(user);
+        console.log("[Backend Login] Access Token generated."); // NEW LOG
         // If using refresh tokens:
         // const refreshToken = generateRefreshToken(user);
         // await pool.query('INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)', [user.id, refreshToken, new Date(Date.now() + JWT_REFRESH_TOKEN_EXPIRY_MS)]);
