@@ -1,26 +1,16 @@
 // src/client/src/AuthContext.jsx
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
-// Create the Auth Context
 const AuthContext = createContext(null);
+export const useAuth = () => useContext(AuthContext);
 
-// Custom hook to use the Auth Context
-export const useAuth = () => {
-  return useContext(AuthContext);
-};
-
-// Auth Provider Component
 export const AuthProvider = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState(null); // Stores user object { id, email, role }
-  const [userRole, setUserRole] = useState(null); // Stores the user's role string
-  const [loading, setLoading] = useState(true); // To indicate if auth state is still loading
+  const [currentUser, setCurrentUser] = useState(null);
+  const [userRole, setUserRole] = useState(null); // This will store the role name (e.g., 'admin')
+  const [loading, setLoading] = useState(true);
 
-  // Memoized login function
   const login = useCallback(async (email, password) => {
     try {
-      // NOTE: This URL will need to point to your backend's login endpoint.
-      // We haven't implemented the login endpoint on the backend yet in server3.txt.
-      // This will fail with 404 until we add the backend /api/login endpoint.
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -34,17 +24,29 @@ export const AuthProvider = ({ children }) => {
 
       const data = await response.json();
       localStorage.setItem('accessToken', data.accessToken);
-      localStorage.setItem('user', JSON.stringify(data.user)); // Store user data
-      setCurrentUser(data.user);
-      setUserRole(data.user.role);
-      return data.user; // Return user data on success
+
+      // --- CRITICAL CHANGE HERE ---
+      // The backend is now sending role_id. We need to store role_id and the role_name if available.
+      const userToStore = {
+          id: data.user.id,
+          email: data.user.email,
+          role_id: data.user.role_id,
+          // TEMP HACK: For now, we manually map common role_ids to names on the frontend.
+          // This will be replaced by dynamic permissions in the future.
+          role_name: getRoleNameFromId(data.user.role_id) // Get role name based on ID
+      };
+      localStorage.setItem('user', JSON.stringify(userToStore));
+      setCurrentUser(userToStore);
+      setUserRole(userToStore.role_name); // Set userRole to the name
+      // --- END CRITICAL CHANGE ---
+
+      return userToStore;
     } catch (error) {
       console.error('Login error:', error);
-      throw error; // Re-throw to be caught by the calling component (e.g., login form)
+      throw error;
     }
   }, []);
 
-  // Memoized logout function
   const logout = useCallback(() => {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('user');
@@ -52,7 +54,18 @@ export const AuthProvider = ({ children }) => {
     setUserRole(null);
   }, []);
 
-  // Effect to check for existing token and user data on app load
+  // Helper to map role_id to a display name (Temporary until full RBAC is implemented)
+  const getRoleNameFromId = (id) => {
+      switch(id) {
+          case 1: return 'admin';
+          case 2: return 'manager';
+          case 3: return 'employee';
+          case 4: return 'customer';
+          default: return 'unknown';
+      }
+  };
+
+
   useEffect(() => {
     const checkAuthStatus = () => {
       const storedToken = localStorage.getItem('accessToken');
@@ -61,34 +74,36 @@ export const AuthProvider = ({ children }) => {
       if (storedToken && storedUser) {
         try {
           const parsedUser = JSON.parse(storedUser);
-          // Minimal validation: check if required fields exist
-          if (parsedUser && parsedUser.id && parsedUser.email && parsedUser.role) {
+          if (parsedUser && parsedUser.id && parsedUser.email && parsedUser.role_id) { // Check for role_id
+            // If user object from localStorage doesn't have role_name, derive it
+            if (!parsedUser.role_name) {
+                parsedUser.role_name = getRoleNameFromId(parsedUser.role_id);
+            }
             setCurrentUser(parsedUser);
-            setUserRole(parsedUser.role);
+            setUserRole(parsedUser.role_name); // Set userRole to the name
           } else {
-            // Invalid stored user data, clear it
             console.warn("Invalid user data found in localStorage. Clearing...");
             logout();
           }
         } catch (e) {
           console.error("Error parsing stored user data:", e);
-          logout(); // Clear invalid data
+          logout();
         }
       }
-      setLoading(false); // Authentication check is complete
+      setLoading(false);
     };
 
     checkAuthStatus();
   }, [logout]);
 
-  // Value provided by the context to its consumers
   const authContextValue = {
     currentUser,
-    userRole,
+    userRole, // This is now the role name string
     loading,
     login,
     logout,
-    isAuthenticated: !!currentUser, // Convenience flag
+    isAuthenticated: !!currentUser,
+    // These now check against the role name string
     isAdmin: userRole === 'admin',
     isManager: userRole === 'manager',
     isEmployee: userRole === 'employee',
@@ -96,7 +111,6 @@ export const AuthProvider = ({ children }) => {
   };
 
   if (loading) {
-    // Optionally render a loading spinner or splash screen
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: '24px', color: '#333' }}>
         Loading authentication...

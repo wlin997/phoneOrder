@@ -42,7 +42,7 @@ async function comparePassword(password, hash) {
 }
 
 function generateAccessToken(user) {
-    return jwt.sign({ id: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: process.env.ACCESS_TOKEN_EXPIRY });
+    return jwt.sign({ id: user.id, email: user.email, role: user.role_id }, process.env.JWT_SECRET, { expiresIn: process.env.ACCESS_TOKEN_EXPIRY });
 }
 
 function generateRefreshToken(user) {
@@ -238,20 +238,36 @@ async function archiveOrders() {
 // --- NEW AUTHENTICATION ENDPOINTS ---
 // User Registration
 app.post('/api/register', async (req, res) => {
-    const { email, password, role } = req.body; // Role might be default or set by admin
+    const { email, password, role_name } = req.body; // Expect role_name from frontend (e.g., 'admin', 'customer')
     if (!email || !password) {
         return res.status(400).json({ error: "Email and password are required." });
     }
     try {
         const hashedPassword = await hashPassword(password);
+
+        // Fetch the role_id based on the provided role_name, default to 'customer'
+        const defaultRoleName = role_name || 'customer';
+        const roleResult = await pool.query('SELECT id FROM roles WHERE name = $1', [defaultRoleName]);
+        const roleId = roleResult.rows[0]?.id;
+
+        if (!roleId) {
+            return res.status(400).json({ error: `Invalid role specified: ${defaultRoleName}.` });
+        }
+
         const result = await pool.query(
-            'INSERT INTO users (email, password_hash, role_id) VALUES ($1, $2, $3) RETURNING id, email, role_id',
-            [email, hashedPassword, role || 'customer'] // Default role
+            'INSERT INTO users (email, password_hash, role_id) VALUES ($1, $2, $3) RETURNING id, email, role_id', // Insert into role_id, return role_id
+            [email, hashedPassword, roleId] // Use the fetched roleId
         );
         const user = result.rows[0];
-        const accessToken = generateAccessToken(user);
-        // For simplicity, we'll omit refresh tokens for now, but consider adding them.
-        res.status(201).json({ message: "User registered successfully.", accessToken, user: { id: user.id, email: user.email, role: user.role } });
+        // Note: generateAccessToken still expects 'user.role' but will temporarily get 'user.role_id'.
+        // This will be fixed in the next phase of dynamic RBAC.
+        const accessToken = generateAccessToken(user); // JWT will have role_id for now
+
+        res.status(201).json({
+            message: "User registered successfully.",
+            accessToken,
+            user: { id: user.id, email: user.email, role_id: user.role_id, role_name: defaultRoleName }
+        });
     } catch (err) {
         if (err.code === '23505') { // Unique violation for email
             return res.status(409).json({ error: "Email already registered." });

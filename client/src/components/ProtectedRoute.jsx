@@ -1,28 +1,22 @@
 // src/client/src/components/ProtectedRoute.jsx
 import React from 'react';
-import { Navigate, Outlet } from 'react-router-dom'; // 'Outlet' is used when ProtectedRoute is a parent route in main.jsx
-import { useAuth } from '../AuthContext'; // Path to AuthContext relative to this file
+import { Navigate, Outlet } from 'react-router-dom';
+import { useAuth } from '../AuthContext';
 
 const ProtectedRoute = ({ allowedRoles }) => {
-  const { currentUser, userRole, loading, isAuthenticated } = useAuth(); // Assuming isAuthenticated is derived in useAuth
+  const { currentUser, userRole, loading, isAuthenticated } = useAuth(); // userRole now holds the role_name
 
-  // If authentication state is still loading, don't render anything yet
-  // You could also show a loading spinner here.
   if (loading) {
-    return null; // Or a loading component
+    return null;
   }
 
-  // If user is not authenticated, redirect to the login page
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
-  // If allowedRoles are specified, check if the user's role is included
+  // --- CRITICAL CHANGE HERE ---
+  // The 'allowedRoles' prop (e.g., ['admin', 'manager']) now needs to be checked against userRole (e.g., 'admin')
   if (allowedRoles && !allowedRoles.includes(userRole)) {
-    // If authenticated but not authorized for this role, redirect to dashboard or a forbidden page
-    // Here, redirecting to the main dashboard (which is also protected,
-    // so it might further redirect based on its allowedRoles if the dashboard itself is role-specific,
-    // or simply navigate to a default landing for logged-in users).
     return (
       <div style={{
           display: 'flex',
@@ -37,9 +31,9 @@ const ProtectedRoute = ({ allowedRoles }) => {
       }}>
           <h1 style={{ fontSize: '2em', marginBottom: '10px' }}>Access Denied</h1>
           <p style={{ fontSize: '1.2em' }}>You do not have the required permissions to view this page.</p>
-          <p style={{ fontSize: '1em', marginTop: '10px' }}>Your role: <strong>{String(userRole || 'N/A')}</strong></p> {/* Safeguard String conversion */}
+          <p style={{ fontSize: '1em', marginTop: '10px' }}>Your role: <strong>{String(userRole || 'N/A')}</strong></p>
           <button
-              onClick={() => window.location.href = '/'} // Redirects to the root (dashboard)
+              onClick={() => window.location.href = '/app'} // Redirect to dashboard
               style={{
                   marginTop: '20px',
                   padding: '10px 20px',
@@ -57,7 +51,6 @@ const ProtectedRoute = ({ allowedRoles }) => {
     );
   }
 
-  // If authenticated and authorized, render the child routes (via Outlet)
   return <Outlet />;
 };
 
