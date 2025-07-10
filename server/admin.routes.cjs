@@ -1,12 +1,15 @@
 // admin.routes.js  (CommonJS)
 const express = require("express");
+
 const {
   getAllRoles,
   getAllPermissions,
   getRolePermissions,
   upsertRolePermissions,
   updateUserRole,
-} = require("./rbac.service.js");
+} = require("./rbac.service.cjs");
+
+
 const { authorizePermissions } = require("./auth.middleware.js");
 
 const router = express.Router();
