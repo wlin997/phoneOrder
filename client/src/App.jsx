@@ -1,14 +1,12 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import "./App.css";
 import "./index.css";
-import { Link, useNavigate } from 'react-router-dom'; // Import useNavigate
+import { Link, useNavigate } from 'react-router-dom';
 import NavMenu from './components/NavMenu';
 import ErrorBoundary from './components/ErrorBoundary';
 import axios from 'axios';
 
-// --- AUTH IMPORT ---
 import { useAuth } from './AuthContext'; // Import useAuth
-// --- END AUTH IMPORT ---
 
 console.log("------------------------------------------");
 console.log("[App.jsx] Component file loaded and parsing.");
@@ -19,7 +17,7 @@ const MAX_PRINTED_ORDERS = 1000;
 const loadViewedOrders = () => {
     try {
         const stored = localStorage.getItem('viewedOrders');
-        return stored ? JSON.parse(stored) : {}; // Corrected: Removed 's' typo if it was present here
+        return stored ? JSON.parse(stored) : {};
     } catch (err) {
         console.error('Error loading viewed orders from localStorage:', err);
         return {};
@@ -34,7 +32,7 @@ const saveViewedOrders = (viewedOrders) => {
     }
 };
 
-// This is the CORRECT, single instance of formatItem. The duplicate below has been removed.
+// This is the CORRECT, single instance of formatItem.
 const formatItem = (item) => {
     console.log('[Debug] Item Data (OrderDetailsDisplay):', item);
     const price = item.qty > 1
@@ -229,7 +227,7 @@ function App() {
         document.addEventListener('mousedown', handleClickOutside);
         return () => {
             console.log("[App.jsx useEffect] Cleaning up click outside listener.");
-            // FIXED TYPO: Corrected handleOutsideClick to handleClickOutside
+            // FIXED TYPO: Corrected handleOutsideClick to handleClickOutside for consistency.
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, []);
@@ -482,7 +480,7 @@ function App() {
             await fetchUpdatingOrders();
         } catch (error) {
             console.error('[App.jsx handleReprint] Error reprocessing order:', error);
-            alert(`Failed to re-process order: ${err.message}`);
+            alert(`Failed to re-process order: ${error.message}`);
         } finally {
             setIsProcessing(false);
         }
@@ -713,7 +711,7 @@ const handleViewDetails = async (order) => {
         const accessToken = localStorage.getItem('accessToken');
         if (!accessToken) {
             console.log("[App.jsx printer useEffect] No access token found, skipping printer status check.");
-            logout();
+            logout(); // Assuming logout is available here from useAuth
             setPrinterStatus('N/A (Auth Needed)');
             return;
         }
