@@ -6,7 +6,7 @@ import NavMenu from './components/NavMenu';
 import ErrorBoundary from './components/ErrorBoundary';
 import axios from 'axios';
 
-import { useAuth } from './AuthContext'; // Import useAuth
+import { useAuth } from './AuthContext';
 
 console.log("------------------------------------------");
 console.log("[App.jsx] Component file loaded and parsing.");
@@ -32,7 +32,6 @@ const saveViewedOrders = (viewedOrders) => {
     }
 };
 
-// This is the CORRECT, single instance of formatItem.
 const formatItem = (item) => {
     console.log('[Debug] Item Data (OrderDetailsDisplay):', item);
     const price = item.qty > 1
@@ -170,6 +169,8 @@ function App() {
     const viewedOrdersRef = useRef(loadViewedOrders());
 
     const { isAuthenticated, userRole, logout } = useAuth(); // Correctly using useAuth hook
+    // Declaring useNavigate here to ensure it's within the component's scope.
+    const navigate = useNavigate(); // ADDED: Declare useNavigate here
 
     console.log("[App.jsx] App component state initialized. IsAuthenticated:", isAuthenticated);
 
@@ -215,6 +216,11 @@ function App() {
     useEffect(() => {
         console.log("[App.jsx useEffect] Setting up click outside listener.");
         const handleClickOutside = (event) => {
+            // Safeguard: Ensure menuRef.current exists
+            if (!menuRef.current) {
+                console.log("[App.jsx handleClickOutside] menuRef.current is null, skipping click outside logic.");
+                return;
+            }
             if (menuRef.current && !menuRef.current.contains(event.target)) {
                 const menuButton = menuRef.current.previousElementSibling;
                 if (menuButton && !menuButton.contains(event.target)) {
@@ -230,7 +236,7 @@ function App() {
             // FIXED TYPO: Corrected handleOutsideClick to handleClickOutside for consistency.
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, []);
+    }, [menuRef, setIsMenuOpen]); // ADDED: menuRef and setIsMenuOpen to dependency array
 
     const fetchOrders = useCallback(async () => {
         console.log("[App.jsx fetchOrders] Attempting to fetch incoming orders.");
@@ -480,7 +486,7 @@ function App() {
             await fetchUpdatingOrders();
         } catch (error) {
             console.error('[App.jsx handleReprint] Error reprocessing order:', error);
-            alert(`Failed to re-process order: ${error.message}`);
+            alert(`Failed to re-process order: ${err.message}`);
         } finally {
             setIsProcessing(false);
         }
@@ -711,7 +717,7 @@ const handleViewDetails = async (order) => {
         const accessToken = localStorage.getItem('accessToken');
         if (!accessToken) {
             console.log("[App.jsx printer useEffect] No access token found, skipping printer status check.");
-            logout(); // Assuming logout is available here from useAuth
+            logout();
             setPrinterStatus('N/A (Auth Needed)');
             return;
         }
@@ -977,7 +983,7 @@ const handleViewDetails = async (order) => {
                                         {Array.isArray(order.printedTimestamps) && order.printedTimestamps.length > 0 && (
                                           <div className="text-xs text-gray-500 mt-1 w-full pl-6">
                                             {order.printedTimestamps.map((ts, idx) => (
-                                              <div key={idx}>{new Date(ts).toLocaleString()}</div>
+                                              <li key={idx}>{new Date(ts).toLocaleString()}</li>
                                             ))}
                                           </div>
                                         )}
