@@ -1,17 +1,17 @@
-// admin.routes.js  (CommonJS)
-const express = require("express");
-const {
+// admin.routes.js (ESM version for Node v22+)
+import express from "express";
+import {
   getAllRoles,
   getAllPermissions,
   getRolePermissions,
   upsertRolePermissions,
   updateUserRole,
-} = require("./rbac.service.js");
-const { authorizePermissions } = require("./auth.middleware.js");
+} from "./rbac.service.js";
+import { authorizePermissions } from "./auth.middleware.js";
 
 const router = express.Router();
 
-// every route below requires manage_admin_settings
+// Every route below requires this permission
 router.use(authorizePermissions(["manage_admin_settings"]));
 
 router.get("/roles", async (_, res, next) => {
@@ -53,7 +53,6 @@ router.get("/roles/:roleId/permissions", async (req, res, next) => {
 });
 
 router.put("/roles/:roleId/permissions", async (req, res, next) => {
-  // body = [1,4,6]  (array of permission IDs)
   try {
     await upsertRolePermissions(req.params.roleId, req.body);
     res.sendStatus(204);
@@ -85,4 +84,4 @@ router.put("/users/:userId/role", async (req, res, next) => {
   }
 });
 
-module.exports = router;   // ← CommonJS export
+export default router;
