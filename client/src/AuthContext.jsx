@@ -6,16 +6,12 @@ export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
-  const [userRole, setUserRole] = useState(null); // This will store the role name (e.g., 'admin')
+  const [userRole, setUserRole] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const login = useCallback(async (email, password) => {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/login`, {
-        console.log("[AuthContext Login] Raw data from backend:", data); // NEW LOG
-        console.log("[AuthContext Login] User data received:", data.user); // NEW LOG
-        console.log("[AuthContext Login] Role ID from backend:", data.user.role_id); // NEW LOG
-
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -27,23 +23,24 @@ export const AuthProvider = ({ children }) => {
       }
 
       const data = await response.json();
+      // --- CORRECTED PLACEMENT OF LOGS ---
+      console.log("[AuthContext Login] Raw data from backend:", data); // NEW LOG - CORRECTED PLACEMENT
+      console.log("[AuthContext Login] User data received:", data.user); // NEW LOG - CORRECTED PLACEMENT
+      console.log("[AuthContext Login] Role ID from backend:", data.user.role_id); // NEW LOG - CORRECTED PLACEMENT
+      // --- END CORRECTED PLACEMENT ---
+
       localStorage.setItem('accessToken', data.accessToken);
 
-      // --- CRITICAL CHANGE HERE ---
-      // The backend is now sending role_id. We need to store role_id and the role_name if available.
       const userToStore = {
           id: data.user.id,
           email: data.user.email,
           role_id: data.user.role_id,
-          // TEMP HACK: For now, we manually map common role_ids to names on the frontend.
-          // This will be replaced by dynamic permissions in the future.
-          role_name: getRoleNameFromId(data.user.role_id) // Get role name based on ID
+          role_name: getRoleNameFromId(data.user.role_id)
       };
-       console.log("[AuthContext Login] User object prepared for storage:", userToStore); // NEW LOG
+      console.log("[AuthContext Login] User object prepared for storage:", userToStore); // NEW LOG
       localStorage.setItem('user', JSON.stringify(userToStore));
       setCurrentUser(userToStore);
-      setUserRole(userToStore.role_name); // Set userRole to the name
-      // --- END CRITICAL CHANGE ---
+      setUserRole(userToStore.role_name);
 
       return userToStore;
     } catch (error) {
@@ -70,7 +67,6 @@ export const AuthProvider = ({ children }) => {
       }
   };
 
-
   useEffect(() => {
     const checkAuthStatus = () => {
       const storedToken = localStorage.getItem('accessToken');
@@ -81,17 +77,15 @@ export const AuthProvider = ({ children }) => {
           const parsedUser = JSON.parse(storedUser);
           console.log("[AuthContext useEffect] Parsed user from localStorage:", parsedUser); // NEW LOG
           console.log("[AuthContext useEffect] Role ID from localStorage:", parsedUser.role_id); // NEW LOG
-          if (parsedUser && parsedUser.id && parsedUser.email && parsedUser.role_id) { // Check for role_id
-            // If user object from localStorage doesn't have role_name, derive it
+          if (parsedUser && parsedUser.id && parsedUser.email && typeof parsedUser.role_id === 'number') {
             if (!parsedUser.role_name) {
                 parsedUser.role_name = getRoleNameFromId(parsedUser.role_id);
             }
             console.log("[AuthContext useEffect] Role Name derived:", parsedUser.role_name); // NEW LOG
             setCurrentUser(parsedUser);
-            setUserRole(parsedUser.role_name); // Set userRole to the name
+            setUserRole(parsedUser.role_name);
           } else {
             console.warn("[AuthContext useEffect] Invalid user data or role_id type in localStorage. Clearing...");
-            console.warn("Invalid user data found in localStorage. Clearing...");
             logout();
           }
         } catch (e) {
@@ -107,12 +101,11 @@ export const AuthProvider = ({ children }) => {
 
   const authContextValue = {
     currentUser,
-    userRole, // This is now the role name string
+    userRole,
     loading,
     login,
     logout,
     isAuthenticated: !!currentUser,
-    // These now check against the role name string
     isAdmin: userRole === 'admin',
     isManager: userRole === 'manager',
     isEmployee: userRole === 'employee',
