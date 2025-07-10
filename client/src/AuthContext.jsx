@@ -23,19 +23,20 @@ export const AuthProvider = ({ children }) => {
       }
 
       const data = await response.json();
-      console.log("[AuthContext Login] Raw data from backend:", data);
-      console.log("[AuthContext Login] User data received:", data.user);
-      console.log("[AuthContext Login] Role ID from backend:", data.user.role_id);
+      console.log("[AuthContext Login] Raw data from backend:", data); // LOG
+      console.log("[AuthContext Login] User data received:", data.user); // LOG
+      console.log("[AuthContext Login] Role ID from backend:", data.user.role_id); // LOG
+
+      localStorage.setItem('accessToken', data.accessToken);
 
       const userToStore = {
           id: data.user.id,
           email: data.user.email,
-          role_id: Number(data.user.role_id), // CRITICAL: Convert role_id to Number here
-          role_name: getRoleNameFromId(Number(data.user.role_id)) // Pass Number to helper
+          role_id: data.user.role_id, // This will be a number from backend, but getRoleNameFromId might expect string
+          role_name: getRoleNameFromId(data.user.role_id) // This is where the 'unknown' likely comes from if type mismatch
       };
-      console.log("[AuthContext Login] User object prepared for storage:", userToStore);
+      console.log("[AuthContext Login] User object prepared for storage:", userToStore); // LOG
       localStorage.setItem('user', JSON.stringify(userToStore));
-      localStorage.setItem('accessToken', data.accessToken); // Set access token after user data
       setCurrentUser(userToStore);
       setUserRole(userToStore.role_name);
 
@@ -53,12 +54,9 @@ export const AuthProvider = ({ children }) => {
     setUserRole(null);
   }, []);
 
-  // Helper to map role_id to a display name (Temporary until full RBAC is implemented)
+  // Helper to map role_id to a display name
   const getRoleNameFromId = (id) => {
-      // Ensure 'id' is explicitly a number for the switch statement
-      const numericId = Number(id); // Use Number() to convert to a number type
-
-      switch(numericId) { // Use the numericId here
+      switch(id) { // This switch expects a number, but 'id' might be a string from JWT/localStorage
           case 1: return 'admin';
           case 2: return 'manager';
           case 3: return 'employee';
@@ -75,23 +73,18 @@ export const AuthProvider = ({ children }) => {
       if (storedToken && storedUser) {
         try {
           const parsedUser = JSON.parse(storedUser);
-          console.log("[AuthContext useEffect] Parsed user from localStorage:", parsedUser);
-          console.log("[AuthContext useEffect] Role ID from localStorage (before conversion):", parsedUser.role_id); // LOG
-
-          // CRITICAL FIX: Convert role_id to Number from localStorage
-          parsedUser.role_id = Number(parsedUser.role_id); // <--- ADD THIS LINE (Explicit conversion)
-
-          // Check if role_id exists and is a valid number AFTER conversion
-          if (parsedUser && parsedUser.id && parsedUser.email && !isNaN(parsedUser.role_id)) { // <--- MODIFIED TYPE CHECK
+          console.log("[AuthContext useEffect] Parsed user from localStorage:", parsedUser); // LOG
+          console.log("[AuthContext useEffect] Role ID from localStorage:", parsedUser.role_id); // LOG
+          // This check 'typeof parsedUser.role_id === 'number'' will fail if it's a string "1"
+          if (parsedUser && parsedUser.id && parsedUser.email && typeof parsedUser.role_id === 'number') {
             if (!parsedUser.role_name) {
                 parsedUser.role_name = getRoleNameFromId(parsedUser.role_id);
             }
-            console.log("[AuthContext useEffect] Role ID from localStorage (after conversion):", parsedUser.role_id); // LOG
             console.log("[AuthContext useEffect] Role Name derived:", parsedUser.role_name); // LOG
             setCurrentUser(parsedUser);
             setUserRole(parsedUser.role_name);
           } else {
-            console.warn("[AuthContext useEffect] Invalid user data or role_id is not a valid number after conversion. Clearing..."); // LOG
+            console.warn("[AuthContext useEffect] Invalid user data or role_id type in localStorage. Clearing..."); // LOG
             logout();
           }
         } catch (e) {
@@ -131,4 +124,4 @@ export const AuthProvider = ({ children }) => {
       {children}
     </AuthContext.Provider>
   );
-}; 
+};

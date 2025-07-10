@@ -1,28 +1,27 @@
 import { useEffect, useState, Component, useRef, useCallback } from "react";
 import "./App.css";
 import "./index.css";
-import { Link, useNavigate } from 'react-router-dom'; // Ensure useNavigate is imported
+import { Link } from 'react-router-dom';
 import NavMenu from './components/NavMenu';
 import ErrorBoundary from './components/ErrorBoundary';
 import axios from 'axios';
-import { useAuth } from './AuthContext'; // Import useAuth
-
-console.log("------------------------------------------");
-console.log("[App.jsx] Component file loaded and parsing."); // NEW LOG
-console.log("------------------------------------------");
+import.meta.env.VITE_API_URL;
+import KDS from './KdsComponent.jsx';
 
 const MAX_PRINTED_ORDERS = 1000;
 
+// Load viewed orders from localStorage
 const loadViewedOrders = () => {
     try {
         const stored = localStorage.getItem('viewedOrders');
-        return stored ? JSON.parse(stored) : {};
+        return stored ? JSON.parse(stored) : {};s
     } catch (err) {
         console.error('Error loading viewed orders from localStorage:', err);
         return {};
     }
 };
 
+// Save viewed orders to localStorage
 const saveViewedOrders = (viewedOrders) => {
     try {
         localStorage.setItem('viewedOrders', JSON.stringify(viewedOrders));
@@ -50,14 +49,14 @@ function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
     }
 
     const formatItem = (item) => {
-        console.log('[Debug] Item Data (OrderDetailsDisplay):', item);
-        const price = item.qty > 1
-            ? `$${parseFloat(item.total_price_each * item.qty).toFixed(2)}`
-            : item.base_price
-                ? `$${parseFloat(item.base_price).toFixed(2)}`
+        console.log('[Debug] Item Data:', item);
+        const price = item.qty > 1 
+            ? `$${parseFloat(item.total_price_each * item.qty).toFixed(2)}` 
+            : item.base_price 
+                ? `$${parseFloat(item.base_price).toFixed(2)}` 
                 : '$0.00';
         console.log(`[Debug] Item: ${item.item_name || 'undefined'}, total_price_each: ${item.total_price_each}, base_price: ${item.base_price}, price: ${price}`);
-        return `${price} - ${item.qty} x ${item.item_name || 'undefined'}`;
+        return `${price} - ${item.qty} x ${item.item_name || 'undefined'}`; // Use item_name or fallback
     };
 
     return (
@@ -86,13 +85,13 @@ function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
 
             <div className="mb-4 mt-6">
                 <p><strong>Order Type:</strong> {order.orderType}</p>
-                <p><strong>Time Ordered:</strong> {new Date(order.timeOrdered).toLocaleString()}</p>
+                <p><strong>Time Ordered:</strong> {order.timeOrdered}</p>
                 <p><strong>Status:</strong> {order.orderUpdateStatus === 'ChkRecExist' ? 'Customer Updating' : (order.orderProcessed ? 'Processed' : 'Incoming')}</p>
             </div>
 
             <div className="mb-4">
                 <p><strong>Caller:</strong> {order.callerName}</p>
-                <p><strong>Phone:</strong> {String(order.callerPhone || 'N/A')}</p>
+                <p><strong>Phone:</strong> {order.callerPhone}</p>
                 <p><strong>Email:</strong> {order.email}</p>
                 <p><strong>Address:</strong> {order.callerAddress}, {order.callerCity}, {order.callerState} {order.callerZip}</p>
                 {order.utensil && <p className="mt-3"><strong>Utensils:</strong> {order.utensil}</p>}
@@ -135,7 +134,7 @@ function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
 
             <div className="text-xs text-gray-500 mt-auto pt-4 border-t border-gray-100">
                 <p>Last Data Modified: {order.sheetLastModified ? new Date(order.sheetLastModified).toLocaleString() : 'N/A'}</p>
-                <p>Processed Count: {String(order.printedCount || 0)}</p>
+                {order.printedCount > 0 && <p>Processed Count: {order.printedCount}</p>}
                 {order.printedTimestamps && order.printedTimestamps.length > 0 && (
                     <div>
                         <p>Processed Times:</p>
@@ -152,7 +151,7 @@ function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
 }
 
 function App() {
-    console.log('[App.jsx] App component START of function.');
+    console.log('App component initializing');
     const [incomingOrders, setIncomingOrders] = useState([]);
     const [printedOrders, setPrintedOrders] = useState([]);
     const [updatingOrders, setUpdatingOrders] = useState([]);
@@ -167,53 +166,11 @@ function App() {
     const toggledOrdersRef = useRef({});
     const viewedOrdersRef = useRef(loadViewedOrders());
 
-    const { isAuthenticated, userRole, logout } = useAuth(); // ADDED: useAuth hook
-
-    console.log("[App.jsx] App component state initialized. IsAuthenticated:", isAuthenticated); // NEW LOG
-
-    // NEW AUTH: Add useEffect to handle authentication changes and initial fetches
     useEffect(() => {
-        console.log("[App.jsx main useEffect] Running initial and interval fetches based on authentication. IsAuthenticated:", isAuthenticated); // NEW LOG
-        const initiateFetches = async () => {
-            if (isAuthenticated) {
-                console.log("[App.jsx main useEffect] User is authenticated, initiating data fetches."); // NEW LOG
-                await fetchOrders();
-                await fetchPrintedOrders();
-                await fetchUpdatingOrders();
-            } else {
-                console.log("[App.jsx main useEffect] User is NOT authenticated, skipping data fetches and clearing state."); // NEW LOG
-                setIncomingOrders([]);
-                setPrintedOrders([]);
-                setUpdatingOrders([]);
-            }
-        };
-        initiateFetches();
-
-        const interval = setInterval(() => {
-            console.log("[App.jsx main useEffect] Interval fetch running. IsAuthenticated:", isAuthenticated); // NEW LOG
-            if (isAuthenticated) {
-                fetchOrders();
-                fetchPrintedOrders();
-                fetchUpdatingOrders();
-            } else {
-                 console.log("[App.jsx main useEffect] User not authenticated, skipping interval fetch."); // NEW LOG
-            }
-        }, 15000);
-
-        return () => {
-            console.log("[App.jsx main useEffect] Clearing main interval."); // NEW LOG
-            clearInterval(interval);
-        }
-    }, [fetchOrders, fetchPrintedOrders, fetchUpdatingOrders, isAuthenticated, logout]); // Added isAuthenticated and logout to dependencies
-
-
-    useEffect(() => {
-        console.log("[App.jsx useEffect] Saving viewed orders."); // NEW LOG
         saveViewedOrders(viewedOrdersRef.current);
     }, [viewedOrdersRef.current]);
 
     useEffect(() => {
-        console.log("[App.jsx useEffect] Setting up click outside listener."); // NEW LOG
         const handleClickOutside = (event) => {
             if (menuRef.current && !menuRef.current.contains(event.target)) {
                 const menuButton = menuRef.current.previousElementSibling;
@@ -226,38 +183,21 @@ function App() {
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => {
-            console.log("[App.jsx useEffect] Cleaning up click outside listener."); // NEW LOG
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, []);
 
     const fetchOrders = useCallback(async () => {
-        console.log("[App.jsx fetchOrders] Attempting to fetch incoming orders."); // NEW LOG
-        const accessToken = localStorage.getItem('accessToken'); // ADDED: Get access token
-        if (!accessToken) {
-            console.log("[App.jsx fetchOrders] No access token found, skipping fetch."); // NEW LOG
-            logout(); // Log out if token is missing
-            return;
-        }
-
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000);
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/list`, {
-                signal: controller.signal,
-                headers: { 'Authorization': `Bearer ${accessToken}` } // ADDED AUTH HEADER
-            });
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/list`, { signal: controller.signal });
             clearTimeout(timeoutId);
             if (!res.ok) {
-                if (res.status === 401 || res.status === 403) {
-                    console.error("[App.jsx fetchOrders] Auth error fetching incoming orders. Logging out."); // NEW LOG
-                    logout();
-                    return;
-                }
                 throw new Error(`Failed to fetch incoming orders: ${res.status} ${res.statusText}`);
             }
             const data = await res.json();
-            console.log("[App.jsx fetchOrders] Data received from /api/list:", data); // NEW LOG
+            console.log("Data received from /api/list:", data);
 
             setIncomingOrders(() => {
                 const newOrderObjs = data.map((order) => {
@@ -295,40 +235,23 @@ function App() {
 
         } catch (err) {
             if (err.name === 'AbortError') {
-                console.log('[App.jsx fetchOrders] Fetch incoming orders timed out.'); // NEW LOG
+                console.log('Fetch incoming orders timed out.');
             } else {
-                console.error("[App.jsx fetchOrders] Failed to fetch incoming orders:", err.message, err.stack); // NEW LOG
+                console.error("Failed to fetch incoming orders:", err.message, err.stack);
             }
         }
-    }, [selectedOrderDetails, logout]);
+    }, [selectedOrderDetails]);
 
     const fetchPrintedOrders = useCallback(async () => {
-        console.log("[App.jsx fetchPrintedOrders] Attempting to fetch printed orders."); // NEW LOG
-        const accessToken = localStorage.getItem('accessToken'); // ADDED: Get access token
-        if (!accessToken) {
-            console.log("[App.jsx fetchPrintedOrders] No access token found, skipping fetch."); // NEW LOG
-            logout(); // Log out as fallback
-            return;
-        }
-
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000);
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/printed`, {
-                signal: controller.signal,
-                headers: { 'Authorization': `Bearer ${accessToken}` } // ADDED AUTH HEADER
-            });
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/printed`, { signal: controller.signal });
             clearTimeout(timeoutId);
             if (!res.ok) {
-                if (res.status === 401 || res.status === 403) {
-                    console.error("[App.jsx fetchPrintedOrders] Auth error fetching printed orders. Logging out."); // NEW LOG
-                    logout();
-                    return;
-                }
                 throw new Error(`Failed to fetch processed orders: ${res.status} ${res.statusText}`);
             }
             const data = await res.json();
-            console.log("[App.jsx fetchPrintedOrders] Data received from /api/printed:", data); // NEW LOG
 
             setPrintedOrders(() => {
                 const newPrintedOrderObjs = data.map((order) => {
@@ -342,39 +265,23 @@ function App() {
             });
         } catch (err) {
             if (err.name === 'AbortError') {
-                console.log('[App.jsx fetchPrintedOrders] Fetch processed orders timed out.'); // NEW LOG
+                console.log('Fetch processed orders timed out.');
             } else {
-                console.error("[App.jsx fetchPrintedOrders] Failed to fetch processed orders:", err.message, err.stack); // NEW LOG
+                console.error("Failed to fetch processed orders:", err.message, err.stack);
             }
         }
-    }, [logout]);
+    }, []);
 
     const fetchUpdatingOrders = useCallback(async () => {
-        console.log("[App.jsx fetchUpdatingOrders] Attempting to fetch updating orders."); // NEW LOG
-        const accessToken = localStorage.getItem('accessToken'); // ADDED: Get access token
-        if (!accessToken) {
-            console.log("[App.jsx fetchUpdatingOrders] No access token found, skipping fetch."); // NEW LOG
-            logout(); // Log out as fallback
-            return;
-        }
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000);
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/updating`, {
-                signal: controller.signal,
-                headers: { 'Authorization': `Bearer ${accessToken}` } // ADDED AUTH HEADER
-            });
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/updating`, { signal: controller.signal });
             clearTimeout(timeoutId);
             if (!res.ok) {
-                if (res.status === 401 || res.status === 403) {
-                    console.error("[App.jsx fetchUpdatingOrders] Auth error fetching updating orders. Logging out."); // NEW LOG
-                    logout();
-                    return;
-                }
                 throw new Error(`Failed to fetch updating orders: ${res.status} ${res.statusText}`);
             }
             const data = await res.json();
-            console.log("[App.jsx fetchUpdatingOrders] Data received from /api/updating:", data); // NEW LOG
 
             setUpdatingOrders(data.map(order => ({ ...order })));
 
@@ -395,44 +302,25 @@ function App() {
             }
         } catch (err) {
             if (err.name === 'AbortError') {
-                console.log('[App.jsx fetchUpdatingOrders] Fetch updating orders timed out.'); // NEW LOG
+                console.log('Fetch updating orders timed out.');
             } else {
-                console.error("[App.jsx fetchUpdatingOrders] Failed to fetch customer updating orders:", err.message, err.stack); // NEW LOG
+                console.error("Failed to fetch customer updating orders:", err.message, err.stack);
             }
         }
-    }, [selectedOrderDetails, logout]); // Added logout to dependency array
+    }, [selectedOrderDetails]);
 
     const handleFireToKitchen = async (rowIndex) => {
-        console.log("[App.jsx handleFireToKitchen] Firing order to kitchen:", rowIndex); // NEW LOG
         setIsProcessing(true);
-        const accessToken = localStorage.getItem('accessToken'); // ADDED: Get access token
-        if (!accessToken) {
-            alert("Authentication token missing. Please log in again.");
-            logout();
-            setIsProcessing(false);
-            return;
-        }
         try {
             const response = await fetch(`${import.meta.env.VITE_API_URL}/api/fire-order`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${accessToken}` // ADDED AUTH HEADER
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ rowIndex })
             });
             const data = await response.json();
-            if (!response.ok) {
-                if (response.status === 401 || response.status === 403) {
-                    alert("Authentication expired or unauthorized. Please log in again.");
-                    logout();
-                    return;
-                }
-                throw new Error(data.error || 'Backend error');
-            }
+            if (!response.ok) throw new Error(data.error || 'Backend error');
             alert('Order fired successfully!');
         } catch (err) {
-            console.error("[App.jsx handleFireToKitchen] Error firing order:", err); // NEW LOG
             alert(`Failed to fire order: ${err.message}`);
         } finally {
             setIsProcessing(false);
@@ -443,42 +331,27 @@ function App() {
     };
 
     const handleReprint = async (order) => {
-        console.log(`[App.jsx handleReprint] Reprinting order at rowIndex: ${order.rowIndex}`); // NEW LOG
         setIsProcessing(true);
-        const accessToken = localStorage.getItem('accessToken'); // ADDED: Get access token
-        if (!accessToken) {
-            alert("Authentication token missing. Please log in again.");
-            logout();
-            setIsProcessing(false);
-            return;
-        }
+        console.log(`[App.jsx] Reprinting order at rowIndex: ${order.rowIndex}`);
         try {
             const response = await fetch(`${import.meta.env.VITE_API_URL}/api/fire-order`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${accessToken}` // ADDED AUTH HEADER
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ rowIndex: order.rowIndex })
             });
 
             if (!response.ok) {
-                if (response.status === 401 || response.status === 403) {
-                    alert("Authentication expired or unauthorized. Please log in again.");
-                    logout();
-                    return;
-                }
                 const errorData = await response.json();
                 throw new Error(errorData.details || `Reprint failed: ${response.status}`);
             }
 
             const data = await response.json();
-            console.log(`[App.jsx handleReprint] Order ${order.orderNum} re-processed. New count: ${data.printedCount}`); // NEW LOG
+            console.log(`[App.jsx] Order ${order.orderNum} re-processed. New count: ${data.printedCount}`);
             alert('Order sent for reprint!');
             await fetchPrintedOrders();
             await fetchUpdatingOrders();
         } catch (error) {
-            console.error('[App.jsx handleReprint] Error reprocessing order:', error); // NEW LOG
+            console.error('[App.jsx] Error reprocessing order:', error);
             alert(`Failed to re-process order: ${error.message}`);
         } finally {
             setIsProcessing(false);
@@ -486,41 +359,23 @@ function App() {
     };
 
     useEffect(() => {
-        console.log("[App.jsx main useEffect] Initial and interval fetches initiated. IsAuthenticated:", isAuthenticated); // NEW LOG
         const initiateFetches = async () => {
-            if (isAuthenticated) {
-                console.log("[App.jsx main useEffect] User is authenticated, initiating data fetches."); // NEW LOG
-                await fetchOrders();
-                await fetchPrintedOrders();
-                await fetchUpdatingOrders();
-            } else {
-                console.log("[App.jsx main useEffect] User is NOT authenticated, skipping data fetches and clearing state."); // NEW LOG
-                setIncomingOrders([]);
-                setPrintedOrders([]);
-                setUpdatingOrders([]);
-            }
+            await fetchOrders();
+            await fetchPrintedOrders();
+            await fetchUpdatingOrders();
         };
         initiateFetches();
 
         const interval = setInterval(() => {
-            console.log("[App.jsx main useEffect] Interval fetch running. IsAuthenticated:", isAuthenticated); // NEW LOG
-            if (isAuthenticated) {
-                fetchOrders();
-                fetchPrintedOrders();
-                fetchUpdatingOrders();
-            } else {
-                 console.log("[App.jsx main useEffect] User not authenticated, skipping interval fetch."); // NEW LOG
-            }
+            fetchOrders();
+            fetchPrintedOrders();
+            fetchUpdatingOrders();
         }, 15000);
 
-        return () => {
-            console.log("[App.jsx main useEffect] Clearing main interval."); // NEW LOG
-            clearInterval(interval);
-        }
-    }, [fetchOrders, fetchPrintedOrders, fetchUpdatingOrders, isAuthenticated, logout]); // Added isAuthenticated and logout to dependencies
+        return () => clearInterval(interval);
+    }, [fetchOrders, fetchPrintedOrders, fetchUpdatingOrders]);
 
 const handleToggle = async (id, orderNum) => {
-    console.log(`[App.jsx handleToggle] Toggling order ID: ${id}, Order Num: ${orderNum}`); // NEW LOG
     viewedOrdersRef.current = {
         ...viewedOrdersRef.current,
         [id]: true
@@ -537,28 +392,15 @@ const handleToggle = async (id, orderNum) => {
         });
         toggledOrdersRef.current[id] = true;
 
-        const accessToken = localStorage.getItem('accessToken'); // ADDED: Get access token
-        if (!accessToken) {
-            alert("Authentication token missing. Please log in again.");
-            logout();
-            return;
-        }
         try {
-            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/order-by-row/${id}`, {
-                headers: { 'Authorization': `Bearer ${accessToken}` } // ADDED AUTH HEADER
-            });
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/order-by-row/${id}`);
             if (!response.ok) {
-                if (response.status === 401 || response.status === 403) {
-                    alert("Authentication expired or unauthorized. Please log in again.");
-                    logout();
-                    return;
-                }
                 throw new Error(`Failed to fetch order details for rowIndex ${id}: ${response.status} ${response.statusText}`);
             }
             const text = await response.text();
-            console.log('[App.jsx handleToggle] Raw API Response Text for handleToggle:', text); // NEW LOG
+            console.log('[Debug] Raw API Response Text for handleToggle:', text);
             const orderData = JSON.parse(text);
-            console.log('[App.jsx handleToggle] Parsed API Response for handleToggle:', orderData); // NEW LOG
+            console.log('[Debug] Parsed API Response for handleToggle:', orderData);
             setSelectedOrderDetails({
                 ...orderData,
                 viewed: !!viewedOrdersRef.current[orderData.id],
@@ -568,7 +410,7 @@ const handleToggle = async (id, orderNum) => {
                 })) || []
             });
         } catch (error) {
-            console.error('[App.jsx handleToggle] Error fetching order details:', error); // NEW LOG
+            console.error('Error fetching order details:', error);
             setSelectedOrderDetails(null);
             alert(`Failed to load order details: ${error.message}`);
         }
@@ -585,20 +427,19 @@ const handleToggle = async (id, orderNum) => {
     saveViewedOrders(viewedOrdersRef.current);
 };
 
-// This formatItem is a duplicate, likely from a copy-paste mistake. The one above is used.
-// const formatItem = (item) => {
-//     console.log('[Debug] Item Data:', item);
-//     const price = item.qty > 1
-//         ? `$${parseFloat(item.total_price_each * item.qty).toFixed(2)}`
-//         : item.base_price
-//             ? `$${parseFloat(item.base_price).toFixed(2)}`
-//             : '$0.00';
-//     console.log(`[Debug] Item: ${item.item_name || 'undefined'}, total_price_each: ${item.total_price_each}, base_price: ${item.base_price}, price: ${price}`);
-//     return `${price} - ${item.qty} x ${item.item_name || 'undefined'}`; // Use item_name or fallback
-// };
+const formatItem = (item) => {
+    console.log('[Debug] Item Data:', item);
+    const price = item.qty > 1 
+        ? `$${parseFloat(item.total_price_each * item.qty).toFixed(2)}` 
+        : item.base_price 
+            ? `$${parseFloat(item.base_price).toFixed(2)}` 
+            : '$0.00';
+    console.log(`[Debug] Item: ${item.item_name || 'undefined'}, total_price_each: ${item.total_price_each}, base_price: ${item.base_price}, price: ${price}`);
+    return `${price} - ${item.qty} x ${item.item_name || 'undefined'}`; // Use item_name or fallback
+};
 
 const handleViewDetails = async (order) => {
-    console.log('handleViewDetails for order:', order.orderNum, 'rowIndex:', order.rowIndex); // NEW LOG
+    console.log('handleViewDetails for order:', order.orderNum, 'rowIndex:', order.rowIndex);
 
     if (order.rowIndex && !order.orderProcessed) {
         viewedOrdersRef.current = {
@@ -624,27 +465,13 @@ const handleViewDetails = async (order) => {
         setIncomingOrders(prev => prev.map(o => ({...o, toggled: false})));
     }
 
-    const accessToken = localStorage.getItem('accessToken'); // ADDED: Get access token
-    if (!accessToken) {
-        alert("Authentication token missing. Please log in again.");
-        logout(); // Assuming logout is available here from useAuth
-        return;
-    }
-
     try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/order-by-row/${order.rowIndex}`, {
-            headers: { 'Authorization': `Bearer ${accessToken}` } // ADDED AUTH HEADER
-        });
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/order-by-row/${order.rowIndex}`);
         if (!response.ok) {
-            if (response.status === 401 || response.status === 403) {
-                alert("Authentication expired or unauthorized. Please log in again.");
-                logout();
-                return;
-            }
             throw new Error(`Failed to fetch order details for rowIndex ${order.rowIndex}: ${response.status} ${response.statusText}`);
         }
         const orderData = await response.json();
-        console.log('[App.jsx handleViewDetails] Parsed API Response for handleViewDetails:', orderData); // NEW LOG
+        console.log('[Debug] API Response for handleViewDetails:', orderData);
         setSelectedOrderDetails({
             ...orderData,
             viewed: true,
@@ -658,7 +485,7 @@ const handleViewDetails = async (order) => {
             }) || [] // Default to empty array if items is undefined
         });
     } catch (error) {
-        console.error('[App.jsx handleViewDetails] Error fetching order details:', error); // NEW LOG
+        console.error('Error fetching order details:', error);
         setSelectedOrderDetails(null);
         alert(`Failed to load order details: ${error.message}`);
     }
@@ -718,44 +545,22 @@ const handleViewDetails = async (order) => {
     };
 
     useEffect(() => {
-        console.log("[App.jsx printer useEffect] Checking printer status initiated."); // NEW LOG
-        const accessToken = localStorage.getItem('accessToken'); // ADDED: Get access token
-        if (!accessToken) {
-            console.log("[App.jsx printer useEffect] No access token found, skipping printer status check."); // NEW LOG
-            logout(); // Assuming logout is available here from useAuth
-            setPrinterStatus('N/A (Auth Needed)');
-            return;
-        }
-
         const checkPrinterStatus = async () => {
             try {
-                const response = await fetch(`${import.meta.env.VITE_API_URL}/api/printer-status`, {
-                    headers: { 'Authorization': `Bearer ${accessToken}` } // ADDED AUTH HEADER
-                });
-                if (!response.ok) {
-                    if (response.status === 401 || response.status === 403) {
-                        console.error("[App.jsx printer useEffect] Auth error checking printer status. Logging out."); // NEW LOG
-                        logout();
-                        return;
-                    }
-                    throw new Error(`Status check failed: ${response.status}`);
-                }
+                const response = await fetch(`${import.meta.env.VITE_API_URL}/api/printer-status`);
+                if (!response.ok) throw new Error(`Status check failed: ${response.status}`);
                 const data = await response.json();
                 setPrinterStatus(data.available ? 'Connected' : 'Not Connected');
             } catch (err) {
-                console.error('[App.jsx printer useEffect] Error checking printer status:', err.message); // NEW LOG
+                console.error('[App.jsx] Error checking printer status:', err.message);
                 setPrinterStatus('Not Connected');
             }
         };
         checkPrinterStatus();
         const intervalId = setInterval(checkPrinterStatus, 60000);
-        return () => {
-            console.log("[App.jsx printer useEffect] Clearing printer interval."); // NEW LOG
-            clearInterval(intervalId);
-        }
-    }, [logout]); // Added logout to dependency array
+        return () => clearInterval(intervalId);
+    }, []);
 
-    console.log("[App.jsx] App component JSX return."); // NEW LOG
     return (
         <ErrorBoundary>
             <div className="relative">
@@ -840,13 +645,13 @@ const handleViewDetails = async (order) => {
                                         onClick={() => requestSort('timeOrdered')}
                                         className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${sortConfig.key === 'timeOrdered' ? 'bg-cyan-500 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`}
                                     >
-                                        Date/Time {sortConfig.key === 'timeOrdered' ? (sortConfig.direction === 'ascending' ? 'â' : 'â') : ''}
+                                        Date/Time {sortConfig.key === 'timeOrdered' ? (sortConfig.direction === 'ascending' ? 'â��' : 'â��') : ''}
                                     </button>
                                     <button
                                         onClick={() => requestSort('callerName')}
                                         className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${sortConfig.key === 'callerName' ? 'bg-cyan-500 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`}
                                     >
-                                        Name {sortConfig.key === 'callerName' ? (sortConfig.direction === 'ascending' ? 'â' : 'â') : ''}
+                                        Name {sortConfig.key === 'callerName' ? (sortConfig.direction === 'ascending' ? 'â��' : 'â��') : ''}
                                     </button>
                                 </div>
                             </div>
@@ -988,7 +793,7 @@ const handleViewDetails = async (order) => {
                                         {Array.isArray(order.printedTimestamps) && order.printedTimestamps.length > 0 && (
                                           <div className="text-xs text-gray-500 mt-1 w-full pl-6">
                                             {order.printedTimestamps.map((ts, idx) => (
-                                              <div key={idx}>{new Date(ts).toLocaleString()}</div>
+                                              <div key={idx}>Fired: {new Date(ts).toLocaleString()}</div>
                                             ))}
                                           </div>
                                         )}
@@ -1003,4 +808,4 @@ const handleViewDetails = async (order) => {
     );
 }
 
-export default App; 
+export default App;
