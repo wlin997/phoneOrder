@@ -1,24 +1,21 @@
 import { useEffect, useState, Component, useRef, useCallback } from "react";
 import "./App.css";
 import "./index.css";
-import { Link, useNavigate } from 'react-router-dom'; // Import useNavigate
+import { Link, useNavigate } from 'react-router-dom';
 import NavMenu from './components/NavMenu';
 import ErrorBoundary from './components/ErrorBoundary';
 import axios from 'axios';
-// import.meta.env.VITE_API_URL; // This line does nothing, can be removed
-// import KDS from './KdsComponent.jsx'; // Removed: KDS is not directly used/rendered in App.jsx
-
-// --- NEW AUTH IMPORT ---
 import { useAuth } from './AuthContext'; // Import useAuth
-// --- END NEW AUTH IMPORT ---
+
+console.log("------------------------------------------");
+console.log("[App.jsx] Component file loaded and parsing.");
+console.log("------------------------------------------");
 
 const MAX_PRINTED_ORDERS = 1000;
 
-// Load viewed orders from localStorage
 const loadViewedOrders = () => {
     try {
         const stored = localStorage.getItem('viewedOrders');
-        // FIXED TYPO: Removed 's' at the end of the return statement
         return stored ? JSON.parse(stored) : {};
     } catch (err) {
         console.error('Error loading viewed orders from localStorage:', err);
@@ -26,7 +23,6 @@ const loadViewedOrders = () => {
     }
 };
 
-// Save viewed orders to localStorage
 const saveViewedOrders = (viewedOrders) => {
     try {
         localStorage.setItem('viewedOrders', JSON.stringify(viewedOrders));
@@ -61,7 +57,7 @@ function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
                 ? `$${parseFloat(item.base_price).toFixed(2)}`
                 : '$0.00';
         console.log(`[Debug] Item: ${item.item_name || 'undefined'}, total_price_each: ${item.total_price_each}, base_price: ${item.base_price}, price: ${price}`);
-        return `${price} - ${item.qty} x ${item.item_name || 'undefined'}`; // Use item_name or fallback
+        return `${price} - ${item.qty} x ${item.item_name || 'undefined'}`;
     };
 
     return (
@@ -90,13 +86,13 @@ function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
 
             <div className="mb-4 mt-6">
                 <p><strong>Order Type:</strong> {order.orderType}</p>
-                <p><strong>Time Ordered:</strong> {new Date(order.timeOrdered).toLocaleString()}</p> {/* Format date */}
+                <p><strong>Time Ordered:</strong> {new Date(order.timeOrdered).toLocaleString()}</p>
                 <p><strong>Status:</strong> {order.orderUpdateStatus === 'ChkRecExist' ? 'Customer Updating' : (order.orderProcessed ? 'Processed' : 'Incoming')}</p>
             </div>
 
             <div className="mb-4">
                 <p><strong>Caller:</strong> {order.callerName}</p>
-                <p><strong>Phone:</strong> {String(order.callerPhone || 'N/A')}</p> {/* Safeguard: Ensure callerPhone is string */}
+                <p><strong>Phone:</strong> {String(order.callerPhone || 'N/A')}</p>
                 <p><strong>Email:</strong> {order.email}</p>
                 <p><strong>Address:</strong> {order.callerAddress}, {order.callerCity}, {order.callerState} {order.callerZip}</p>
                 {order.utensil && <p className="mt-3"><strong>Utensils:</strong> {order.utensil}</p>}
@@ -139,8 +135,8 @@ function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
 
             <div className="text-xs text-gray-500 mt-auto pt-4 border-t border-gray-100">
                 <p>Last Data Modified: {order.sheetLastModified ? new Date(order.sheetLastModified).toLocaleString() : 'N/A'}</p>
-                <p>Processed Count: {String(order.printedCount || 0)}</p> {/* Safeguard String conversion */}
-                {order.printedTimestamps && Array.isArray(order.printedTimestamps) && order.printedTimestamps.length > 0 && (
+                <p>Processed Count: {String(order.printedCount || 0)}</p>
+                {order.printedTimestamps && order.printedTimestamps.length > 0 && (
                     <div>
                         <p>Processed Times:</p>
                         <ul className="list-disc list-inside pl-4">
@@ -171,16 +167,51 @@ function App() {
     const toggledOrdersRef = useRef({});
     const viewedOrdersRef = useRef(loadViewedOrders());
 
-    // NEW AUTH: Get authentication state
-    const { isAuthenticated, userRole, logout } = useAuth(); // Import useAuth and use it here!
+    const { isAuthenticated, userRole, logout } = useAuth(); // ADDED: useAuth hook
 
-    console.log("[App.jsx] App component state initialized.");
+    console.log("[App.jsx] App component state initialized. IsAuthenticated:", isAuthenticated);
 
     useEffect(() => {
+        console.log("[App.jsx main useEffect] Initial and interval fetches initiated. IsAuthenticated:", isAuthenticated);
+        const initiateFetches = async () => {
+            if (isAuthenticated) {
+                console.log("[App.jsx main useEffect] User is authenticated, initiating data fetches.");
+                await fetchOrders();
+                await fetchPrintedOrders();
+                await fetchUpdatingOrders();
+            } else {
+                console.log("[App.jsx main useEffect] User is NOT authenticated, skipping data fetches and clearing state.");
+                setIncomingOrders([]);
+                setPrintedOrders([]);
+                setUpdatingOrders([]);
+            }
+        };
+        initiateFetches();
+
+        const interval = setInterval(() => {
+            console.log("[App.jsx main useEffect] Interval fetch running. IsAuthenticated:", isAuthenticated);
+            if (isAuthenticated) {
+                fetchOrders();
+                fetchPrintedOrders();
+                fetchUpdatingOrders();
+            } else {
+                 console.log("[App.jsx main useEffect] User not authenticated, skipping interval fetch.");
+            }
+        }, 15000);
+
+        return () => {
+            console.log("[App.jsx main useEffect] Clearing main interval.");
+            clearInterval(interval);
+        }
+    }, [fetchOrders, fetchPrintedOrders, fetchUpdatingOrders, isAuthenticated, logout]);
+
+    useEffect(() => {
+        console.log("[App.jsx useEffect] Saving viewed orders.");
         saveViewedOrders(viewedOrdersRef.current);
     }, [viewedOrdersRef.current]);
 
     useEffect(() => {
+        console.log("[App.jsx useEffect] Setting up click outside listener.");
         const handleClickOutside = (event) => {
             if (menuRef.current && !menuRef.current.contains(event.target)) {
                 const menuButton = menuRef.current.previousElementSibling;
@@ -193,17 +224,16 @@ function App() {
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => {
+            console.log("[App.jsx useEffect] Cleaning up click outside listener.");
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, []);
 
     const fetchOrders = useCallback(async () => {
-        // NEW AUTH: Get token and handle unauthenticated state for API call
+        console.log("[App.jsx fetchOrders] Attempting to fetch incoming orders.");
         const accessToken = localStorage.getItem('accessToken');
         if (!accessToken) {
             console.log("[App.jsx fetchOrders] No access token found, skipping fetch.");
-            // If the component is protected by ProtectedRoute, this logout might be redundant,
-            // but good as a fallback if a token somehow becomes invalid mid-session.
             logout();
             return;
         }
@@ -213,11 +243,10 @@ function App() {
             const timeoutId = setTimeout(() => controller.abort(), 5000);
             const res = await fetch(`${import.meta.env.VITE_API_URL}/api/list`, {
                 signal: controller.signal,
-                headers: { 'Authorization': `Bearer ${accessToken}` } // ADDED AUTH HEADER
+                headers: { 'Authorization': `Bearer ${accessToken}` }
             });
             clearTimeout(timeoutId);
             if (!res.ok) {
-                // NEW AUTH: Handle 401/403 specifically
                 if (res.status === 401 || res.status === 403) {
                     console.error("[App.jsx fetchOrders] Auth error fetching incoming orders. Logging out.");
                     logout();
@@ -252,7 +281,7 @@ function App() {
                             viewed: !!viewedOrdersRef.current[selectedOrderDetails.id],
                             items: updatedSelected.items.map(item => ({
                                 ...item,
-                                total_price_each: item.total_price_each || item.base_price // Ensure total_price_each is set
+                                total_price_each: item.total_price_each || item.base_price
                             }))
                         });
                     }
@@ -269,14 +298,14 @@ function App() {
                 console.error("[App.jsx fetchOrders] Failed to fetch incoming orders:", err.message, err.stack);
             }
         }
-    }, [selectedOrderDetails, logout]); // Added logout to dependency array
+    }, [selectedOrderDetails, logout]);
 
     const fetchPrintedOrders = useCallback(async () => {
-        // NEW AUTH: Get token and handle unauthenticated state for API call
+        console.log("[App.jsx fetchPrintedOrders] Attempting to fetch printed orders.");
         const accessToken = localStorage.getItem('accessToken');
         if (!accessToken) {
             console.log("[App.jsx fetchPrintedOrders] No access token found, skipping fetch.");
-            logout(); // Log out as fallback
+            logout();
             return;
         }
 
@@ -285,11 +314,10 @@ function App() {
             const timeoutId = setTimeout(() => controller.abort(), 5000);
             const res = await fetch(`${import.meta.env.VITE_API_URL}/api/printed`, {
                 signal: controller.signal,
-                headers: { 'Authorization': `Bearer ${accessToken}` } // ADDED AUTH HEADER
+                headers: { 'Authorization': `Bearer ${accessToken}` }
             });
             clearTimeout(timeoutId);
             if (!res.ok) {
-                // NEW AUTH: Handle 401/403 specifically
                 if (res.status === 401 || res.status === 403) {
                     console.error("[App.jsx fetchPrintedOrders] Auth error fetching printed orders. Logging out.");
                     logout();
@@ -298,6 +326,7 @@ function App() {
                 throw new Error(`Failed to fetch processed orders: ${res.status} ${res.statusText}`);
             }
             const data = await res.json();
+            console.log("[App.jsx fetchPrintedOrders] Data received from /api/printed:", data);
 
             setPrintedOrders(() => {
                 const newPrintedOrderObjs = data.map((order) => {
@@ -313,17 +342,17 @@ function App() {
             if (err.name === 'AbortError') {
                 console.log('[App.jsx fetchPrintedOrders] Fetch processed orders timed out.');
             } else {
-                console.error("Failed to fetch processed orders:", err.message, err.stack);
+                console.error("[App.jsx fetchPrintedOrders] Failed to fetch processed orders:", err.message, err.stack);
             }
         }
-    }, [logout]); // Added logout to dependency array
+    }, [logout]);
 
     const fetchUpdatingOrders = useCallback(async () => {
-        // NEW AUTH: Get token and handle unauthenticated state for API call
+        console.log("[App.jsx fetchUpdatingOrders] Attempting to fetch updating orders.");
         const accessToken = localStorage.getItem('accessToken');
         if (!accessToken) {
             console.log("[App.jsx fetchUpdatingOrders] No access token found, skipping fetch.");
-            logout(); // Log out as fallback
+            logout();
             return;
         }
         try {
@@ -331,11 +360,10 @@ function App() {
             const timeoutId = setTimeout(() => controller.abort(), 5000);
             const res = await fetch(`${import.meta.env.VITE_API_URL}/api/updating`, {
                 signal: controller.signal,
-                headers: { 'Authorization': `Bearer ${accessToken}` } // ADDED AUTH HEADER
+                headers: { 'Authorization': `Bearer ${accessToken}` }
             });
             clearTimeout(timeoutId);
             if (!res.ok) {
-                // NEW AUTH: Handle 401/403 specifically
                 if (res.status === 401 || res.status === 403) {
                     console.error("[App.jsx fetchUpdatingOrders] Auth error fetching updating orders. Logging out.");
                     logout();
@@ -344,6 +372,7 @@ function App() {
                 throw new Error(`Failed to fetch updating orders: ${res.status} ${res.statusText}`);
             }
             const data = await res.json();
+            console.log("[App.jsx fetchUpdatingOrders] Data received from /api/updating:", data);
 
             setUpdatingOrders(data.map(order => ({ ...order })));
 
@@ -355,7 +384,7 @@ function App() {
                         viewed: !!viewedOrdersRef.current[selectedOrderDetails.id],
                         items: updatedSelected.items.map(item => ({
                             ...item,
-                            total_price_each: item.total_price_each || item.base_price // Ensure total_price_each is set
+                            total_price_each: item.total_price_each || item.base_price
                         }))
                     });
                 } else {
@@ -369,11 +398,11 @@ function App() {
                 console.error("[App.jsx fetchUpdatingOrders] Failed to fetch customer updating orders:", err.message, err.stack);
             }
         }
-    }, [selectedOrderDetails, logout]); // Added logout to dependency array
+    }, [selectedOrderDetails, logout]);
 
     const handleFireToKitchen = async (rowIndex) => {
+        console.log("[App.jsx handleFireToKitchen] Firing order to kitchen:", rowIndex);
         setIsProcessing(true);
-        // NEW AUTH: Get token and handle unauthenticated state for API call
         const accessToken = localStorage.getItem('accessToken');
         if (!accessToken) {
             alert("Authentication token missing. Please log in again.");
@@ -386,13 +415,12 @@ function App() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${accessToken}` // ADDED AUTH HEADER
+                    'Authorization': `Bearer ${accessToken}`
                 },
                 body: JSON.stringify({ rowIndex })
             });
             const data = await response.json();
             if (!response.ok) {
-                // NEW AUTH: Handle 401/403 specifically
                 if (response.status === 401 || response.status === 403) {
                     alert("Authentication expired or unauthorized. Please log in again.");
                     logout();
@@ -413,9 +441,8 @@ function App() {
     };
 
     const handleReprint = async (order) => {
+        console.log(`[App.jsx handleReprint] Reprinting order at rowIndex: ${order.rowIndex}`);
         setIsProcessing(true);
-        console.log(`[App.jsx] Reprinting order at rowIndex: ${order.rowIndex}`);
-        // NEW AUTH: Get token and handle unauthenticated state for API call
         const accessToken = localStorage.getItem('accessToken');
         if (!accessToken) {
             alert("Authentication token missing. Please log in again.");
@@ -428,13 +455,12 @@ function App() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${accessToken}` // ADDED AUTH HEADER
+                    'Authorization': `Bearer ${accessToken}`
                 },
                 body: JSON.stringify({ rowIndex: order.rowIndex })
             });
 
             if (!response.ok) {
-                // NEW AUTH: Handle 401/403 specifically
                 if (response.status === 401 || response.status === 403) {
                     alert("Authentication expired or unauthorized. Please log in again.");
                     logout();
@@ -445,7 +471,7 @@ function App() {
             }
 
             const data = await response.json();
-            console.log(`[App.jsx] Order ${order.orderNum} re-processed. New count: ${data.printedCount}`);
+            console.log(`[App.jsx handleReprint] Order ${order.orderNum} re-processed. New count: ${data.printedCount}`);
             alert('Order sent for reprint!');
             await fetchPrintedOrders();
             await fetchUpdatingOrders();
@@ -458,16 +484,15 @@ function App() {
     };
 
     useEffect(() => {
-        // NEW AUTH: Only fetch if authenticated
-        console.log("[App.jsx main useEffect] Initial and interval fetches initiated. Is authenticated:", isAuthenticated);
+        console.log("[App.jsx main useEffect] Initial and interval fetches initiated. IsAuthenticated:", isAuthenticated);
         const initiateFetches = async () => {
             if (isAuthenticated) {
+                console.log("[App.jsx main useEffect] User is authenticated, initiating data fetches.");
                 await fetchOrders();
                 await fetchPrintedOrders();
                 await fetchUpdatingOrders();
             } else {
-                console.log("[App.jsx main useEffect] User not authenticated, skipping initial fetches.");
-                // Optionally clear state if not authenticated, e.g. for public dashboards
+                console.log("[App.jsx main useEffect] User is NOT authenticated, skipping data fetches and clearing state.");
                 setIncomingOrders([]);
                 setPrintedOrders([]);
                 setUpdatingOrders([]);
@@ -476,8 +501,7 @@ function App() {
         initiateFetches();
 
         const interval = setInterval(() => {
-            // NEW AUTH: Only refresh if authenticated
-            console.log("[App.jsx main useEffect] Interval fetch running. Is authenticated:", isAuthenticated);
+            console.log("[App.jsx main useEffect] Interval fetch running. IsAuthenticated:", isAuthenticated);
             if (isAuthenticated) {
                 fetchOrders();
                 fetchPrintedOrders();
@@ -491,7 +515,7 @@ function App() {
             console.log("[App.jsx main useEffect] Clearing main interval.");
             clearInterval(interval);
         }
-    }, [fetchOrders, fetchPrintedOrders, fetchUpdatingOrders, isAuthenticated, logout]); // Added isAuthenticated and logout to dependencies
+    }, [fetchOrders, fetchPrintedOrders, fetchUpdatingOrders, isAuthenticated, logout]);
 
 const handleToggle = async (id, orderNum) => {
     console.log(`[App.jsx handleToggle] Toggling order ID: ${id}, Order Num: ${orderNum}`);
@@ -511,7 +535,6 @@ const handleToggle = async (id, orderNum) => {
         });
         toggledOrdersRef.current[id] = true;
 
-        // NEW AUTH: Get token and handle unauthenticated state for API call
         const accessToken = localStorage.getItem('accessToken');
         if (!accessToken) {
             alert("Authentication token missing. Please log in again.");
@@ -520,10 +543,9 @@ const handleToggle = async (id, orderNum) => {
         }
         try {
             const response = await fetch(`${import.meta.env.VITE_API_URL}/api/order-by-row/${id}`, {
-                headers: { 'Authorization': `Bearer ${accessToken}` } // ADDED AUTH HEADER
+                headers: { 'Authorization': `Bearer ${accessToken}` }
             });
             if (!response.ok) {
-                // NEW AUTH: Handle 401/403 specifically
                 if (response.status === 401 || response.status === 403) {
                     alert("Authentication expired or unauthorized. Please log in again.");
                     logout();
@@ -600,7 +622,6 @@ const handleViewDetails = async (order) => {
         setIncomingOrders(prev => prev.map(o => ({...o, toggled: false})));
     }
 
-    // NEW AUTH: Get token and handle unauthenticated state for API call
     const accessToken = localStorage.getItem('accessToken');
     if (!accessToken) {
         alert("Authentication token missing. Please log in again.");
@@ -610,10 +631,9 @@ const handleViewDetails = async (order) => {
 
     try {
         const response = await fetch(`${import.meta.env.VITE_API_URL}/api/order-by-row/${order.rowIndex}`, {
-            headers: { 'Authorization': `Bearer ${accessToken}` } // ADDED AUTH HEADER
+            headers: { 'Authorization': `Bearer ${accessToken}` }
         });
         if (!response.ok) {
-            // NEW AUTH: Handle 401/403 specifically
             if (response.status === 401 || response.status === 403) {
                 alert("Authentication expired or unauthorized. Please log in again.");
                 logout();
@@ -696,11 +716,11 @@ const handleViewDetails = async (order) => {
     };
 
     useEffect(() => {
-        // NEW AUTH: Get token and handle unauthenticated state for API call
+        console.log("[App.jsx printer useEffect] Checking printer status initiated.");
         const accessToken = localStorage.getItem('accessToken');
         if (!accessToken) {
             console.log("[App.jsx printer useEffect] No access token found, skipping printer status check.");
-            // logout(); // This is App.jsx, not RootApp. Handle within this component as fallback
+            logout();
             setPrinterStatus('N/A (Auth Needed)');
             return;
         }
@@ -708,13 +728,12 @@ const handleViewDetails = async (order) => {
         const checkPrinterStatus = async () => {
             try {
                 const response = await fetch(`${import.meta.env.VITE_API_URL}/api/printer-status`, {
-                    headers: { 'Authorization': `Bearer ${accessToken}` } // ADDED AUTH HEADER
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
                 });
                 if (!response.ok) {
-                    // NEW AUTH: Handle 401/403 specifically
                     if (response.status === 401 || response.status === 403) {
                         console.error("[App.jsx printer useEffect] Auth error checking printer status. Logging out.");
-                        logout(); // Assuming logout is available here from useAuth
+                        logout();
                         return;
                     }
                     throw new Error(`Status check failed: ${response.status}`);
@@ -726,14 +745,13 @@ const handleViewDetails = async (order) => {
                 setPrinterStatus('Not Connected');
             }
         };
-        console.log("[App.jsx printer useEffect] Checking printer status initiated.");
         checkPrinterStatus();
         const intervalId = setInterval(checkPrinterStatus, 60000);
         return () => {
             console.log("[App.jsx printer useEffect] Clearing printer interval.");
             clearInterval(intervalId);
         }
-    }, [logout]); // Added logout to dependency array
+    }, [logout]);
 
     console.log("[App.jsx] App component JSX return.");
     return (
@@ -803,7 +821,7 @@ const handleViewDetails = async (order) => {
                                             <span className="relative flex h-3 w-3 mr-2">
                                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                                                 <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                                            </span>
+                                                    </span>
                                             <span>New or updated order</span>
                                         </div>
                                         <div className="flex items-center text-center">
@@ -820,13 +838,13 @@ const handleViewDetails = async (order) => {
                                         onClick={() => requestSort('timeOrdered')}
                                         className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${sortConfig.key === 'timeOrdered' ? 'bg-cyan-500 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`}
                                     >
-                                        Date/Time {sortConfig.key === 'timeOrdered' ? (sortConfig.direction === 'ascending' ? 'â' : 'â') : ''}
+                                        Date/Time {sortConfig.key === 'timeOrdered' ? (sortConfig.direction === 'ascending' ? 'â–²' : 'â–¼') : ''}
                                     </button>
                                     <button
                                         onClick={() => requestSort('callerName')}
                                         className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${sortConfig.key === 'callerName' ? 'bg-cyan-500 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`}
                                     >
-                                        Name {sortConfig.key === 'callerName' ? (sortConfig.direction === 'ascending' ? 'â' : 'â') : ''}
+                                        Name {sortConfig.key === 'callerName' ? (sortConfig.direction === 'ascending' ? 'â–²' : 'â–¼') : ''}
                                     </button>
                                 </div>
                             </div>
@@ -968,7 +986,7 @@ const handleViewDetails = async (order) => {
                                         {Array.isArray(order.printedTimestamps) && order.printedTimestamps.length > 0 && (
                                           <div className="text-xs text-gray-500 mt-1 w-full pl-6">
                                             {order.printedTimestamps.map((ts, idx) => (
-                                              <li key={idx}>{new Date(ts).toLocaleString()}</li>
+                                              <div key={idx}>{new Date(ts).toLocaleString()}</div>
                                             ))}
                                           </div>
                                         )}
