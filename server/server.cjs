@@ -1124,7 +1124,7 @@ pool.connect()
         startCronJob();
         
 // ===== RBAC additions =====
-const { getUserPermissions } = require("./rbac.service.js");
+const { getUserPermissions } = require("./rbac.service.cjs");
 const jwt = require("jsonwebtoken");
 
 async function generateAccessToken(user) {
