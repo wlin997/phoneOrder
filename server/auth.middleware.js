@@ -1,8 +1,8 @@
 // auth.middleware.js ── JWT verify + permission guard
-import jwt from "jsonwebtoken";
-import { getUserPermissions } from "./rbac.service.js";
+const { getUserPermissions } = require("./rbac.service.js");
+const jwt = require("jsonwebtoken");
 
-export function authenticateToken(req, res, next) {
+function authenticateToken(req, res, next) {
   const header = req.headers["authorization"];
   const token  = header && header.split(" ")[1];
   if (!token)
@@ -18,7 +18,7 @@ export function authenticateToken(req, res, next) {
 /** Guard for granular routes
  *  Usage:  app.post("/api/specials", authorizePermissions(["edit_daily_specials"]), …)
  */
-export function authorizePermissions(required) {
+function authorizePermissions(required) {
   return (req, res, next) => {
     const perms = req.user.permissions || [];
     const ok = required.every(p => perms.includes(p));
@@ -26,3 +26,8 @@ export function authorizePermissions(required) {
     next();
   };
 }
+
+module.exports = {
+  authenticateToken,
+  authorizePermissions
+};
