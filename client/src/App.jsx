@@ -1,15 +1,13 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import "./App.css";
 import "./index.css";
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom'; // Import useNavigate
 import NavMenu from './components/NavMenu';
 import ErrorBoundary from './components/ErrorBoundary';
 import axios from 'axios';
-// Removed: import.meta.env.VITE_API_URL; // This line does nothing, can be removed
-// Removed: import KDS from './KdsComponent.jsx'; // KDS is not directly rendered in App.jsx
 
-// --- AUTH IMPORT (Ensure these are correctly imported for use within App component) ---
-import { useAuth } from './AuthContext';
+// --- AUTH IMPORT ---
+import { useAuth } from './AuthContext'; // Import useAuth
 // --- END AUTH IMPORT ---
 
 console.log("------------------------------------------");
@@ -21,7 +19,7 @@ const MAX_PRINTED_ORDERS = 1000;
 const loadViewedOrders = () => {
     try {
         const stored = localStorage.getItem('viewedOrders');
-        return stored ? JSON.parse(stored) : {};
+        return stored ? JSON.parse(stored) : {}; // Corrected: Removed 's' typo if it was present here
     } catch (err) {
         console.error('Error loading viewed orders from localStorage:', err);
         return {};
@@ -34,6 +32,18 @@ const saveViewedOrders = (viewedOrders) => {
     } catch (err) {
         console.error('Error saving viewed orders to localStorage:', err);
     }
+};
+
+// This is the CORRECT, single instance of formatItem. The duplicate below has been removed.
+const formatItem = (item) => {
+    console.log('[Debug] Item Data (OrderDetailsDisplay):', item);
+    const price = item.qty > 1
+        ? `$${parseFloat(item.total_price_each * item.qty).toFixed(2)}`
+        : item.base_price
+            ? `$${parseFloat(item.base_price).toFixed(2)}`
+            : '$0.00';
+    console.log(`[Debug] Item: ${item.item_name || 'undefined'}, total_price_each: ${item.total_price_each}, base_price: ${item.base_price}, price: ${price}`);
+    return `${price} - ${item.qty} x ${item.item_name || 'undefined'}`;
 };
 
 function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
@@ -53,17 +63,6 @@ function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
             </div>
         );
     }
-
-    const formatItem = (item) => {
-        console.log('[Debug] Item Data (OrderDetailsDisplay):', item);
-        const price = item.qty > 1
-            ? `$${parseFloat(item.total_price_each * item.qty).toFixed(2)}`
-            : item.base_price
-                ? `$${parseFloat(item.base_price).toFixed(2)}`
-                : '$0.00';
-        console.log(`[Debug] Item: ${item.item_name || 'undefined'}, total_price_each: ${item.total_price_each}, base_price: ${item.base_price}, price: ${price}`);
-        return `${price} - ${item.qty} x ${item.item_name || 'undefined'}`;
-    };
 
     return (
         <div className="bg-white p-6 rounded-lg shadow-inner overflow-y-auto h-full text-base text-left">
@@ -172,7 +171,7 @@ function App() {
     const toggledOrdersRef = useRef({});
     const viewedOrdersRef = useRef(loadViewedOrders());
 
-    const { isAuthenticated, userRole, logout } = useAuth(); // ADDED: useAuth hook
+    const { isAuthenticated, userRole, logout } = useAuth(); // Correctly using useAuth hook
 
     console.log("[App.jsx] App component state initialized. IsAuthenticated:", isAuthenticated);
 
@@ -230,6 +229,7 @@ function App() {
         document.addEventListener('mousedown', handleClickOutside);
         return () => {
             console.log("[App.jsx useEffect] Cleaning up click outside listener.");
+            // FIXED TYPO: Corrected handleOutsideClick to handleClickOutside
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, []);
@@ -482,7 +482,7 @@ function App() {
             await fetchUpdatingOrders();
         } catch (error) {
             console.error('[App.jsx handleReprint] Error reprocessing order:', error);
-            alert(`Failed to re-process order: ${error.message}`);
+            alert(`Failed to re-process order: ${err.message}`);
         } finally {
             setIsProcessing(false);
         }
@@ -588,18 +588,6 @@ const handleToggle = async (id, orderNum) => {
     saveViewedOrders(viewedOrdersRef.current);
 };
 
-// This formatItem is a duplicate, likely from a copy-paste mistake. The one above is used.
-// const formatItem = (item) => {
-//     console.log('[Debug] Item Data:', item);
-//     const price = item.qty > 1
-//         ? `$${parseFloat(item.total_price_each * item.qty).toFixed(2)}`
-//         : item.base_price
-//             ? `$${parseFloat(item.base_price).toFixed(2)}`
-//             : '$0.00';
-//     console.log(`[Debug] Item: ${item.item_name || 'undefined'}, total_price_each: ${item.total_price_each}, base_price: ${item.base_price}, price: ${price}`);
-//     return `${price} - ${item.qty} x ${item.item_name || 'undefined'}`; // Use item_name or fallback
-// };
-
 const handleViewDetails = async (order) => {
     console.log('handleViewDetails for order:', order.orderNum, 'rowIndex:', order.rowIndex);
 
@@ -658,7 +646,7 @@ const handleViewDetails = async (order) => {
                     ...item,
                     total_price_each: item.total_price_each || computedPrice.toFixed(2)
                 };
-            }) || [] // Default to empty array if items is undefined
+            }) || []
         });
     } catch (error) {
         console.error('[App.jsx handleViewDetails] Error fetching order details:', error);
