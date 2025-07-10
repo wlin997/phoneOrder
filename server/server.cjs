@@ -4,6 +4,9 @@
 process.env.TZ = 'America/New_York'; // Set default timezone
 
 const express = require("express");
+const adminRoutes = require("./admin.routes.js");
+const { authenticateToken, authorizePermissions } = require("./auth.middleware.js");
+
 const fs = require("fs");
 const fsp = require("fs").promises;
 const path = require("path");
@@ -1119,7 +1122,26 @@ pool.connect()
     .then(() => {
         console.log("✅ Database connection successful.");
         startCronJob();
-        app.listen(PORT, () => {
+        
+// ===== RBAC additions =====
+const { getUserPermissions } = require("./rbac.service.js");
+const jwt = require("jsonwebtoken");
+
+async function generateAccessToken(user) {
+  const permissions = await getUserPermissions(user.id);
+  const payload = {
+    id: user.id,
+    email: user.email,
+    role_name: user.role_name,
+    permissions
+  };
+  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "8h" });
+}
+
+// Admin API
+app.use("/api/admin", authenticateToken, adminRoutes);
+
+app.listen(PORT, () => {
             console.log(`🚀 Server running at http://localhost:${PORT}`);
             if (process.env.RENDER_URL) {
                 console.log(`✅ Server is publicly available at: ${process.env.RENDER_URL}`);
