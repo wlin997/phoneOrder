@@ -1,46 +1,35 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import "./App.css";
 import "./index.css";
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom'; // Keep useNavigate, as it's used within App
 import NavMenu from './components/NavMenu';
 import ErrorBoundary from './components/ErrorBoundary';
 import axios from 'axios';
 
-import { useAuth } from './AuthContext';
-
-console.log("------------------------------------------");
-console.log("[App.jsx] Component file loaded and parsing.");
-console.log("------------------------------------------");
+// --- AUTH IMPORT ---
+import { useAuth } from './AuthContext'; // NEW: Import useAuth hook
+// --- END AUTH IMPORT ---
 
 const MAX_PRINTED_ORDERS = 1000;
 
+// Load viewed orders from localStorage
 const loadViewedOrders = () => {
     try {
         const stored = localStorage.getItem('viewedOrders');
-        return stored ? JSON.parse(stored) : {};
+        return stored ? JSON.parse(stored) : {}; // FIXED: Removed 's' typo if it was present here
     } catch (err) {
         console.error('Error loading viewed orders from localStorage:', err);
         return {};
     }
 };
 
+// Save viewed orders to localStorage
 const saveViewedOrders = (viewedOrders) => {
     try {
         localStorage.setItem('viewedOrders', JSON.stringify(viewedOrders));
     } catch (err) {
         console.error('Error saving viewed orders to localStorage:', err);
     }
-};
-
-const formatItem = (item) => {
-    console.log('[Debug] Item Data (OrderDetailsDisplay):', item);
-    const price = item.qty > 1
-        ? `$${parseFloat(item.total_price_each * item.qty).toFixed(2)}`
-        : item.base_price
-            ? `$${parseFloat(item.base_price).toFixed(2)}`
-            : '$0.00';
-    console.log(`[Debug] Item: ${item.item_name || 'undefined'}, total_price_each: ${item.total_price_each}, base_price: ${item.base_price}, price: ${price}`);
-    return `${price} - ${item.qty} x ${item.item_name || 'undefined'}`;
 };
 
 function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
@@ -60,6 +49,17 @@ function OrderDetailsDisplay({ order, onFireToKitchen, isProcessing }) {
             </div>
         );
     }
+
+    const formatItem = (item) => {
+        console.log('[Debug] Item Data (OrderDetailsDisplay):', item);
+        const price = item.qty > 1
+            ? `$${parseFloat(item.total_price_each * item.qty).toFixed(2)}`
+            : item.base_price
+                ? `$${parseFloat(item.base_price).toFixed(2)}`
+                : '$0.00';
+        console.log(`[Debug] Item: ${item.item_name || 'undefined'}, total_price_each: ${item.total_price_each}, base_price: ${item.base_price}, price: ${price}`);
+        return `${price} - ${item.qty} x ${item.item_name || 'undefined'}`;
+    };
 
     return (
         <div className="bg-white p-6 rounded-lg shadow-inner overflow-y-auto h-full text-base text-left">
@@ -168,9 +168,9 @@ function App() {
     const toggledOrdersRef = useRef({});
     const viewedOrdersRef = useRef(loadViewedOrders());
 
+    // NEW AUTH: Get authentication state and logout function
     const { isAuthenticated, userRole, logout } = useAuth(); // Correctly using useAuth hook
-    // Declaring useNavigate here to ensure it's within the component's scope.
-    const navigate = useNavigate(); // ADDED: Declare useNavigate here
+    const navigate = useNavigate(); // ADDED: Declare useNavigate here as it is used below
 
     console.log("[App.jsx] App component state initialized. IsAuthenticated:", isAuthenticated);
 
@@ -983,7 +983,7 @@ const handleViewDetails = async (order) => {
                                         {Array.isArray(order.printedTimestamps) && order.printedTimestamps.length > 0 && (
                                           <div className="text-xs text-gray-500 mt-1 w-full pl-6">
                                             {order.printedTimestamps.map((ts, idx) => (
-                                              <li key={idx}>{new Date(ts).toLocaleString()}</li>
+                                              <div key={idx}>{new Date(ts).toLocaleString()}</div>
                                             ))}
                                           </div>
                                         )}
