@@ -1,0 +1,114 @@
+Attack Plan: Dynamic Role-Based Access Control
+
+Goal: Implement a fully dynamic, database-driven, and UI-manageable role and permission system. Admins can configure roles and permissions via a frontend grid.
+
+This is a significant architectural change, involving:
+1.  Database Schema Changes: New tables for roles and permissions, and a linking table for user-role relationships.
+2.  Backend API Endpoints: New API endpoints for admins to manage roles, permissions, and assign roles to users.
+3.  Backend Logic: Modify the authenticateToken and authorizeRoles middleware to fetch roles and permissions from the database dynamically, rather than relying on hardcoded user.role from the JWT.
+4.  Frontend UI: Create an administrative interface (e.g., within the /admin section) where authorized users (admins) can:
+    * View/manage existing roles.
+    * Create new roles.
+    * Assign/revoke specific permissions to roles.
+    * Assign/revoke roles to users (or even directly assign permissions to users, though role-based is usually cleaner).
+    * A grid/matrix interface would be ideal for managing permissions.
+
+---
+
+Phase 1: Database Schema (PostgreSQL)
+
+We need new tables to define roles, permissions, and the relationships between them.
+
+1.  roles Table: Stores the name and description of each role (e.g., 'admin', 'manager', 'employee', 'customer').
+
+    CREATE TABLE roles (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(50) UNIQUE NOT NULL, -- e.g., 'admin', 'manager', 'employee', 'customer'
+        description TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+2.  permissions Table: Stores granular actions or resources that can be controlled (e.g., 'view_dashboard', 'manage_kds', 'view_reports', 'manage_admin_settings', 'fire_orders', 'edit_daily_specials').
+
+    CREATE TABLE permissions (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) UNIQUE NOT NULL, -- e.g., 'view_dashboard', 'manage_kds', 'fire_orders'
+        description TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+3.  role_permissions Table (Junction Table): Links roles to permissions, defining what each role is allowed to do.
+
+    CREATE TABLE role_permissions (
+        role_id INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+        permission_id INTEGER NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
+        PRIMARY KEY (role_id, permission_id), -- Composite primary key
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+4.  Modify users Table:
+    * Remove the role column from the users table. Instead, a user will reference a role by its ID.
+    * Crucially, add role_id to the users table as a foreign key. This allows a user to belong to a single primary role. If a user can have multiple roles, we'd need another junction table (user_roles). For simplicity, let's stick to one role per user for now, as it aligns with your current user.role string.
+
+    -- Drop the existing 'role' column if it exists
+    ALTER TABLE users DROP COLUMN IF EXISTS role;
+
+    -- Add the 'role_id' column as a foreign key
+    ALTER TABLE users ADD COLUMN role_id INTEGER REFERENCES roles(id) ON DELETE RESTRICT; -- RESTRICT prevents deleting a role if users are assigned to it
+
+    -- Optional: If you had default roles, you might need to set a default role_id here
+    -- For example, assign a 'customer' role_id to existing users who didn't have a specific role
+    -- UPDATE users SET role_id = (SELECT id FROM roles WHERE name = 'customer') WHERE role_id IS NULL;
+
+---
+
+Phase 2: Backend Development (Node.js/Express)
+
+1.  Seed Initial Data (Manual or Script):
+    * Populate roles table (admin, manager, employee, customer).
+    * Populate permissions table (view_dashboard, manage_kds, view_reports, manage_admin_settings, fire_orders, edit_daily_specials, etc. – granularly map to your current protected routes).
+    * Populate role_permissions (e.g., admin role has all permissions, manager has some, employee fewer).
+    * Update existing users to link to a role_id.
+
+2.  API Endpoints for Admin Management:
+    * GET /api/admin/roles: Get all roles.
+    * POST /api/admin/roles: Create a new role.
+    * GET /api/admin/permissions: Get all available permissions.
+    * GET /api/admin/roles/:roleId/permissions: Get permissions for a specific role.
+    * PUT /api/admin/roles/:roleId/permissions: Update permissions for a specific role (e.g., add/remove multiple permissions).
+    * GET /api/admin/users: Get all users with their roles.
+    * PUT /api/admin/users/:userId/role: Update a user's role.
+
+3.  Modify Authentication/Authorization Middleware (server3.txt):
+    * JWT Payload: The user.role in the JWT will no longer be a string. Instead, it should be user.role_id.
+    * generateAccessToken: When creating the JWT, fetch the user's role name based on role_id and include all their permissions in the JWT payload. This makes permission checks very fast as they don't require a database lookup on every request.
+        * Modify generateAccessToken to query roles and role_permissions to get the role_name and an array of permission_names for that user.
+        * The JWT payload would now look like: { id: user.id, email: user.email, role_name: 'admin', permissions: ['manage_kds', 'view_reports', ...] }.
+    * authorizeRoles Middleware (Rename/Refactor to authorizePermissions):
+        * This middleware will now check req.user.permissions (from the JWT) to see if the required permission is present.
+        * const authorizePermissions = (requiredPermissions) => { ... }
+        * It will iterate through requiredPermissions (which could be an array of permissions required for the route) and check if req.user.permissions contains all of them.
+
+---
+
+Phase 3: Frontend Development (React - App.jsx, Admin.jsx, etc.)
+
+1.  Modify AuthContext.jsx:
+    * Update the login function to parse the new permissions array from the JWT.
+    * Store userPermissions state in AuthContext.
+    * Provide userPermissions via useAuth() hook.
+
+2.  Modify NavMenu.jsx:
+    * Conditional rendering will now check isAuthenticated and userPermissions.includes('permission_name') instead of userRole === 'admin'.
+
+3.  Create Admin UI (Admin.jsx):
+    * Develop a new section within Admin.jsx to manage roles and permissions.
+    * Grid Interface: Create a visually intuitive grid (e.g., using a table or CSS grid) to display roles as rows and permissions as columns. Checkboxes at each intersection (Role X can Permission Y) allow admins to assign/revoke permissions.
+    * Implement API calls to the new backend admin endpoints (/api/admin/roles, /api/admin/permissions, etc.) to populate and update this grid.
+    * Implement user management: Display a list of users, and allow assigning roles (from the roles table) to them.
+
+4.  Update Other Components (App.jsx, KdsComponent.jsx, Report.jsx, dailySpecials.jsx):
+    * Where you currently use authorizeRoles(['role']), you will switch to authorizePermissions(['permission_name']).
+    * Frontend UI elements (buttons, sections) that were conditionally rendered based on userRole will now check userPermissions.includes('permission_name').
