@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
-import jwtDecode from "jwt-decode"; // npm i jwt-decode --save
+import { jwtDecode } from "jwt-decode";
 import axios from "axios";
 
 /**
