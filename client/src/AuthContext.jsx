@@ -12,6 +12,10 @@ export const AuthProvider = ({ children }) => {
   const login = useCallback(async (email, password) => {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/login`, {
+        console.log("[AuthContext Login] Raw data from backend:", data); // NEW LOG
+        console.log("[AuthContext Login] User data received:", data.user); // NEW LOG
+        console.log("[AuthContext Login] Role ID from backend:", data.user.role_id); // NEW LOG
+
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -35,6 +39,7 @@ export const AuthProvider = ({ children }) => {
           // This will be replaced by dynamic permissions in the future.
           role_name: getRoleNameFromId(data.user.role_id) // Get role name based on ID
       };
+       console.log("[AuthContext Login] User object prepared for storage:", userToStore); // NEW LOG
       localStorage.setItem('user', JSON.stringify(userToStore));
       setCurrentUser(userToStore);
       setUserRole(userToStore.role_name); // Set userRole to the name
@@ -74,14 +79,18 @@ export const AuthProvider = ({ children }) => {
       if (storedToken && storedUser) {
         try {
           const parsedUser = JSON.parse(storedUser);
+          console.log("[AuthContext useEffect] Parsed user from localStorage:", parsedUser); // NEW LOG
+          console.log("[AuthContext useEffect] Role ID from localStorage:", parsedUser.role_id); // NEW LOG
           if (parsedUser && parsedUser.id && parsedUser.email && parsedUser.role_id) { // Check for role_id
             // If user object from localStorage doesn't have role_name, derive it
             if (!parsedUser.role_name) {
                 parsedUser.role_name = getRoleNameFromId(parsedUser.role_id);
             }
+            console.log("[AuthContext useEffect] Role Name derived:", parsedUser.role_name); // NEW LOG
             setCurrentUser(parsedUser);
             setUserRole(parsedUser.role_name); // Set userRole to the name
           } else {
+            console.warn("[AuthContext useEffect] Invalid user data or role_id type in localStorage. Clearing...");
             console.warn("Invalid user data found in localStorage. Clearing...");
             logout();
           }
