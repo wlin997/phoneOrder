@@ -1,127 +1,105 @@
-// src/client/src/AuthContext.jsx
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import jwtDecode from "jwt-decode"; // npm i jwt-decode --save
+import axios from "axios";
+
+/**
+ * Shape of the JWT payload we expect from the backend
+ * {
+ *   id: number,
+ *   email: string,
+ *   role_name: string,         // e.g. "admin"
+ *   permissions: string[]      // ["manage_kds", "view_reports", ...]
+ * }
+ */
 
 const AuthContext = createContext(null);
-export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [userRole, setUserRole] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  const login = useCallback(async (email, password) => {
+  const [token, setToken] = useState(() => localStorage.getItem("token"));
+  const [user, setUser] = useState(() => {
+    if (!token) return null;
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Login failed');
-      }
-
-      const data = await response.json();
-      console.log("[AuthContext Login] Raw data from backend:", data); // LOG
-      console.log("[AuthContext Login] User data received:", data.user); // LOG
-      console.log("[AuthContext Login] Role ID from backend:", data.user.role_id); // LOG
-
-      localStorage.setItem('accessToken', data.accessToken);
-
-      const userToStore = {
-          id: data.user.id,
-          email: data.user.email,
-          role_id: data.user.role_id, // This will be a number from backend, but getRoleNameFromId might expect string
-          role_name: getRoleNameFromId(data.user.role_id) // This is where the 'unknown' likely comes from if type mismatch
-      };
-      console.log("[AuthContext Login] User object prepared for storage:", userToStore); // LOG
-      localStorage.setItem('user', JSON.stringify(userToStore));
-      setCurrentUser(userToStore);
-      setUserRole(userToStore.role_name);
-
-      return userToStore;
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
+      return jwtDecode(token);
+    } catch (e) {
+      console.error("Invalid stored token", e);
+      localStorage.removeItem("token");
+      return null;
     }
-  }, []);
+  });
 
-  const logout = useCallback(() => {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('user');
-    setCurrentUser(null);
-    setUserRole(null);
-  }, []);
+  /* ─────────────────────────── Helpers ─────────────────────────── */
+  const isAuthenticated = !!user;
+  const userPermissions = user?.permissions || [];
 
-  // Helper to map role_id to a display name
-  const getRoleNameFromId = (id) => {
-      switch(id) { // This switch expects a number, but 'id' might be a string from JWT/localStorage
-          case 1: return 'admin';
-          case 2: return 'manager';
-          case 3: return 'employee';
-          case 4: return 'customer';
-          default: return 'unknown';
-      }
+  const hasPermission = useCallback(
+    (perm) => {
+      if (!perm) return false;
+      if (!Array.isArray(perm)) return userPermissions.includes(perm);
+      // array case: return true if ALL perms present
+      return perm.every((p) => userPermissions.includes(p));
+    },
+    [userPermissions]
+  );
+
+  /* ─────────────────────────── Login ─────────────────────────── */
+  const login = async (email, password) => {
+    const { data } = await axios.post("/api/login", { email, password });
+    const incomingToken = data.token;
+    const decoded = jwtDecode(incomingToken);
+    setToken(incomingToken);
+    setUser(decoded);
+    localStorage.setItem("token", incomingToken);
+    // Set axios default header so subsequent requests include the token
+    axios.defaults.headers.common["Authorization"] = `Bearer ${incomingToken}`;
   };
 
+  /* ─────────────────────────── Logout ─────────────────────────── */
+  const logout = () => {
+    setToken(null);
+    setUser(null);
+    localStorage.removeItem("token");
+    delete axios.defaults.headers.common["Authorization"];
+  };
+
+  /* ─────────────────────────── Token Bootstrap ─────────────────────────── */
   useEffect(() => {
-    const checkAuthStatus = () => {
-      const storedToken = localStorage.getItem('accessToken');
-      const storedUser = localStorage.getItem('user');
+    if (token) {
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
-      if (storedToken && storedUser) {
-        try {
-          const parsedUser = JSON.parse(storedUser);
-          console.log("[AuthContext useEffect] Parsed user from localStorage:", parsedUser); // LOG
-          console.log("[AuthContext useEffect] Role ID from localStorage:", parsedUser.role_id); // LOG
-          // This check 'typeof parsedUser.role_id === 'number'' will fail if it's a string "1"
-          if (parsedUser && parsedUser.id && parsedUser.email && typeof parsedUser.role_id === 'number') {
-            if (!parsedUser.role_name) {
-                parsedUser.role_name = getRoleNameFromId(parsedUser.role_id);
-            }
-            console.log("[AuthContext useEffect] Role Name derived:", parsedUser.role_name); // LOG
-            setCurrentUser(parsedUser);
-            setUserRole(parsedUser.role_name);
-          } else {
-            console.warn("[AuthContext useEffect] Invalid user data or role_id type in localStorage. Clearing..."); // LOG
-            logout();
-          }
-        } catch (e) {
-          console.error("Error parsing stored user data:", e);
-          logout();
-        }
+      // Auto-logout if token expired (simple client check)
+      const { exp } = jwtDecode(token);
+      const timeout = exp * 1000 - Date.now();
+      if (timeout > 0) {
+        const id = setTimeout(logout, timeout);
+        return () => clearTimeout(id);
+      } else {
+        logout();
       }
-      setLoading(false);
-    };
+    }
+  }, [token]);
 
-    checkAuthStatus();
-  }, [logout]);
-
-  const authContextValue = {
-    currentUser,
-    userRole,
-    loading,
+  const value = {
+    isAuthenticated,
+    user,
+    userPermissions,
+    hasPermission,
     login,
     logout,
-    isAuthenticated: !!currentUser,
-    isAdmin: userRole === 'admin',
-    isManager: userRole === 'manager',
-    isEmployee: userRole === 'employee',
-    isCustomer: userRole === 'customer',
   };
 
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: '24px', color: '#333' }}>
-        Loading authentication...
-      </div>
-    );
-  }
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
 
-  return (
-    <AuthContext.Provider value={authContextValue}>
-      {children}
-    </AuthContext.Provider>
-  );
+export const useAuth = () => {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
+  return ctx;
+};
+
+/* ─────────────────────────── Higher‑order guard ─────────────────────────── */
+export const RequirePerms = ({ perms, children, fallback = null }) => {
+  const { isAuthenticated, hasPermission } = useAuth();
+  if (!isAuthenticated) return fallback;
+  if (hasPermission(perms)) return children;
+  return fallback;
 };
