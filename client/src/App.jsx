@@ -1,11 +1,16 @@
-import { useEffect, useState, Component, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import "./App.css";
 import "./index.css";
 import { Link, useNavigate } from 'react-router-dom';
 import NavMenu from './components/NavMenu';
 import ErrorBoundary from './components/ErrorBoundary';
 import axios from 'axios';
-import { useAuth } from './AuthContext'; // Import useAuth
+// Removed: import.meta.env.VITE_API_URL; // This line does nothing, can be removed
+// Removed: import KDS from './KdsComponent.jsx'; // KDS is not directly rendered in App.jsx
+
+// --- AUTH IMPORT (Ensure these are correctly imported for use within App component) ---
+import { useAuth } from './AuthContext';
+// --- END AUTH IMPORT ---
 
 console.log("------------------------------------------");
 console.log("[App.jsx] Component file loaded and parsing.");
@@ -656,7 +661,7 @@ const handleViewDetails = async (order) => {
             }) || [] // Default to empty array if items is undefined
         });
     } catch (error) {
-        console.error('Error fetching order details:', error);
+        console.error('[App.jsx handleViewDetails] Error fetching order details:', error);
         setSelectedOrderDetails(null);
         alert(`Failed to load order details: ${error.message}`);
     }
@@ -821,7 +826,7 @@ const handleViewDetails = async (order) => {
                                             <span className="relative flex h-3 w-3 mr-2">
                                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                                                 <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                                                    </span>
+                                            </span>
                                             <span>New or updated order</span>
                                         </div>
                                         <div className="flex items-center text-center">
