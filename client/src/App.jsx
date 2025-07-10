@@ -48,7 +48,7 @@ const App = () => {
             <RequirePerms perms="manage_admin_settings" fallback={<Navigate to="/" replace />}><Admin /></RequirePerms>
           }/>
           <Route path="/admin/roles" element={
-             <RequirePerms perms="manage_admin_settings" fallback={<Navigate to=\"/\" replace />}><RoleManager /></RequirePerms>
+             <RequirePerms perms="manage_admin_settings" fallback={<Navigate to="/" replace />}><RoleManager /></RequirePerms>
           }/>
         </Routes>
       </main>
