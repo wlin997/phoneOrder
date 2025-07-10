@@ -1,5 +1,6 @@
-// auth.middleware.js  (CommonJS)
+// auth.middleware.js
 const jwt = require("jsonwebtoken");
+const { getUserPermissions } = require("./rbac.service.cjs"); // ✅ correctly using require
 
 function authenticateToken(req, res, next) {
   const token = req.headers.authorization?.split(" ")[1];

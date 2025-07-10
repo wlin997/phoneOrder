@@ -4,8 +4,8 @@
 process.env.TZ = 'America/New_York'; // Set default timezone
 
 const express = require("express");
-const adminRoutes = require("./admin.routes.js");
-const { authenticateToken, authorizePermissions } = require("./auth.middleware.js");
+const adminRoutes = require("./admin.routes.cjs");
+const { authenticateToken, authorizePermissions } = require("./auth.middleware.cjs");
 
 const fs = require("fs");
 const fsp = require("fs").promises;
