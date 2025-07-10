@@ -23,22 +23,19 @@ export const AuthProvider = ({ children }) => {
       }
 
       const data = await response.json();
-      // --- CORRECTED PLACEMENT OF LOGS ---
-      console.log("[AuthContext Login] Raw data from backend:", data); // NEW LOG - CORRECTED PLACEMENT
-      console.log("[AuthContext Login] User data received:", data.user); // NEW LOG - CORRECTED PLACEMENT
-      console.log("[AuthContext Login] Role ID from backend:", data.user.role_id); // NEW LOG - CORRECTED PLACEMENT
-      // --- END CORRECTED PLACEMENT ---
-
-      localStorage.setItem('accessToken', data.accessToken);
+      console.log("[AuthContext Login] Raw data from backend:", data);
+      console.log("[AuthContext Login] User data received:", data.user);
+      console.log("[AuthContext Login] Role ID from backend:", data.user.role_id);
 
       const userToStore = {
           id: data.user.id,
           email: data.user.email,
-          role_id: data.user.role_id,
-          role_name: getRoleNameFromId(data.user.role_id)
+          role_id: Number(data.user.role_id), // CRITICAL: Convert role_id to Number here
+          role_name: getRoleNameFromId(Number(data.user.role_id)) // Pass Number to helper
       };
-      console.log("[AuthContext Login] User object prepared for storage:", userToStore); // NEW LOG
+      console.log("[AuthContext Login] User object prepared for storage:", userToStore);
       localStorage.setItem('user', JSON.stringify(userToStore));
+      localStorage.setItem('accessToken', data.accessToken); // Set access token after user data
       setCurrentUser(userToStore);
       setUserRole(userToStore.role_name);
 
@@ -58,7 +55,10 @@ export const AuthProvider = ({ children }) => {
 
   // Helper to map role_id to a display name (Temporary until full RBAC is implemented)
   const getRoleNameFromId = (id) => {
-      switch(id) {
+      // Ensure 'id' is explicitly a number for the switch statement
+      const numericId = Number(id); // Use Number() to convert to a number type
+
+      switch(numericId) { // Use the numericId here
           case 1: return 'admin';
           case 2: return 'manager';
           case 3: return 'employee';
@@ -75,17 +75,23 @@ export const AuthProvider = ({ children }) => {
       if (storedToken && storedUser) {
         try {
           const parsedUser = JSON.parse(storedUser);
-          console.log("[AuthContext useEffect] Parsed user from localStorage:", parsedUser); // NEW LOG
-          console.log("[AuthContext useEffect] Role ID from localStorage:", parsedUser.role_id); // NEW LOG
-          if (parsedUser && parsedUser.id && parsedUser.email && typeof parsedUser.role_id === 'number') {
+          console.log("[AuthContext useEffect] Parsed user from localStorage:", parsedUser);
+          console.log("[AuthContext useEffect] Role ID from localStorage (before conversion):", parsedUser.role_id); // LOG
+
+          // CRITICAL FIX: Convert role_id to Number from localStorage
+          parsedUser.role_id = Number(parsedUser.role_id); // <--- ADD THIS LINE (Explicit conversion)
+
+          // Check if role_id exists and is a valid number AFTER conversion
+          if (parsedUser && parsedUser.id && parsedUser.email && !isNaN(parsedUser.role_id)) { // <--- MODIFIED TYPE CHECK
             if (!parsedUser.role_name) {
                 parsedUser.role_name = getRoleNameFromId(parsedUser.role_id);
             }
-            console.log("[AuthContext useEffect] Role Name derived:", parsedUser.role_name); // NEW LOG
+            console.log("[AuthContext useEffect] Role ID from localStorage (after conversion):", parsedUser.role_id); // LOG
+            console.log("[AuthContext useEffect] Role Name derived:", parsedUser.role_name); // LOG
             setCurrentUser(parsedUser);
             setUserRole(parsedUser.role_name);
           } else {
-            console.warn("[AuthContext useEffect] Invalid user data or role_id type in localStorage. Clearing...");
+            console.warn("[AuthContext useEffect] Invalid user data or role_id is not a valid number after conversion. Clearing..."); // LOG
             logout();
           }
         } catch (e) {
