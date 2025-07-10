@@ -1,7 +1,6 @@
-// server/db.js  – shared Postgres pool (ES Module)
-import { Pool } from "pg";
-import dotenv from "dotenv";
-dotenv.config();
+// server/db.js  – shared Postgres pool (CommonJS)
+const { Pool } = require("pg");
+require("dotenv").config();
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -11,4 +10,4 @@ const pool = new Pool({
       : false,
 });
 
-export default pool;
+module.exports = pool;

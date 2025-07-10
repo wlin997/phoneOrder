@@ -1,13 +1,8 @@
-// auth.middleware.js ── ESM version
-import jwt from "jsonwebtoken";
-import { getUserPermissions } from "./rbac.service.js";
+// auth.middleware.js  (CommonJS)
+const jwt = require("jsonwebtoken");
 
-/**
- * JWT Authentication Middleware
- */
-export function authenticateToken(req, res, next) {
-  const header = req.headers["authorization"];
-  const token = header && header.split(" ")[1];
+function authenticateToken(req, res, next) {
+  const token = req.headers.authorization?.split(" ")[1];
   if (!token) return res.status(401).json({ message: "Missing token" });
 
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
@@ -17,11 +12,7 @@ export function authenticateToken(req, res, next) {
   });
 }
 
-/**
- * Permission Guard
- * @param {string[]} required - Permissions like ['edit_orders']
- */
-export function authorizePermissions(required) {
+function authorizePermissions(required) {
   return (req, res, next) => {
     const perms = req.user?.permissions || [];
     const ok = required.every(p => perms.includes(p));
@@ -29,3 +20,5 @@ export function authorizePermissions(required) {
     next();
   };
 }
+
+module.exports = { authenticateToken, authorizePermissions };
