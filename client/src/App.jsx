@@ -492,39 +492,7 @@ function App() {
         }
     };
 
-    useEffect(() => {
-        console.log("[App.jsx main useEffect] Initial and interval fetches initiated. IsAuthenticated:", isAuthenticated);
-        const initiateFetches = async () => {
-            if (isAuthenticated) {
-                console.log("[App.jsx main useEffect] User is authenticated, initiating data fetches.");
-                await fetchOrders();
-                await fetchPrintedOrders();
-                await fetchUpdatingOrders();
-            } else {
-                console.log("[App.jsx main useEffect] User is NOT authenticated, skipping data fetches and clearing state.");
-                setIncomingOrders([]);
-                setPrintedOrders([]);
-                setUpdatingOrders([]);
-            }
-        };
-        initiateFetches();
-
-        const interval = setInterval(() => {
-            console.log("[App.jsx main useEffect] Interval fetch running. IsAuthenticated:", isAuthenticated);
-            if (isAuthenticated) {
-                fetchOrders();
-                fetchPrintedOrders();
-                fetchUpdatingOrders();
-            } else {
-                 console.log("[App.jsx main useEffect] User not authenticated, skipping interval fetch.");
-            }
-        }, 15000);
-
-        return () => {
-            console.log("[App.jsx main useEffect] Clearing main interval.");
-            clearInterval(interval);
-        }
-    }, [fetchOrders, fetchPrintedOrders, fetchUpdatingOrders, isAuthenticated, logout]);
+    
 
 const handleToggle = async (id, orderNum) => {
     console.log(`[App.jsx handleToggle] Toggling order ID: ${id}, Order Num: ${orderNum}`);
