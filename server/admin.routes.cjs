@@ -10,7 +10,7 @@ const {
 } = require("./rbac.service.cjs");
 
 
-const { authorizePermissions } = require("./auth.middleware.js");
+const { authorizePermissions } = require("./auth.middleware.cjs");
 
 const router = express.Router();
 router.use(authorizePermissions(["manage_admin_settings"]));
