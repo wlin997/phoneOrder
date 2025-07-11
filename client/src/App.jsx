@@ -6,7 +6,7 @@ import Report from "./Report.jsx";
 import KDS from "./KdsComponent.jsx";
 import DailySpecialsManager from "./dailySpecials.jsx";
 import Admin from "./Admin.jsx";
-import Login from "./Login.jsx";            // make sure Login.jsx exists
+import Login from "./Login.jsx";
 
 import NavMenu, { RequirePerms } from "./components/NavMenu.jsx";
 
@@ -35,7 +35,7 @@ export default function App() {
           {/* Public route */}
           <Route path="/login" element={<Login />} />
 
-          {/* Dashboard becomes layout for its own deeper paths → use /* */}
+          {/* Dashboard acts as layout for routes under / → use /* */}
           <Route path="/*" element={<Dashboard />} />
 
           {/* Protected single-page routes */}
