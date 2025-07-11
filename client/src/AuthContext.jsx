@@ -1,105 +1,85 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { jwtDecode } from "jwt-decode";
+import jwtDecode from "jwt-decode";
 import axios from "axios";
 
-/**
- * Shape of the JWT payload we expect from the backend
- * {
- *   id: number,
- *   email: string,
- *   role_name: string,         // e.g. "admin"
- *   permissions: string[]      // ["manage_kds", "view_reports", ...]
- * }
- */
+/*********************************************************
+ * AuthContext – central login/logout & permission logic *
+ *********************************************************/
+
+const API = axios.create({
+  baseURL: import.meta.env.VITE_API_URL ?? "",
+});
 
 const AuthContext = createContext(null);
+export const useAuth = () => useContext(AuthContext);
 
-export const AuthProvider = ({ children }) => {
+export function AuthProvider({ children }) {
+  /* ── token persisted in localStorage ─────────────────── */
   const [token, setToken] = useState(() => localStorage.getItem("token"));
-  const [user, setUser] = useState(() => {
+  const [user, setUser]   = useState(() => {
     if (!token) return null;
-    try {
-      return jwtDecode(token);
-    } catch (e) {
-      console.error("Invalid stored token", e);
-      localStorage.removeItem("token");
-      return null;
-    }
+    try { return jwtDecode(token); } catch { return null; }
   });
 
-  /* ─────────────────────────── Helpers ─────────────────────────── */
   const isAuthenticated = !!user;
   const userPermissions = user?.permissions || [];
 
-  const hasPermission = useCallback(
-    (perm) => {
-      if (!perm) return false;
-      if (!Array.isArray(perm)) return userPermissions.includes(perm);
-      // array case: return true if ALL perms present
-      return perm.every((p) => userPermissions.includes(p));
-    },
-    [userPermissions]
-  );
+  /* ── helper: check permission(s) ─────────────────────── */
+  const hasPermission = useCallback((permOrArr) => {
+    const needed = Array.isArray(permOrArr) ? permOrArr : [permOrArr];
+    return needed.every((p) => userPermissions.includes(p));
+  }, [userPermissions]);
 
-  /* ─────────────────────────── Login ─────────────────────────── */
+  /* ── login ───────────────────────────────────────────── */
   const login = async (email, password) => {
-    const { data } = await axios.post("/api/login", { email, password });
-    const incomingToken = data.token;
-    const decoded = jwtDecode(incomingToken);
-    setToken(incomingToken);
-    setUser(decoded);
-    localStorage.setItem("token", incomingToken);
-    // Set axios default header so subsequent requests include the token
-    axios.defaults.headers.common["Authorization"] = `Bearer ${incomingToken}`;
+    const { data } = await API.post("/api/login", { email, password });
+    localStorage.setItem("token", data.token);
+    setToken(data.token);
+    setUser(jwtDecode(data.token));
   };
 
-  /* ─────────────────────────── Logout ─────────────────────────── */
+  /* ── logout ──────────────────────────────────────────── */
   const logout = () => {
+    localStorage.removeItem("token");
     setToken(null);
     setUser(null);
-    localStorage.removeItem("token");
-    delete axios.defaults.headers.common["Authorization"];
   };
 
-  /* ─────────────────────────── Token Bootstrap ─────────────────────────── */
+  /* ── attach token to axios + auto‑logout on expiry ───── */
   useEffect(() => {
-    if (token) {
-      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    if (!token) return;
 
-      // Auto-logout if token expired (simple client check)
-      const { exp } = jwtDecode(token);
-      const timeout = exp * 1000 - Date.now();
-      if (timeout > 0) {
-        const id = setTimeout(logout, timeout);
-        return () => clearTimeout(id);
-      } else {
-        logout();
-      }
+    API.defaults.headers.common.Authorization = `Bearer ${token}`;
+
+    const { exp } = jwtDecode(token);
+    const ttl = exp * 1000 - Date.now();
+    if (ttl > 0) {
+      const id = setTimeout(logout, ttl);
+      return () => clearTimeout(id);
+    } else {
+      logout();
     }
   }, [token]);
 
   const value = {
-    isAuthenticated,
+    token,
     user,
+    isAuthenticated,
     userPermissions,
     hasPermission,
     login,
     logout,
+    api: API,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
+}
 
-export const useAuth = () => {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
-  return ctx;
-};
-
-/* ─────────────────────────── Higher‑order guard ─────────────────────────── */
+/**********************************************
+ * <RequirePerms> – wrapper to guard UI nodes *
+ **********************************************/
 export const RequirePerms = ({ perms, children, fallback = null }) => {
   const { isAuthenticated, hasPermission } = useAuth();
   if (!isAuthenticated) return fallback;
-  if (hasPermission(perms)) return children;
-  return fallback;
+  return hasPermission(perms) ? children : fallback;
 };
