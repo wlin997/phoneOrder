@@ -1,57 +1,58 @@
 import React, { useState } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import Dashboard from "./Dashboard.jsx";
 import Report from "./Report.jsx";
 import KDS from "./KdsComponent.jsx";
 import DailySpecialsManager from "./dailySpecials.jsx";
 import Admin from "./Admin.jsx";
-import Login from "./Login.jsx";              // make sure Login.jsx exists
+import Login from "./Login.jsx";            // make sure Login.jsx exists
 
 import NavMenu, { RequirePerms } from "./components/NavMenu.jsx";
 
-const App = () => {
+export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const toggleMenu = () => setIsMenuOpen((p) => !p);
+  const toggleMenu = () => setIsMenuOpen((prev) => !prev);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* top bar */}
+    <BrowserRouter>
+      {/* ------------ Top bar ------------- */}
       <header className="flex justify-between items-center bg-white shadow px-4 py-3">
         <h1 className="text-xl font-semibold">Synthpify.ai Dashboard</h1>
-        <button onClick={toggleMenu} className="text-gray-700">
+        <button onClick={toggleMenu} className="text-gray-700" aria-label="Menu">
           <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
       </header>
 
-      {/* slide-in menu */}
+      {/* ------------ Slide-in sidebar ------------- */}
       <NavMenu isMenuOpen={isMenuOpen} handleMenuClose={() => setIsMenuOpen(false)} />
 
-      {/* main router */}
+      {/* ------------ Main router ------------- */}
       <main className="p-6">
         <Routes>
-          {/* public routes */}
+          {/* Public route */}
           <Route path="/login" element={<Login />} />
 
-          {/* protected routes */}
-          <Route path="/*" element={<Dashboard />} />   {/* now matches deeper URLs */}
+          {/* Dashboard becomes layout for its own deeper paths → use /* */}
+          <Route path="/*" element={<Dashboard />} />
+
+          {/* Protected single-page routes */}
+          <Route
+            path="/kds"
+            element={
+              <RequirePerms perms="manage_kds" fallback={<Navigate to="/login" replace />}>
+                <KDS />
+              </RequirePerms>
+            }
+          />
 
           <Route
             path="/report"
             element={
               <RequirePerms perms="view_reports" fallback={<Navigate to="/login" replace />}>
                 <Report />
-              </RequirePerms>
-            }
-          />
-
-          <Route
-            path="/kds"
-            element={
-              <RequirePerms perms="manage_kds" fallback={<Navigate to="/login" replace />}>
-                <KDS />
               </RequirePerms>
             }
           />
@@ -74,12 +75,10 @@ const App = () => {
             }
           />
 
-          {/* catch-all: send unknown urls to dashboard */}
-            <Route path="*" element={<Navigate to="/" replace />} />
+          {/* Catch-all → Dashboard */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
-    </div>
+    </BrowserRouter>
   );
-};
-
-export default App;  
+}
