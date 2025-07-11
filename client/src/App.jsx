@@ -8,7 +8,8 @@ import DailySpecialsManager from "./dailySpecials.jsx";
 import Admin from "./Admin.jsx";
 import Login from "./Login.jsx";
 
-import NavMenu, { RequirePerms } from "./components/NavMenu.jsx";
+import { RequireAuth, RequirePerms } from "./AuthContext.jsx";
+import NavMenu from "./components/NavMenu.jsx";
 
 export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -16,7 +17,7 @@ export default function App() {
 
   return (
     <>
-      {/* ------------ Top bar ------------- */}
+      {/* ---------- Top Bar ---------- */}
       <header className="flex justify-between items-center bg-white shadow px-4 py-3">
         <h1 className="text-xl font-semibold">Synthpify.ai Dashboard</h1>
         <button onClick={toggleMenu} className="text-gray-700" aria-label="Menu">
@@ -26,57 +27,75 @@ export default function App() {
         </button>
       </header>
 
-      {/* ------------ Slide-in sidebar ------------- */}
+      {/* ---------- Sidebar ---------- */}
       <NavMenu isMenuOpen={isMenuOpen} handleMenuClose={() => setIsMenuOpen(false)} />
 
-      {/* ------------ Main router ------------- */}
+      {/* ---------- Main Router ---------- */}
       <main className="p-6">
         <Routes>
-          {/* Public route */}
+          {/* Public */}
           <Route path="/login" element={<Login />} />
 
-          {/* Dashboard acts as layout for routes under / → use /* */}
-          <Route path="/*" element={<Dashboard />} />
+          {/* Dashboard (any logged-in user) */}
+          <Route
+            path="/*"
+            element={
+              <RequireAuth>
+                <Dashboard />
+              </RequireAuth>
+            }
+          />
 
-          {/* Protected single-page routes */}
+          {/* KDS */}
           <Route
             path="/kds"
             element={
-              <RequirePerms perms="manage_kds" fallback={<Navigate to="/login" replace />}>
-                <KDS />
-              </RequirePerms>
+              <RequireAuth>
+                <RequirePerms perms="manage_kds" fallback={<Navigate to="/" replace />}>
+                  <KDS />
+                </RequirePerms>
+              </RequireAuth>
             }
           />
 
+          {/* Reports */}
           <Route
             path="/report"
             element={
-              <RequirePerms perms="view_reports" fallback={<Navigate to="/login" replace />}>
-                <Report />
-              </RequirePerms>
+              <RequireAuth>
+                <RequirePerms perms="view_reports" fallback={<Navigate to="/" replace />}>
+                  <Report />
+                </RequirePerms>
+              </RequireAuth>
             }
           />
 
+          {/* Daily Specials */}
           <Route
             path="/daily-specials"
             element={
-              <RequirePerms perms="edit_daily_specials" fallback={<Navigate to="/login" replace />}>
-                <DailySpecialsManager />
-              </RequirePerms>
+              <RequireAuth>
+                <RequirePerms perms="edit_daily_specials" fallback={<Navigate to="/" replace />}>
+                  <DailySpecialsManager />
+                </RequirePerms>
+              </RequireAuth>
             }
           />
 
+          {/* Admin Settings */}
           <Route
             path="/admin"
             element={
-              <RequirePerms perms="manage_admin_settings" fallback={<Navigate to="/login" replace />}>
-                <Admin />
-              </RequirePerms>
+              <RequireAuth>
+                <RequirePerms perms="manage_admin_settings" fallback={<Navigate to="/" replace />}>
+                  <Admin />
+                </RequirePerms>
+              </RequireAuth>
             }
           />
 
-          {/* Catch-all → Dashboard */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          {/* Catch-all → /login */}
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </main>
     </>

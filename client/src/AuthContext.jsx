@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { jwtDecode } from "jwt-decode";
 import axios from "axios";
+import { Navigate } from "react-router-dom";
 
 /*********************************************************
  * AuthContext – central login/logout & permission logic *
@@ -83,3 +84,9 @@ export const RequirePerms = ({ perms, children, fallback = null }) => {
   if (!isAuthenticated) return fallback;
   return hasPermission(perms) ? children : fallback;
 };
+
+export const RequireAuth = ({ children, fallback = <Navigate to="/login" replace /> }) => {
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? children : fallback;
+};
+
