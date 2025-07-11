@@ -75,11 +75,11 @@ const App = () => {
           />
 
           {/* catch-all → dashboard or 404 */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="/*" element={<Dashboard />} />
         </Routes>
       </main>
     </div>
   );
 };
 
-export default App;
+export default App; 
