@@ -36,7 +36,7 @@ const App = () => {
           <Route path="/login" element={<Login />} />
 
           {/* protected routes */}
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/*" element={<Dashboard />} />   {/* now matches deeper URLs */}
 
           <Route
             path="/report"
@@ -82,4 +82,4 @@ const App = () => {
   );
 };
 
-export default App; 
+export default App;  
