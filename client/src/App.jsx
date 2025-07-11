@@ -9,6 +9,7 @@ import Admin from "./Admin.jsx";
 import NavMenu from "./components/NavMenu.jsx";         // ✅ CORRECTED
 import { RequirePerms } from "./AuthContext.jsx";
 import RoleManager from "./RoleManager.jsx";
+import Login from "./Login.jsx";
 
 const App = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -50,6 +51,7 @@ const App = () => {
           <Route path="/admin/roles" element={
              <RequirePerms perms="manage_admin_settings" fallback={<Navigate to="/" replace />}><RoleManager /></RequirePerms>
           }/>
+          <Route path="/login" element={<Login />} />
         </Routes>
       </main>
     </div>
