@@ -74,8 +74,8 @@ const App = () => {
             }
           />
 
-          {/* catch-all → dashboard or 404 */}
-          <Route path="/*" element={<Dashboard />} />
+          {/* catch-all: send unknown urls to dashboard */}
+            <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
     </div>
