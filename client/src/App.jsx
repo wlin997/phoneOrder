@@ -11,6 +11,7 @@ import Login from "./Login.jsx";
 import { RequireAuth, RequirePerms } from "./AuthContext.jsx";
 import NavMenu from "./components/NavMenu.jsx";
 
+import RoleManager from "./RoleManager.jsx"; 
 /*───────────────────────────────────────────────────────────*/
 
 export default function App() {
@@ -122,6 +123,8 @@ export default function App() {
 
           {/* Catch‑all → /login */}
           <Route path="*" element={<Navigate to="/login" replace />} />
+
+          <Route path="/roles" element={<RequirePerms perms="manage_admin_settings"><RoleManager /></RequirePerms>} />
         </Routes>
       </main>
     </>

@@ -191,6 +191,16 @@ const NavMenu = ({ isMenuOpen, handleMenuClose }) => {
                 </Link>
               </li>
             </RequirePerms>
+            <RequirePerms perms="manage_admin_settings">
+              <li className="mb-4">
+                <Link to="/roles" onClick={handleMenuClose} className="flex items-center p-2 text-gray-700 rounded-lg hover:bg-cyan-50 hover:text-cyan-600">
+                  <svg className="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>Role Manager</span>
+                </Link>
+              </li>
+            </RequirePerms>
 
             {/* Log Out */}
             <li className="mt-6 pt-4 border-t">
