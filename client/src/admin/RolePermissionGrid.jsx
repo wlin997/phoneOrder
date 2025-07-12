@@ -1,99 +1,51 @@
-import React, { useEffect, useState } from "react";
-import axios from "axios";
+import React from "react";
 
-const RolePermissionGrid = () => {
-  const [roles, setRoles] = useState([]);
-  const [permissions, setPermissions] = useState([]);
-  const [matrix, setMatrix] = useState({}); // { roleId: Set(permissionId) }
-  const [saving, setSaving] = useState(false);
-
-  /* ─────────── Load roles & permissions ─────────── */
-  useEffect(() => {
-    async function fetchData() {
-      const [roleRes, permRes] = await Promise.all([
-        axios.get("/api/admin/roles"),
-        axios.get("/api/admin/permissions"),
-      ]);
-      setRoles(roleRes.data);
-      setPermissions(permRes.data);
-
-      // build matrix
-      const map = {};
-      await Promise.all(
-        roleRes.data.map(async (role) => {
-          const { data } = await axios.get(
-            `/api/admin/roles/${role.id}/permissions`
-          );
-          map[role.id] = new Set(data.map((p) => p.id));
-        })
-      );
-      setMatrix(map);
-    }
-    fetchData();
-  }, []);
-
-  /* ─────────── Toggle checkbox ─────────── */
-  const handleToggle = (roleId, permId) => {
-    setMatrix((prev) => {
-      const next = { ...prev };
-      const set = new Set(next[roleId]);
-      if (set.has(permId)) set.delete(permId);
-      else set.add(permId);
-      next[roleId] = set;
-      return next;
-    });
-  };
-
-  /* ─────────── Save to server ─────────── */
-  const saveRole = async (roleId) => {
-    setSaving(true);
-    try {
-      await axios.put(`/api/admin/roles/${roleId}/permissions`, [
-        ...matrix[roleId],
-      ]);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (!roles.length) return <p>Loading roles…</p>;
+/**
+ * RolePermissionGrid
+ * @param {Array} roles  [{ id, name, perms:[id,…] }]
+ * @param {Array} perms  [{ id, name }]
+ * @param {Function} onToggle (roleId, permId) => void
+ */
+const RolePermissionGrid = ({ roles = [], perms = [], onToggle }) => {
+  // Defensive guards
+  if (!Array.isArray(roles) || !Array.isArray(perms)) {
+    console.warn("RolePermissionGrid expected arrays:", { roles, perms });
+    return (
+      <p className="text-red-600 px-4 py-2">
+        Failed to load role/permission data (see console).
+      </p>
+    );
+  }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-max border text-sm">
-        <thead>
+    <div className="overflow-auto">
+      <table className="min-w-full text-sm">
+        <thead className="bg-gray-100">
           <tr>
-            <th className="border px-4 py-2 text-left">Role</th>
-            {permissions.map((perm) => (
-              <th key={perm.id} className="border px-2 py-1 rotate-45">
+            <th className="px-4 py-2 text-left">Role</th>
+            {perms.map((perm) => (
+              <th key={perm.id} className="px-4 py-2 text-center">
                 {perm.name}
               </th>
             ))}
-            <th className="border px-4 py-2">Actions</th>
           </tr>
         </thead>
+
         <tbody>
-          {roles.map((role) => (
-            <tr key={role.id}>
-              <td className="border px-4 py-2 font-medium">{role.name}</td>
-              {permissions.map((perm) => (
-                <td key={perm.id} className="border text-center">
+          {roles.map((role, ri) => (
+            <tr key={role.id} className={ri % 2 ? "bg-gray-50" : "bg-white"}>
+              <td className="px-4 py-2 font-medium">{role.name}</td>
+
+              {perms.map((perm) => (
+                <td key={perm.id} className="px-4 py-2 text-center">
                   <input
                     type="checkbox"
-                    checked={matrix[role.id]?.has(perm.id) || false}
-                    onChange={() => handleToggle(role.id, perm.id)}
+                    checked={role.perms?.includes(perm.id)}
+                    onChange={() => onToggle?.(role.id, perm.id)}
+                    className="h-4 w-4 text-cyan-600 focus:ring-cyan-500"
                   />
                 </td>
               ))}
-              <td className="border px-4 py-2">
-                <button
-                  className="px-2 py-1 bg-cyan-600 text-white rounded"
-                  disabled={saving}
-                  onClick={() => saveRole(role.id)}
-                >
-                  Save
-                </button>
-              </td>
             </tr>
           ))}
         </tbody>
