@@ -4,11 +4,12 @@ import UserRoleTable from "./admin/UserRoleTable.jsx";
 
 const RoleManager = () => (
   <div className="space-y-10">
-    <h2 className="text-2xl font-bold">Role ⇄ Permission Matrix</h2>
-    <RolePermissionGrid />
+     <h1 className="text-red-500">RoleManager Component Loaded</h1>
+        <h2 className="text-2xl font-bold">Role ⇄ Permission Matrix</h2>
+        <RolePermissionGrid />
 
-    <h2 className="text-2xl font-bold">User ⇄ Role Assignment</h2>
-    <UserRoleTable />
+        <h2 className="text-2xl font-bold">User ⇄ Role Assignment</h2>
+        <UserRoleTable />
   </div>
 );
 
