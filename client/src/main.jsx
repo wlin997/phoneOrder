@@ -6,6 +6,7 @@ import App from "./App.jsx";
 import { AuthProvider } from "./AuthContext.jsx";
 import "./index.css";
 
+import { Toaster } from "react-hot-toast";
 /**
  * Root entry: we wrap App in
  *   • AuthProvider  – global auth state
@@ -16,6 +17,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     <AuthProvider>
       <BrowserRouter>
         <App />
+        <Toaster position="top-right" />   {/* NEW */}
       </BrowserRouter>
     </AuthProvider>
   </React.StrictMode>
