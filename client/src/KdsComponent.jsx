@@ -270,13 +270,6 @@ export default function KDS() {
     return (
         <ErrorBoundary>
             <div className="min-h-screen w-screen bg-gray-100 text-gray-800 font-sans flex flex-row-reverse">
-                <button
-                    onClick={handleMenuOpen}
-                    className="fixed top-4 right-4 z-50 text-gray-600 hover:text-gray-800 focus:outline-none p-2 bg-white rounded-full shadow-md"
-                    aria-label="Open menu"
-                >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
-                </button>
                 <NavMenu isMenuOpen={isMenuOpen} handleMenuClose={handleMenuClose} />
                 
                 <div className="flex-none w-80 bg-white p-4 border-l border-gray-200 flex flex-col">

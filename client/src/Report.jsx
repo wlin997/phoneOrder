@@ -125,14 +125,7 @@ function Report() {
     <ErrorBoundary>
       <div className="min-h-screen bg-gray-100 text-gray-800">
         {/* Hamburger Menu Button */}
-        <button
-          onClick={handleMenuOpen}
-          className="fixed top-4 right-4 z-50 text-gray-600 hover:text-gray-800 focus:outline-none p-2 bg-white rounded-full shadow-md"
-          aria-label="Open menu"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
-        </button>
-
+       
         {/* Navigation Menu Component */}
         <NavMenu isMenuOpen={isMenuOpen} handleMenuClose={handleMenuClose} />
 
