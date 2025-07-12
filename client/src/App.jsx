@@ -11,35 +11,52 @@ import Login from "./Login.jsx";
 import { RequireAuth, RequirePerms } from "./AuthContext.jsx";
 import NavMenu from "./components/NavMenu.jsx";
 
+/*───────────────────────────────────────────────────────────*/
+
 export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const toggleMenu = () => setIsMenuOpen((prev) => !prev);
+  const toggleMenu = () => setIsMenuOpen((p) => !p);
 
   return (
     <>
-      {/* ---------- Header ---------- */}
+      {/* ---------- GLOBAL HEADER (edge‑to‑edge) ---------- */}
       <header className="flex justify-between items-center bg-white shadow px-4 py-3">
         <h1 className="text-xl font-semibold">Synthpify.ai Dashboard</h1>
-        <button onClick={toggleMenu} className="text-gray-700" aria-label="Menu">
-          <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+
+        <button
+          onClick={toggleMenu}
+          className="text-gray-700"
+          aria-label="Open side menu"
+        >
+          <svg
+            className="w-7 h-7"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M4 6h16M4 12h16M4 18h16"
+            />
           </svg>
         </button>
       </header>
 
-      {/* ---------- Sidebar (fixed, full‑viewport) ---------- */}
+      {/* ---------- FIXED SIDEBAR ---------- */}
       <NavMenu
         isMenuOpen={isMenuOpen}
         handleMenuClose={() => setIsMenuOpen(false)}
       />
 
-      {/* ---------- Main content ---------- */}
+      {/* ---------- PAGE CONTENT ---------- */}
       <main className="p-6">
         <Routes>
           {/* Public */}
           <Route path="/login" element={<Login />} />
 
-          {/* Dashboard (any logged‑in user) */}
+          {/* Dashboard */}
           <Route
             path="/*"
             element={
@@ -78,7 +95,10 @@ export default function App() {
             path="/daily-specials"
             element={
               <RequireAuth>
-                <RequirePerms perms="edit_daily_specials" fallback={<Navigate to="/" replace />}>
+                <RequirePerms
+                  perms="edit_daily_specials"
+                  fallback={<Navigate to="/" replace />}
+                >
                   <DailySpecialsManager />
                 </RequirePerms>
               </RequireAuth>
@@ -90,7 +110,10 @@ export default function App() {
             path="/admin"
             element={
               <RequireAuth>
-                <RequirePerms perms="manage_admin_settings" fallback={<Navigate to="/" replace />}>
+                <RequirePerms
+                  perms="manage_admin_settings"
+                  fallback={<Navigate to="/" replace />}
+                >
                   <Admin />
                 </RequirePerms>
               </RequireAuth>
