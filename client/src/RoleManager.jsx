@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import clsx from "clsx";
 import toast from "react-hot-toast";
-import { useAuth } from "../AuthContext.jsx";        // axios instance with auth header
+import { useAuth } from "./AuthContext.jsx";        // axios instance with auth header
 
 /* ─── MOCK DATA  (swap with real GET calls later) ─────────────────── */
 const mockPerms = [
