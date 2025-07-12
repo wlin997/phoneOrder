@@ -17,7 +17,7 @@ export default function App() {
 
   return (
     <>
-      {/* ---------- Top Bar ---------- */}
+      {/* ---------- Header ---------- */}
       <header className="flex justify-between items-center bg-white shadow px-4 py-3">
         <h1 className="text-xl font-semibold">Synthpify.ai Dashboard</h1>
         <button onClick={toggleMenu} className="text-gray-700" aria-label="Menu">
@@ -27,16 +27,19 @@ export default function App() {
         </button>
       </header>
 
-      {/* ---------- Sidebar ---------- */}
-      <NavMenu isMenuOpen={isMenuOpen} handleMenuClose={() => setIsMenuOpen(false)} />
+      {/* ---------- Sidebar (fixed, full‑viewport) ---------- */}
+      <NavMenu
+        isMenuOpen={isMenuOpen}
+        handleMenuClose={() => setIsMenuOpen(false)}
+      />
 
-      {/* ---------- Main Router ---------- */}
+      {/* ---------- Main content ---------- */}
       <main className="p-6">
         <Routes>
           {/* Public */}
           <Route path="/login" element={<Login />} />
 
-          {/* Dashboard (any logged-in user) */}
+          {/* Dashboard (any logged‑in user) */}
           <Route
             path="/*"
             element={
@@ -94,7 +97,7 @@ export default function App() {
             }
           />
 
-          {/* Catch-all → /login */}
+          {/* Catch‑all → /login */}
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </main>
