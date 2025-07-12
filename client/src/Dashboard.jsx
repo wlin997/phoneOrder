@@ -564,16 +564,6 @@ const handleViewDetails = async (order) => {
     return (
         <ErrorBoundary>
             <div className="relative">
-                <button
-                    onClick={handleMenuOpen}
-                    className="fixed top-4 right-4 z-50 text-gray-600 hover:text-gray-800 focus:outline-none p-2 bg-white rounded-full shadow-md"
-                    aria-label="Open menu"
-                >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-                    </svg>
-                </button>
-
                 <div className="fixed top-4 left-4 z-50 flex items-center bg-white p-2 rounded-full shadow-md">
                     <svg
                         className={`w-5 h-5 mr-2 ${printerStatus === 'Connected' ? 'text-green-500' : 'text-red-500'}`}
