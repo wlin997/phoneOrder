@@ -6,8 +6,8 @@ const pool    = require("./db.js");           // ← direct import (no app.local
 
 // ─────────────────────────────────────────────────────────────
 // Middleware: authorizePermissions already applied in server.cjs
-const { requirePermission } = require("./auth.middleware.cjs"); // Change this line
-router.use(requirePermission(["manage_admin_settings"])); // Change this line
+const { authorizePermissions } = require("./auth.middleware.cjs");
+router.use(authorizePermissions(["manage_admin_settings"]));
 // ─────────────────────────────────────────────────────────────
 
 
