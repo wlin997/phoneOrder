@@ -1162,15 +1162,24 @@ const { getUserPermissions } = require("./rbac.service.cjs");
 const jwt = require("jsonwebtoken");
 
 async function generateAccessToken(user) {
-  const permissions = await getUserPermissions(user.id);
+  // 1) get permission names for this user
+  const sql = `
+    SELECT p.name
+    FROM   users u
+    JOIN   role_permissions rp ON rp.role_id = u.role_id
+    JOIN   permissions      p  ON p.id = rp.permission_id
+    WHERE  u.id = $1;
+  `;
+  const { rows } = await pool.query(sql, [user.id]);
+  const permissions = rows.map(r => r.name);     // ["manage_admin_settings", …]
+
+  // 2) build payload
   const payload = {
     id: user.id,
     email: user.email,
-    role_name: user.role_name,
-    permissions
+    role_id: user.role_id,
+    permissions           // ← include array
   };
-  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "8h" });
-}
 
 // Admin API
 app.use("/api/admin", authenticateToken, adminRoutes);
