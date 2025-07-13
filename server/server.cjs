@@ -1161,17 +1161,24 @@ pool.connect()
 const { getUserPermissions } = require("./rbac.service.cjs");
 const jwt = require("jsonwebtoken");
 
+// Define generateAccessToken here, outside the pool.connect() block,
+// as it's a utility for authentication, not dependent on the connection itself.
+// It uses `pool` for queries, so it needs `pool` to be defined.
+const { getUserPermissions } = require("./rbac.service.cjs");
+const jwt = require("jsonwebtoken");
+
 async function generateAccessToken(user) {
   // 1) get permission names for this user
   const sql = `
     SELECT p.name
     FROM   users u
     JOIN   role_permissions rp ON rp.role_id = u.role_id
-    JOIN   permissions      p  ON p.id = rp.permission_id
+    JOIN   permissions      
+ p  ON p.id = rp.permission_id
     WHERE  u.id = $1;
   `;
   const { rows } = await pool.query(sql, [user.id]);
-  const permissions = rows.map(r => r.name);     // ["manage_admin_settings", …]
+  const permissions = rows.map(r => r.name);
 
   // 2) build payload
   const payload = {
@@ -1180,16 +1187,24 @@ async function generateAccessToken(user) {
     role_id: user.role_id,
     permissions           // ← include array
   };
+  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "24h" });
+}
 
-// Admin API
-app.use("/api/admin", authenticateToken, adminRoutes);
+pool.connect()
+    .then(() => {
+        console.log("✅ Database connection successful.");
+        startCronJob();
+        
+        // Admin API - these should be *inside* the .then block's callback
+        app.use("/api/admin", authenticateToken, adminRoutes);
 
-app.listen(PORT, () => {
+        app.listen(PORT, () => {
             console.log(`🚀 Server running at http://localhost:${PORT}`);
             if (process.env.RENDER_URL) {
                 console.log(`✅ Server is publicly available at: ${process.env.RENDER_URL}`);
             }
         });
+    }) // This closing brace and parenthesis correctly close the .then() block's callback and the .then() method itself
     .catch(err => {
         console.error("❌ Failed to connect to the database and start server:", err.message);
         process.exit(1);
