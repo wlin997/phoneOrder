@@ -14,10 +14,26 @@ router.use(authorizePermissions(["manage_admin_settings"]));
 // -------- ROLES --------------------------------------------------
 router.get("/roles", async (_, res, next) => {
   try {
-    const { rows } = await pool.query("SELECT * FROM roles ORDER BY id");
+    const query = `
+      SELECT r.id,
+             r.name,
+             COALESCE(
+               json_agg(p.name) FILTER (WHERE p.name IS NOT NULL),
+               '[]'
+             ) AS permissions
+      FROM roles r
+      LEFT JOIN role_permissions rp ON r.id = rp.role_id
+      LEFT JOIN permissions p ON p.id = rp.permission_id
+      GROUP BY r.id
+      ORDER BY r.name;
+    `;
+    const { rows } = await pool.query(query);
     res.json(rows);
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
+
 
 router.post("/roles", async (req, res, next) => {
   const { name, description = null } = req.body;
@@ -113,4 +129,4 @@ router.post("/users", async (req, res, next) => {
   }
 });
 
-module.exports = router;
+module.exports = router; 
