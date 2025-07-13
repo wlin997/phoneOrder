@@ -37,18 +37,19 @@ function authenticateToken(req, res, next) {
 ────────────────────────────────────────────────────────────*/
 function requirePermission(permission) {
   return (req, res, next) => {
-    // DEBUG – BEGIN
-    console.log("→ [auth] checking for perm:", permission);
-    // DEBUG – END
-
+    // Normalize input: always treat as array
+    const requiredPerms = Array.isArray(permission) ? permission : [permission];
     const userPerms = req.user?.permissions || [];
-    if (!userPerms.includes(permission)) {
-      console.log("→ [auth] ❌ missing permission");          // DEBUG
+
+    console.log("→ [auth] checking for perm(s):", requiredPerms);
+
+    const hasPermission = requiredPerms.some((p) => userPerms.includes(p));
+    if (!hasPermission) {
+      console.log("→ [auth] ❌ missing permission");
       return res.status(401).json({ message: "Unauthorized" });
     }
-    // DEBUG – BEGIN
+
     console.log("→ [auth] ✅ permission granted");
-    // DEBUG – END
     next();
   };
 }
