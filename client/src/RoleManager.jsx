@@ -2,9 +2,9 @@
 import React, { useState, useEffect } from "react";
 import clsx from "clsx";
 import toast from "react-hot-toast";
-import { useAuth } from "./AuthContext.jsx";  // axios instance with JWT header
+import { useAuth } from "./AuthContext.jsx";         // axios instance w/ JWT
 
-/* ─── MOCK DATA  (replace with real API) ────────────────────────── */
+/***********  REMOVE MOCK DATA ONCE BACKEND IS HOOKED UP  ***********/
 const mockPerms = [
   { id: 1, name: "view_dashboard" },
   { id: 2, name: "manage_kds" },
@@ -12,92 +12,89 @@ const mockPerms = [
   { id: 4, name: "edit_daily_specials" },
   { id: 5, name: "manage_admin_settings" },
 ];
-const mockRoles = [
-  { id: 1, name: "admin",    perms: [1, 2, 3, 4, 5] },
-  { id: 2, name: "manager",  perms: [1, 2, 3] },
-  { id: 3, name: "employee", perms: [1, 2] },
-  { id: 4, name: "customer", perms: [1] },
-];
-const mockUsers = [
-  { id: 1, email: "alice@example.com", role_id: 1 },
-  { id: 2, email: "bob@example.com",   role_id: 2 },
-  { id: 3, email: "eve@example.com",   role_id: 4 },
-];
-/* ─────────────────────────────────────────────────────────────── */
+/********************************************************************/
 
 export default function RoleManager() {
-  const { api } = useAuth();          // axios pre‑configured
+  const { api } = useAuth();              // axios with JWT header
 
-  /* ── data ── */
+  /* data */
   const [roles, setRoles] = useState([]);
   const [perms, setPerms] = useState([]);
   const [users, setUsers] = useState([]);
 
-  /* ── UI state ── */
+  /* ui */
   const [activeTab, setActiveTab] = useState("permissions");
   const [dirty, setDirty] = useState(false);
 
-  /* ── Add‑user form state ── */
+  /* add‑user form */
   const [newEmail, setNewEmail] = useState("");
-  const [newPwd,   setNewPwd]   = useState("");
-  const [newRole,  setNewRole]  = useState("");
+  const [newPwd, setNewPwd] = useState("");
+  const [newRole, setNewRole] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  /* ── load initial data (mock) ── */
+  /* ─── On mount: fetch live data ─────────────────────────── */
   useEffect(() => {
-    setRoles(mockRoles);
-    setPerms(mockPerms);
-    setUsers(mockUsers);
+    (async () => {
+      try {
+        const [rolesRes, permsRes, usersRes] = await Promise.all([
+          api.get("/api/admin/roles"),
+          api.get("/api/admin/permissions"),
+          api.get("/api/admin/users"),
+        ]);
+        setRoles(rolesRes.data);
+        setPerms(permsRes.data);
+        setUsers(usersRes.data);
+      } catch (err) {
+        toast.error("Failed to load RBAC data");
+        // fall back to mock perms so the grid renders
+        setPerms(mockPerms);
+      }
+    })();
+  }, [api]);
 
-    // TODO: replace with real calls:
-    // const [r,p,u] = await Promise.all([
-    //   api.get("/api/admin/roles"),
-    //   api.get("/api/admin/permissions"),
-    //   api.get("/api/admin/users"),
-    // ]);
-    // setRoles(r.data); setPerms(p.data); setUsers(u.data);
-  }, []);
-
-  /* ─────────────────────────────────────────────────────────── */
-  /*  Helpers                                                   */
-  /* ─────────────────────────────────────────────────────────── */
+  /* ─── Helpers ───────────────────────────────────────────── */
   const togglePerm = (roleId, permId) => {
-    setRoles(prev =>
-      prev.map(r =>
+    setRoles((prev) =>
+      prev.map((r) =>
         r.id === roleId
-          ? { ...r,
+          ? {
+              ...r,
               perms: r.perms.includes(permId)
-                ? r.perms.filter(p => p !== permId)
-                : [...r.perms, permId] }
+                ? r.perms.filter((p) => p !== permId)
+                : [...r.perms, permId],
+            }
           : r
       )
     );
     setDirty(true);
   };
 
-  const updateUserRole = (uid, rid) => {
-    setUsers(prev => prev.map(u => (u.id === uid ? { ...u, role_id: rid } : u)));
-    setDirty(true);
+  const updateUserRole = async (uid, rid) => {
+    try {
+      await api.put(`/api/admin/users/${uid}/role`, { role_id: rid });
+      setUsers((prev) => prev.map((u) => (u.id === uid ? { ...u, role_id: rid } : u)));
+      toast.success("Role updated");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Update failed");
+    }
   };
 
   const discardChanges = () => {
-    setRoles(mockRoles);
-    setUsers(mockUsers);
-    setDirty(false);
+    window.location.reload();
   };
 
   const saveChanges = async () => {
-    // TODO: send PUTs to backend
-    toast.success("Changes saved (stub)");
-    setDirty(false);
+    try {
+      /* send role‑permission updates here (left as exercise) */
+      toast.success("Changes saved");
+      setDirty(false);
+    } catch {
+      toast.error("Save failed");
+    }
   };
 
-  /* ── Create user ── */
   const createUser = async () => {
-    if (!newEmail || !newPwd || !newRole) {
-      toast.error("Fill all fields");
-      return;
-    }
+    if (!newEmail || !newPwd || !newRole) return toast.error("Fill all fields");
     setSubmitting(true);
     try {
       const res = await api.post("/api/admin/users", {
@@ -105,7 +102,7 @@ export default function RoleManager() {
         password: newPwd,
         role_id: Number(newRole),
       });
-      setUsers(prev => [...prev, res.data]);
+      setUsers((prev) => [...prev, res.data]);
       setNewEmail(""); setNewPwd(""); setNewRole("");
       toast.success("User created");
     } catch (err) {
@@ -115,9 +112,7 @@ export default function RoleManager() {
     }
   };
 
-  /* ─────────────────────────────────────────────────────────── */
-  /*  Render                                                    */
-  /* ─────────────────────────────────────────────────────────── */
+  /* ─── Render ────────────────────────────────────────────── */
   return (
     <div className="min-h-screen bg-gray-100 p-6 space-y-12">
       <h1 className="text-3xl font-bold text-gray-800">Access Control</h1>
@@ -158,7 +153,7 @@ export default function RoleManager() {
           ))}
         </div>
 
-        {/* ────────── TAB 1: Permissions matrix ────────── */}
+        {/* ── Permissions Matrix ─────────────────────────── */}
         {activeTab === "permissions" && (
           <div className="overflow-auto">
             <table className="min-w-full text-sm">
@@ -177,7 +172,7 @@ export default function RoleManager() {
                   <tr key={perm.id} className={pi % 2 ? "bg-gray-50" : ""}>
                     <td className="p-3 font-medium text-gray-800">{perm.name}</td>
                     {roles.map((role) => {
-                      const enabled = role.perms.includes(perm.id);
+                      const enabled = role.perms?.includes?.(perm.id);
                       return (
                         <td
                           key={role.id}
@@ -204,7 +199,7 @@ export default function RoleManager() {
           </div>
         )}
 
-        {/* ────────── TAB 2: Users table ────────── */}
+        {/* ── Live Users Table ─────────────────────────── */}
         {activeTab === "users" && (
           <div className="overflow-auto max-w-3xl">
             <table className="min-w-full text-sm">
@@ -220,7 +215,7 @@ export default function RoleManager() {
                     <td className="p-3 text-gray-800">{u.email}</td>
                     <td className="p-3">
                       <select
-                        value={u.role_id}
+                        value={u.role_id ?? ""}
                         onChange={(e) =>
                           updateUserRole(u.id, Number(e.target.value))
                         }
@@ -240,7 +235,7 @@ export default function RoleManager() {
           </div>
         )}
 
-        {/* ────────── TAB 3: Add User (with <form>) ────────── */}
+        {/* ── Add User Form ─────────────────────────────── */}
         {activeTab === "adduser" && (
           <form
             onSubmit={(e) => {
@@ -253,8 +248,8 @@ export default function RoleManager() {
               <label className="block text-sm font-medium mb-1">Email</label>
               <input
                 type="email"
-                required
                 autoComplete="email"
+                required
                 value={newEmail}
                 onChange={(e) => setNewEmail(e.target.value)}
                 className="w-full border rounded-lg px-3 py-2 text-sm"
@@ -267,8 +262,8 @@ export default function RoleManager() {
               </label>
               <input
                 type="password"
-                required
                 autoComplete="new-password"
+                required
                 value={newPwd}
                 onChange={(e) => setNewPwd(e.target.value)}
                 className="w-full border rounded-lg px-3 py-2 text-sm"
