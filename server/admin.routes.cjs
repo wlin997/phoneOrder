@@ -14,25 +14,33 @@ router.use(authorizePermissions(["manage_admin_settings"]));
 // -------- ROLES --------------------------------------------------
 router.get("/roles", async (_, res, next) => {
   try {
-    const query = `
-      SELECT r.id,
-             r.name,
-             COALESCE(
-               json_agg(p.name) FILTER (WHERE p.name IS NOT NULL),
-               '[]'
-             ) AS permissions
+    const sql = `
+      SELECT
+        r.id,
+        r.name,
+        COALESCE(
+          json_agg(rp.permission_id) FILTER (WHERE rp.permission_id IS NOT NULL),
+          '[]'
+        ) AS perms           -- returns a JSON/text string
       FROM roles r
-      LEFT JOIN role_permissions rp ON r.id = rp.role_id
-      LEFT JOIN permissions p ON p.id = rp.permission_id
+      LEFT JOIN role_permissions rp ON rp.role_id = r.id
       GROUP BY r.id
-      ORDER BY r.name;
+      ORDER BY r.id;
     `;
-    const { rows } = await pool.query(query);
-    res.json(rows);
+    const { rows } = await pool.query(sql);
+
+    // rows[].perms comes back as text ‑‑ convert to JS array
+    const roles = rows.map(r => ({
+      ...r,
+      perms: JSON.parse(r.perms)       // [] or [1,2,3]
+    }));
+
+    res.json(roles);
   } catch (e) {
     next(e);
   }
 });
+
 
 
 router.post("/roles", async (req, res, next) => {
