@@ -1158,9 +1158,6 @@ pool.connect()
         startCronJob();
         
 // ===== RBAC additions =====
-const { getUserPermissions } = require("./rbac.service.cjs");
-const jwt = require("jsonwebtoken");
-
 // Define generateAccessToken here, outside the pool.connect() block,
 // as it's a utility for authentication, not dependent on the connection itself.
 // It uses `pool` for queries, so it needs `pool` to be defined.
