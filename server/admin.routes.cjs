@@ -32,6 +32,7 @@ router.get("/roles", async (_, res, next) => {
     // rows[].perms comes back as text ‑‑ convert to JS array
     const roles = rows.map(r => ({
       ...r,
+      console.log("raw perms field is", row.perms);
       perms: JSON.parse(r.perms)       // [] or [1,2,3]
     }));
 
