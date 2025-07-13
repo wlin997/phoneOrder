@@ -1190,7 +1190,6 @@ app.listen(PORT, () => {
                 console.log(`✅ Server is publicly available at: ${process.env.RENDER_URL}`);
             }
         });
-    })
     .catch(err => {
         console.error("❌ Failed to connect to the database and start server:", err.message);
         process.exit(1);
