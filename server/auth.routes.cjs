@@ -140,11 +140,18 @@ router.post("/2fa/enable", authenticateToken, async (req, res, next) => {
   }
 });
 
+
 /*────────────────────────────────────────────────────
-  WHO AMI  (session probe)   ← ADDED
+  WHO AMI  (session probe)
 ────────────────────────────────────────────────────*/
 router.get("/whoami", authenticateToken, (req, res) => {
-  res.set("Cache-Control", "no-store");          // <- prevent 304 caching
+  res.set({
+    "Cache-Control": "no-store, no-cache, must-revalidate, private",
+    "Pragma":        "no-cache",
+    "Expires":       "0",
+    ETag:            false               // ← prevent 304 by disabling ETag
+  });
+
   res.json({
     id:          req.user.id,
     permissions: req.user.permissions,
