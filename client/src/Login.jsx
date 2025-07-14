@@ -1,93 +1,65 @@
-// client/src/Login.jsx
 import React, { useState } from "react";
-import { useAuth } from "./AuthContext.jsx";   // cookie‑based context
-import { Navigate } from "react-router-dom";
-import toast from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "./AuthContext.jsx";
 
 export default function Login() {
-  const { login, user, authReady } = useAuth();
-
-  /* step 1 fields */
-  const [email,    setEmail]    = useState("");
+  const { login } = useAuth();
+  const navigate = useNavigate();
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
 
-  /* step 2 */
-  const [step,     setStep]     = useState(1);   // 1 = creds, 2 = TOTP
-  const [tmp,      setTmp]      = useState(null); // tmpToken from server
-  const [code,     setCode]     = useState("");  // 6‑digit
-
-  /* submit handler */
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
     try {
-      if (step === 1) {
-        const res = await login(email, password);   // first call
-        if (res?.need2FA) {                         // server says “need code”
-          setTmp(res.tmp);
-          setStep(2);
-          toast.success("Enter your 6‑digit code");
-          return;
-        }
-      } else {
-        await login(null, null, code, tmp);         // step 2 login
-      }
+      await login(email, password);
+      navigate("/");              // go to dashboard
     } catch (err) {
-      toast.error(err.response?.data?.message || "Login failed");
-      return;
+      setError(err.response?.data?.message || "Login failed");
     }
-    // success → context now has user
   };
 
-  /* already logged‑in? redirect */
-  if (authReady && user) return <Navigate to="/" replace />;
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-sm bg-white p-6 rounded shadow space-y-4"
+        /*  width: 100% up to 448px (28rem)  */
+        className="w-full max-w-md bg-white shadow-xl rounded-lg p-10 space-y-6"
       >
-        <h1 className="text-2xl font-semibold text-center">
-          {step === 1 ? "Sign in" : "Two‑Factor Authentication"}
-        </h1>
+        <h2 className="text-2xl font-bold text-center">Sign in</h2>
 
-        {step === 1 ? (
-          <>
-            <input
-              type="email"
-              required
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full border rounded px-3 py-2"
-            />
-            <input
-              type="password"
-              required
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full border rounded px-3 py-2"
-            />
-          </>
-        ) : (
-          <input
-            type="text"
-            inputMode="numeric"
-            pattern="\\d{6}"
-            required
-            placeholder="6‑digit code"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            className="w-full border rounded px-3 py-2 text-center tracking-widest"
-          />
+        {error && (
+          <p className="text-red-600 text-sm text-center" role="alert">
+            {error}
+          </p>
         )}
+
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Email"
+          autoComplete="username"
+          className="w-full border rounded p-3 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+          required
+        />
+
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Password"
+          autoComplete="current-password"
+          className="w-full border rounded p-3 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+          required
+        />
 
         <button
           type="submit"
-          className="w-full bg-cyan-600 text-white py-2 rounded hover:bg-cyan-700"
+          className="w-full bg-cyan-600 hover:bg-cyan-700 text-white py-3 rounded-lg font-semibold transition-colors"
         >
-          {step === 1 ? "Next" : "Verify & Sign in"}
+          Log In
         </button>
       </form>
     </div>
