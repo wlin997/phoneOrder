@@ -24,21 +24,7 @@ const { DateTime }   = require("luxon");
 const FormData       = require("form-data");
 
 console.log("➡️ Importing auth routes");
-try {
-  const authRoutes = require('./auth.routes.cjs');
-  app.use("/api/auth", authRoutes);
-} catch (err) {
-  console.error("❌ Crash during auth.routes import:", err.message);
-  throw err;
-}
-console.log("➡️ Importing admin routes");
-try {
-  const adminRoutes = require('./admin.routes.cjs');
-  app.use("/api/admin", authenticateToken, adminRoutes);
-} catch (err) {
-  console.error("❌ Crash during admin.routes import:", err.message);
-  throw err;
-}
+
 const { authenticateToken } = require("./auth.middleware.cjs");
 const { getUserPermissions } = require("./rbac.service.cjs");
 
@@ -51,6 +37,19 @@ const PORT = process.env.PORT || 3000;     // single PORT definition
 app.use(cookieParser());
 app.use(express.json());
 app.use(cors());                           // adjust origin/credentials if needed
+
+// -------------------------------------------------------
+// 3) load & mount route files  (now app exists ➜ no crash)
+// -------------------------------------------------------
+console.log("➡️ Importing auth routes");
+const authRoutes  = require("./auth.routes.cjs");
+app.use("/api", authRoutes);                // login / 2‑FA / whoami / logout
+
+console.log("➡️ Importing admin routes");
+const adminRoutes = require("./admin.routes.cjs");
+app.use("/api/admin", authenticateToken, adminRoutes);  // RBAC‑protected
+
+
 
 // =============================================================================
 // SERVE REACT STATIC BUILD  (client/dist)
