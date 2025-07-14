@@ -1148,12 +1148,22 @@ pool.connect()
       if (process.env.RENDER_URL) {
         console.log(`🌍 Public URL: ${process.env.RENDER_URL}`);
       }
+
+      /* ─── List every registered route ─── */
+      console.log("📋 Listing all registered Express routes:");
+      app._router.stack
+        .filter(r => r.route)
+        .forEach(r => {
+          const methods = Object.keys(r.route.methods).join(", ").toUpperCase();
+          console.log(` → [${methods}] ${r.route.path}`);
+        });
     });
   })
   .catch(err => {
     console.error("❌ Failed to connect DB or start server:", err.message);
     process.exit(1);
   });
+
 
 
         
