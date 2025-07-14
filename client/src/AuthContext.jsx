@@ -26,16 +26,20 @@ export const useAuth = () => useContext(AuthContext);
   Provider
 ────────────────────────────────────────────────────────────*/
 export function AuthProvider({ children }) {
-  /* token persisted as "accessToken" */
+  /* token persists as "accessToken" */
   const [token, setToken] = useState(() => localStorage.getItem("accessToken"));
-  const [user, setUser] = useState(() => {
+  const [user, setUser]   = useState(() => {
     if (!token) return null;
     try {
       return jwtDecode(token);
-    } catch {
-      return null;
-    }
+    } catch { return null; }
   });
+  const [authReady, setAuthReady] = useState(false); // ← NEW
+
+  /* attach header immediately if we already have a token */
+  if (token && !API.defaults.headers.common.Authorization) {
+    API.defaults.headers.common.Authorization = `Bearer ${token}`;
+  }
 
   const isAuthenticated = !!user;
   const userPermissions = user?.permissions || [];
@@ -53,6 +57,7 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     const { data } = await API.post("/api/login", { email, password });
     localStorage.setItem("accessToken", data.token);
+    API.defaults.headers.common.Authorization = `Bearer ${data.token}`;
     setToken(data.token);
     setUser(jwtDecode(data.token));
   };
@@ -60,16 +65,18 @@ export function AuthProvider({ children }) {
   /* logout */
   const logout = () => {
     localStorage.removeItem("accessToken");
+    delete API.defaults.headers.common.Authorization;
     setToken(null);
     setUser(null);
   };
 
   /*──────────────────────────────────────────────────────────
-    Auto‑restore + expiry check on every token change
+    Validate / restore token on first load & on every change
   ──────────────────────────────────────────────────────────*/
   useEffect(() => {
     if (!token) {
       setUser(null);
+      setAuthReady(true);
       return;
     }
 
@@ -78,19 +85,21 @@ export function AuthProvider({ children }) {
       const ttl = decoded.exp * 1000 - Date.now();
 
       if (ttl <= 0) {
-        logout(); // token already expired
+        logout();          // token expired
+        setAuthReady(true);
         return;
       }
 
-      // restore user & attach header
-      setUser(decoded);
+      setUser(decoded);    // restore user info
       API.defaults.headers.common.Authorization = `Bearer ${token}`;
 
-      // schedule auto‑logout
+      /* schedule auto‑logout right before expiry */
       const id = setTimeout(logout, ttl);
       return () => clearTimeout(id);
     } catch {
-      logout(); // invalid token
+      logout();            // invalid token
+    } finally {
+      setAuthReady(true);  // signal that we’re done checking
     }
   }, [token]);
 
@@ -104,6 +113,7 @@ export function AuthProvider({ children }) {
     login,
     logout,
     api: API,
+    authReady,            // ← expose to consumers
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -117,7 +127,8 @@ export const RequirePerms = ({
   children,
   fallback = null,
 }) => {
-  const { isAuthenticated, hasPermission } = useAuth();
+  const { isAuthenticated, hasPermission, authReady } = useAuth();
+  if (!authReady) return null;          // or a spinner
   if (!isAuthenticated) return fallback;
   return hasPermission(perms) ? children : fallback;
 };
@@ -126,6 +137,7 @@ export const RequireAuth = ({
   children,
   fallback = <Navigate to="/login" replace />,
 }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, authReady } = useAuth();
+  if (!authReady) return null;          // or a spinner
   return isAuthenticated ? children : fallback;
 };
