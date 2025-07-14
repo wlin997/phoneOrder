@@ -1,29 +1,24 @@
 // client/src/RoleManager.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import clsx from "clsx";
 import toast from "react-hot-toast";
 import { useAuth } from "./AuthContext.jsx";
-
-// (remove mockPerms in prod)
-const mockPerms = [];
 
 export default function RoleManager() {
   const { api } = useAuth();
 
   const [roles, setRoles] = useState([]);
-  const [origRoles, setOrigRoles] = useState([]);
   const [perms, setPerms] = useState([]);
   const [users, setUsers] = useState([]);
-
   const [activeTab, setActiveTab] = useState("permissions");
   const [dirty, setDirty] = useState(false);
+  const [editedPwd, setEditedPwd] = useState({});
 
   const [newEmail, setNewEmail] = useState("");
   const [newPwd, setNewPwd] = useState("");
   const [newRole, setNewRole] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  /*────────────── LOAD DATA ──────────────*/
   useEffect(() => {
     (async () => {
       try {
@@ -33,33 +28,23 @@ export default function RoleManager() {
           api.get("/api/admin/users"),
         ]);
         setRoles(rolesRes.data);
-        setOrigRoles(JSON.parse(JSON.stringify(rolesRes.data)));
         setPerms(permsRes.data);
-        setUsers(
-          usersRes.data.map((u) => ({
-            ...u,
-            editedEmail: u.email,
-            editedPwd: "",
-            dirty: false,
-          }))
-        );
+        setUsers(usersRes.data);
       } catch {
         toast.error("Failed to load RBAC data");
-        setPerms(mockPerms);
       }
     })();
   }, [api]);
 
-  /*────────────── PERMISSIONS ────────────*/
-  const togglePerm = (rid, pid) => {
+  const togglePerm = (roleId, permId) => {
     setRoles((prev) =>
       prev.map((r) =>
-        r.id === rid
+        r.id === roleId
           ? {
               ...r,
-              perms: r.perms.includes(pid)
-                ? r.perms.filter((p) => p !== pid)
-                : [...r.perms, pid],
+              perms: r.perms.includes(permId)
+                ? r.perms.filter((p) => p !== permId)
+                : [...r.perms, permId],
             }
           : r
       )
@@ -67,43 +52,30 @@ export default function RoleManager() {
     setDirty(true);
   };
 
-  /*────────────── USER EDITS ─────────────*/
-  const markUser = (uid, changes) =>
-    setUsers((prev) =>
-      prev.map((u) =>
-        u.id === uid ? { ...u, ...changes, dirty: true } : u
-      )
-    );
-
-  const saveUser = async (uid) => {
-    const user = users.find((u) => u.id === uid);
+  const updateUserRole = async (uid, rid) => {
     try {
-      await api.put(`/api/admin/users/${uid}`, {
-        email: user.editedEmail !== user.email ? user.editedEmail : undefined,
-        password: user.editedPwd || undefined,
-        role_id: user.role_id,
-      });
-      toast.success("User updated");
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.id === uid
-            ? {
-                ...u,
-                email: user.editedEmail,
-                editedPwd: "",
-                dirty: false,
-              }
-            : u
-        )
-      );
+      await api.put(`/api/admin/users/${uid}/role`, { role_id: rid });
+      setUsers((prev) => prev.map((u) => (u.id === uid ? { ...u, role_id: rid } : u)));
+      toast.success("Role updated");
     } catch (err) {
       toast.error(err.response?.data?.message || "Update failed");
     }
   };
 
+  const updateUserPassword = async (uid) => {
+    const newPassword = editedPwd[uid];
+    if (!newPassword) return;
+    try {
+      await api.put(`/api/admin/users/${uid}/password`, { password: newPassword });
+      setEditedPwd((p) => ({ ...p, [uid]: "" }));
+      toast.success("Password updated");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Password update failed");
+    }
+  };
+
   const deleteUser = async (uid) => {
-    const user = users.find((u) => u.id === uid);
-    if (!window.confirm(`Delete user ${user.email}?`)) return;
+    if (!confirm("Are you sure you want to delete this user?")) return;
     try {
       await api.delete(`/api/admin/users/${uid}`);
       setUsers((prev) => prev.filter((u) => u.id !== uid));
@@ -113,50 +85,34 @@ export default function RoleManager() {
     }
   };
 
-  /*────────────── ROLE‑PERM SAVE ─────────*/
-  const diff = (a, b) => ({
-    add: b.filter((x) => !a.includes(x)),
-    remove: a.filter((x) => !b.includes(x)),
-  });
+  const discardChanges = () => window.location.reload();
 
   const saveChanges = async () => {
     try {
-      await Promise.all(
-        roles.map((r) => {
-          const o = origRoles.find((x) => x.id === r.id) || { perms: [] };
-          const d = diff(o.perms, r.perms);
-          if (!d.add.length && !d.remove.length) return null;
-          return api.put(`/api/admin/roles/${r.id}/permissions`, d);
-        }).filter(Boolean)
-      );
+      for (const role of roles) {
+        await api.put(`/api/admin/roles/${role.id}/permissions`, {
+          add: role.perms,
+          remove: [], // could diff from original if needed
+        });
+      }
       toast.success("Changes saved");
       setDirty(false);
-      setOrigRoles(JSON.parse(JSON.stringify(roles)));
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Save failed");
+    } catch {
+      toast.error("Save failed");
     }
   };
 
-  const discardChanges = () => window.location.reload();
-
-  /*────────────── CREATE USER ────────────*/
   const createUser = async () => {
-    if (!newEmail || !newPwd || !newRole)
-      return toast.error("Fill all fields");
+    if (!newEmail || !newPwd || !newRole) return toast.error("Fill all fields");
     setSubmitting(true);
     try {
-      const { data } = await api.post("/api/admin/users", {
+      const res = await api.post("/api/admin/users", {
         email: newEmail,
         password: newPwd,
         role_id: Number(newRole),
       });
-      setUsers((prev) => [
-        ...prev,
-        { ...data, editedEmail: data.email, editedPwd: "", dirty: false },
-      ]);
-      setNewEmail("");
-      setNewPwd("");
-      setNewRole("");
+      setUsers((prev) => [...prev, res.data]);
+      setNewEmail(""); setNewPwd(""); setNewRole("");
       toast.success("User created");
     } catch (err) {
       toast.error(err.response?.data?.message || "Create user failed");
@@ -165,30 +121,24 @@ export default function RoleManager() {
     }
   };
 
-  /*────────────── RENDER ─────────────────*/
   return (
     <div className="min-h-screen bg-gray-100 p-6 space-y-12">
       <h1 className="text-3xl font-bold text-gray-800">Access Control</h1>
 
       {dirty && (
-        <div className="sticky top-[76px] bg-white/90 backdrop-blur border-y py-3 px-4 flex gap-3 z-20">
+        <div className="sticky top-[76px] bg-white/90 backdrop-blur border-y py-3 flex gap-3 px-4 z-20">
           <button
             onClick={saveChanges}
-            className="px-4 py-2 rounded-lg bg-cyan-600 text-white"
-          >
-            Save changes
-          </button>
+            className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"
+          >Save changes</button>
           <button
             onClick={discardChanges}
-            className="px-4 py-2 rounded-lg bg-gray-200"
-          >
-            Discard
-          </button>
+            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+          >Discard</button>
         </div>
       )}
 
       <div className="bg-white rounded-xl shadow p-6">
-        {/* Tabs */}
         <div className="flex gap-6 border-b mb-6">
           {["permissions", "users", "adduser"].map((id) => (
             <button
@@ -200,97 +150,42 @@ export default function RoleManager() {
                   ? "border-b-2 border-cyan-600 text-cyan-700"
                   : "text-gray-500 hover:text-gray-700"
               )}
-            >
-              {id === "permissions"
-                ? "Permissions"
-                : id === "users"
-                ? "Users"
-                : "Add User"}
-            </button>
+            >{id === "permissions" ? "Permissions" : id === "users" ? "Users" : "Add User"}</button>
           ))}
         </div>
 
-        {/* Permissions Matrix */}
         {activeTab === "permissions" && (
           <div className="overflow-auto">
-            {/* … unchanged content … */}
-          </div>
-        )}
-
-        {/* Users Tab */}
-        {activeTab === "users" && (
-          <div className="overflow-auto max-w-5xl">
             <table className="min-w-full text-sm">
               <thead>
                 <tr>
-                  <th className="p-3 text-left bg-gray-50">Email</th>
-                  <th className="p-3 text-left bg-gray-50">Role</th>
-                  <th className="p-3 text-left bg-gray-50">Temp&nbsp;Password</th>
-                  <th className="p-3 bg-gray-50 text-center">Actions</th>
+                  <th className="p-3 text-left bg-gray-50">Permission</th>
+                  {roles.map((role) => (
+                    <th key={role.id} className="p-3 text-center bg-gray-50">{role.name}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {users.map((u, i) => (
-                  <tr key={u.id} className={i % 2 ? "bg-gray-50" : ""}>
-                    {/* Email */}
-                    <td className="p-3">
-                      <input
-                        className="border rounded px-2 py-1 w-full text-sm"
-                        value={u.editedEmail}
-                        onChange={(e) =>
-                          markUser(u.id, { editedEmail: e.target.value })
-                        }
-                      />
-                    </td>
-                    {/* Role */}
-                    <td className="p-3">
-                      <select
-                        className="border rounded px-2 py-1 w-full text-sm"
-                        value={u.role_id}
-                        onChange={(e) =>
-                          markUser(u.id, { role_id: Number(e.target.value) })
-                        }
-                      >
-                        {roles.map((r) => (
-                          <option key={r.id} value={r.id}>
-                            {r.name}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    {/* Temp Password */}
-                    <td className="p-3">
-                      <input
-                        type="password"
-                        className="border rounded px-2 py-1 w-full text-sm"
-                        placeholder="(leave blank to keep)"
-                        value={u.editedPwd}
-                        onChange={(e) =>
-                          markUser(u.id, { editedPwd: e.target.value })
-                        }
-                      />
-                    </td>
-                    {/* Actions */}
-                    <td className="p-3 flex justify-center gap-2">
-                      <button
-                        onClick={() => saveUser(u.id)}
-                        disabled={!u.dirty}
-                        className={clsx(
-                          "px-3 py-1 rounded text-sm font-medium",
-                          u.dirty
-                            ? "bg-cyan-600 text-white hover:bg-cyan-700"
-                            : "bg-gray-300 text-gray-600 cursor-not-allowed"
-                        )}
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={() => deleteUser(u.id)}
-                        className="px-3 py-1 rounded text-sm font-medium bg-red-500 text-white hover:bg-red-600"
-                      >
-                        Delete
-                      </button>
-                    </td>
+                {perms.map((perm, pi) => (
+                  <tr key={perm.id} className={pi % 2 ? "bg-gray-50" : ""}>
+                    <td className="p-3 font-medium text-gray-800">{perm.name}</td>
+                    {roles.map((role) => {
+                      const enabled = role.perms?.includes?.(perm.id);
+                      return (
+                        <td
+                          key={role.id}
+                          className="p-3 text-center cursor-pointer"
+                          onClick={() => togglePerm(role.id, perm.id)}
+                        >
+                          <span
+                            className={clsx(
+                              "inline-block px-2 py-1 rounded-full text-xs font-semibold",
+                              enabled ? "bg-cyan-600 text-white" : "bg-gray-200 text-gray-600"
+                            )}
+                          >{enabled ? "ON" : "OFF"}</span>
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>
@@ -298,12 +193,144 @@ export default function RoleManager() {
           </div>
         )}
 
-        {/* Add‑User form remains unchanged */}
+        {activeTab === "users" && (
+          <div className="overflow-auto max-w-5xl">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr>
+                  <th className="p-3 bg-gray-50 text-left">Email</th>
+                  <th className="p-3 bg-gray-50 text-left">Role</th>
+                  <th className="p-3 bg-gray-50 text-left">Temp Password</th>
+                  <th className="p-3 bg-gray-50 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((u) => (
+                  <UserRow
+                    key={u.id}
+                    u={u}
+                    roles={roles}
+                    editedPwd={editedPwd}
+                    setEditedPwd={setEditedPwd}
+                    updateUserRole={updateUserRole}
+                    updateUserPassword={updateUserPassword}
+                    deleteUser={deleteUser}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
         {activeTab === "adduser" && (
-          /* … existing Add User form … */
-          <></>
+          <form onSubmit={(e) => { e.preventDefault(); createUser(); }} className="max-w-sm space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Email</label>
+              <input
+                type="email"
+                autoComplete="email"
+                required
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Temporary Password</label>
+              <input
+                type="password"
+                autoComplete="new-password"
+                required
+                value={newPwd}
+                onChange={(e) => setNewPwd(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Role</label>
+              <select
+                required
+                value={newRole}
+                onChange={(e) => setNewRole(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="">Choose…</option>
+                {roles.map((r) => (
+                  <option key={r.id} value={r.id}>{r.name}</option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="submit"
+              disabled={submitting || !newEmail || !newPwd || !newRole}
+              className={clsx(
+                "w-full py-2 rounded-lg text-white font-semibold transition",
+                submitting || !newEmail || !newPwd || !newRole
+                  ? "bg-cyan-300 cursor-not-allowed"
+                  : "bg-cyan-600 hover:bg-cyan-700"
+              )}
+            >{submitting ? "Creating…" : "Create User"}</button>
+          </form>
         )}
       </div>
     </div>
   );
 }
+
+const UserRow = React.memo(function UserRow({ u, roles, editedPwd, setEditedPwd, updateUserRole, updateUserPassword, deleteUser }) {
+  return (
+    <tr className="odd:bg-gray-50">
+      <td className="p-3 text-gray-800">{u.email}</td>
+      <td className="p-3">
+        <select
+          className="border rounded px-2 py-1 w-full text-sm"
+          value={u.role_id}
+          onChange={(e) => updateUserRole(u.id, Number(e.target.value))}
+        >
+          {roles.map((r) => (
+            <option key={r.id} value={r.id}>{r.name}</option>
+          ))}
+        </select>
+      </td>
+      <td className="p-3">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            updateUserPassword(u.id);
+          }}
+        >
+          <input
+            type="password"
+            autoComplete="new-password"
+            className="border rounded px-2 py-1 w-full text-sm"
+            placeholder="(leave blank)"
+            value={editedPwd[u.id] || ""}
+            onChange={(e) =>
+              setEditedPwd((p) => ({ ...p, [u.id]: e.target.value }))
+            }
+          />
+        </form>
+      </td>
+      <td className="p-3 flex gap-2 justify-center">
+        <button
+          onClick={() => updateUserPassword(u.id)}
+          disabled={!editedPwd[u.id]}
+          className={clsx(
+            "px-3 py-1 rounded text-xs font-medium",
+            editedPwd[u.id]
+              ? "bg-cyan-600 text-white hover:bg-cyan-700"
+              : "bg-gray-300 text-gray-600 cursor-not-allowed"
+          )}
+        >
+          Save&nbsp;Pwd
+        </button>
+        <button
+          onClick={() => deleteUser(u.id)}
+          className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+        >
+          Delete
+        </button>
+      </td>
+    </tr>
+  );
+});

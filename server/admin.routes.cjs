@@ -118,6 +118,22 @@ router.put("/users/:id", async (req, res, next) => {
   }
 });
 
+router.put("/users/:id/password", async (req, res, next) => {
+  const { password } = req.body;
+  if (!password) return res.status(400).json({ message: "Password required" });
+
+  try {
+    const hash = await bcrypt.hash(password, 10);
+    const result = await pool.query(
+      "UPDATE users SET password_hash=$1 WHERE id=$2 RETURNING id, email",
+      [hash, req.params.id]
+    );
+    if (!result.rowCount) return res.status(404).json({ message: "Not found" });
+    res.json(result.rows[0]);
+  } catch (e) { next(e); }
+});
+
+
 /* delete user */
 router.delete("/users/:id", async (req, res, next) => {
   try {
