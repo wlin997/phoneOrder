@@ -1,53 +1,43 @@
-
 // =============================================================================
 // SETUP & CONFIGURATION
 // =============================================================================
 process.env.TZ = "America/New_York";
+require("dotenv").config();          // load .env first
 
-require("dotenv").config();                // load .env first
+const express = require("express");
+const app     = express();           // ← define once, here
 
-const express        = require("express");
-const cookieParser   = require("cookie-parser");
-const cors           = require("cors");
-const path           = require("path");
-const fs             = require("fs");
-const fsp            = require("fs").promises;
-const net            = require("net");
-const http           = require("http");
-const https          = require("https");
-const axios          = require("axios");
-const cron           = require("node-cron");
-const bcrypt         = require("bcryptjs");
-const jwt            = require("jsonwebtoken");
-const { Pool }       = require("pg");
-const { DateTime }   = require("luxon");
-const FormData       = require("form-data");
+/* ─ npm modules ─────────────────────────────────────── */
+const cookieParser = require("cookie-parser");
+const cors         = require("cors");
+const path         = require("path");
+const fs           = require("fs");
+const fsp          = fs.promises;
+const net          = require("net");
+const http         = require("http");
+const https        = require("https");
+const axios        = require("axios");
+const cron         = require("node-cron");
+const bcrypt       = require("bcryptjs");
+const jwt          = require("jsonwebtoken");
+const { Pool }     = require("pg");
+const { DateTime } = require("luxon");
+const FormData     = require("form-data");
 
-console.log("➡️ Importing auth routes");
-
+/* ─ route + middleware imports ─────────────────────── */
+const authRoutes        = require("./auth.routes.cjs");
+const adminRoutes       = require("./admin.routes.cjs");
 const { authenticateToken } = require("./auth.middleware.cjs");
-const { getUserPermissions } = require("./rbac.service.cjs");
 
-const app  = express();
-const PORT = process.env.PORT || 3000;     // single PORT definition
-
-// =============================================================================
-// GLOBAL MIDDLEWARE
-// =============================================================================
+/* ─ express global middleware ──────────────────────── */
 app.use(cookieParser());
 app.use(express.json());
-app.use(cors());                           // adjust origin/credentials if needed
+app.use(cors());
 
-// -------------------------------------------------------
-// 3) load & mount route files  (now app exists ➜ no crash)
-// -------------------------------------------------------
-console.log("➡️ Importing auth routes");
-const authRoutes  = require("./auth.routes.cjs");
-app.use("/api", authRoutes);                // login / 2‑FA / whoami / logout
+/* ─ mount routers ──────────────────────────────────── */
+app.use("/api/auth", authRoutes);                          // login / 2‑FA / whoami / logout
+app.use("/api/admin", authenticateToken, adminRoutes);     // RBAC‑protected
 
-console.log("➡️ Importing admin routes");
-const adminRoutes = require("./admin.routes.cjs");
-app.use("/api/admin", authenticateToken, adminRoutes);  // RBAC‑protected
 
 
 
