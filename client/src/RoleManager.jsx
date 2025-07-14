@@ -19,6 +19,7 @@ export default function RoleManager() {
 
   /* data */
   const [roles, setRoles] = useState([]);
+  const [origRoles, setOrigRoles] = useState([]);   // snapshot for diff
   const [perms, setPerms] = useState([]);
   const [users, setUsers] = useState([]);
 
@@ -42,12 +43,12 @@ export default function RoleManager() {
           api.get("/api/admin/users"),
         ]);
         setRoles(rolesRes.data);
+        setOrigRoles(JSON.parse(JSON.stringify(rolesRes.data))); // deep copy
         setPerms(permsRes.data);
         setUsers(usersRes.data);
       } catch (err) {
         toast.error("Failed to load RBAC data");
-        // fall back to mock perms so the grid renders
-        setPerms(mockPerms);
+        setPerms(mockPerms);   // fallback so grid renders
       }
     })();
   }, [api]);
@@ -83,13 +84,29 @@ export default function RoleManager() {
     window.location.reload();
   };
 
+  /* build delta between original & current perms for a role */
+  const buildDelta = (beforeArr, afterArr) => ({
+    add:    afterArr.filter((p) => !beforeArr.includes(p)),
+    remove: beforeArr.filter((p) => !afterArr.includes(p)),
+  });
+
   const saveChanges = async () => {
     try {
-      /* send role‑permission updates here (left as exercise) */
+      // PUT for every role that actually changed
+      const updates = roles.map((role) => {
+        const orig = origRoles.find((r) => r.id === role.id) || { perms: [] };
+        const delta = buildDelta(orig.perms, role.perms);
+
+        if (!delta.add.length && !delta.remove.length) return null; // no change
+        return api.put(`/api/admin/roles/${role.id}/permissions`, delta);
+      });
+
+      await Promise.all(updates.filter(Boolean));
       toast.success("Changes saved");
       setDirty(false);
-    } catch {
-      toast.error("Save failed");
+      setOrigRoles(JSON.parse(JSON.stringify(roles))); // refresh baseline
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Save failed");
     }
   };
 
