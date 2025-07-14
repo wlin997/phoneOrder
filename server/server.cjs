@@ -23,8 +23,22 @@ const { Pool }       = require("pg");
 const { DateTime }   = require("luxon");
 const FormData       = require("form-data");
 
-const authRoutes     = require("./auth.routes.cjs");
-const adminRoutes    = require("./admin.routes.cjs");
+console.log("➡️ Importing auth routes");
+try {
+  const authRoutes = require('./auth.routes.cjs');
+  app.use("/api/auth", authRoutes);
+} catch (err) {
+  console.error("❌ Crash during auth.routes import:", err.message);
+  throw err;
+}
+console.log("➡️ Importing admin routes");
+try {
+  const adminRoutes = require('./admin.routes.cjs');
+  app.use("/api/admin", authenticateToken, adminRoutes);
+} catch (err) {
+  console.error("❌ Crash during admin.routes import:", err.message);
+  throw err;
+}
 const { authenticateToken } = require("./auth.middleware.cjs");
 const { getUserPermissions } = require("./rbac.service.cjs");
 

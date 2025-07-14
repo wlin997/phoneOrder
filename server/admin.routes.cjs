@@ -5,7 +5,7 @@ const bcrypt  = require("bcryptjs");
 const pool    = require("./db.js");
 
 const { requirePermission } = require("./auth.middleware.cjs");
-router.use(requirePermission("manage_admin_settings"));   // guard all admin routes
+router.use("/",requirePermission("manage_admin_settings"));   // guard all admin routes
 
 /*──────────────────────────  ROLES  ──────────────────────────*/
 router.get("/roles", async (_, res, next) => {
