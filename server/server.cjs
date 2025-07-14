@@ -4,6 +4,10 @@
 process.env.TZ = 'America/New_York'; // Set default timezone
 
 const express = require("express");
+//------  mount cookie-parser ---
+const cookieParser = require("cookie-parser");
+
+
 const adminRoutes = require("./admin.routes.cjs");
 const { authenticateToken, authorizePermissions } = require("./auth.middleware.cjs");
 
@@ -29,6 +33,7 @@ const { getUserPermissions } = require("./rbac.service.cjs");
 
 
 const app = express();
+
 const PORT = process.env.PORT || 3001;
 // --- File paths for local settings ---
 const appSettingsFilePath = path.join(__dirname, 'appSettings.json');
@@ -47,6 +52,16 @@ const getAppSettings = () => {
     };
   }
 };
+
+
+/* ─── global middleware ───────────────────────────── */
+app.use(cookieParser());           // ← must come before auth middleware
+app.use(express.json());           // body parser
+// app.use(cors())  // if you use CORS…
+/* ─── ROUTERS ─────────────────────────────────────── */
+app.use("/api",       require("./auth.routes.cjs"));   // ← NEW: login / 2‑FA / logout
+app.use("/api/admin", require("./admin.routes.cjs"));  // existing admin routes
+
 
 let appSettings = getAppSettings();
 process.env.TZ = appSettings.timezone;
@@ -70,7 +85,7 @@ app.use(cors({
     }
   }
 }));
-app.use(express.json());
+
 
 // =================================================================================
 // DATABASE CONNECTION (PostgreSQL)
@@ -1210,3 +1225,6 @@ const saveAppSettings = async (settings) => {
         throw err;
     }
 };
+
+
+module.exports = app;

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../AuthContext.jsx";
+import { ShieldCheck } from "lucide-react";   // or any icon library yo
 
 /**
  * Wrapper for permission-based rendering
@@ -223,6 +224,20 @@ const NavMenu = ({ isMenuOpen, handleMenuClose }) => {
                 </svg>
                 <span>Log Out</span>
               </button>
+            </li>
+            {/* Security link */}
+            <li className="mt-1">
+              <NavLink
+                to="/profile/security"
+                className={({ isActive }) =>
+                  `flex items-center p-2 rounded-lg hover:bg-gray-100 w-full ${
+                    isActive ? "bg-gray-100 font-semibold" : "text-gray-700"
+                  }`
+                }
+              >
+                <ShieldCheck className="w-5 h-5 mr-3" />
+                <span>Security</span>
+              </NavLink>
             </li>
           </ul>
         </nav>
