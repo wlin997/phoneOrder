@@ -1,103 +1,89 @@
-// =================================================================================
+
+// =============================================================================
 // SETUP & CONFIGURATION
-// =================================================================================
-process.env.TZ = 'America/New_York'; // Set default timezone
+// =============================================================================
+process.env.TZ = "America/New_York";
 
-const express = require("express");
-//------  mount cookie-parser ---
-const cookieParser = require("cookie-parser");
+require("dotenv").config();                // load .env first
 
+const express        = require("express");
+const cookieParser   = require("cookie-parser");
+const cors           = require("cors");
+const path           = require("path");
+const fs             = require("fs");
+const fsp            = require("fs").promises;
+const net            = require("net");
+const http           = require("http");
+const https          = require("https");
+const axios          = require("axios");
+const cron           = require("node-cron");
+const bcrypt         = require("bcryptjs");
+const jwt            = require("jsonwebtoken");
+const { Pool }       = require("pg");
+const { DateTime }   = require("luxon");
+const FormData       = require("form-data");
 
-const adminRoutes = require("./admin.routes.cjs");
-const { authenticateToken, authorizePermissions } = require("./auth.middleware.cjs");
-
-const fs = require("fs");
-const fsp = require("fs").promises;
-const path = require("path");
-const cors = require("cors");
-const cron = require('node-cron');
-const http = require('http');
-const https = require('https');
-const net = require('net');
-const axios = require('axios');
-const { Pool } = require('pg');
-// Import the pg Pool
-const { DateTime } = require('luxon');
-// Import form-data for multipart/form-data uploads
-const FormData = require('form-data'); // Make sure to 'npm install form-data'
-
-// ── Login route (inline) ─────────────────────────────────
-const bcrypt = require("bcryptjs");
-const jwt    = require("jsonwebtoken");
+const authRoutes     = require("./auth.routes.cjs");
+const adminRoutes    = require("./admin.routes.cjs");
+const { authenticateToken } = require("./auth.middleware.cjs");
 const { getUserPermissions } = require("./rbac.service.cjs");
 
+const app  = express();
+const PORT = process.env.PORT || 3000;     // single PORT definition
 
-const app = express();
+// =============================================================================
+// GLOBAL MIDDLEWARE
+// =============================================================================
+app.use(cookieParser());
+app.use(express.json());
+app.use(cors());                           // adjust origin/credentials if needed
 
-const PORT = process.env.PORT || 3001;
-// --- File paths for local settings ---
-const appSettingsFilePath = path.join(__dirname, 'appSettings.json');
-const printerSettingsFilePath = path.join(__dirname, 'printerSettings.json');
+// =============================================================================
+// SERVE REACT STATIC BUILD  (client/dist)
+// =============================================================================
+const clientPath = path.join(__dirname, "client", "dist");
+app.use(express.static(clientPath));
 
-// --- Load app settings from file or use defaults ---
-const getAppSettings = () => {
-  try {
-    const data = fs.readFileSync(appSettingsFilePath, 'utf8');
-    return JSON.parse(data);
-  } catch (err) {
-    return {
-      timezone: 'America/New_York',
-      reportStartHour: 8,
-      archiveCronSchedule: '0 2 * * *' // Default to 2 AM
-    };
-  }
-};
+// =============================================================================
+// API ROUTES
+// =============================================================================
+app.use("/api",       authRoutes);         // login / 2‑FA / whoami / logout
+app.use("/api/admin", authenticateToken, adminRoutes); // RBAC‑protected
 
+// =============================================================================
+// FALLBACK  – All other GETs → React index.html
+// =============================================================================
+app.get("*", (req, res) => {
+  res.sendFile(path.join(clientPath, "index.html"));
+});
 
-/* ─── global middleware ───────────────────────────── */
-app.use(cookieParser());           // ← must come before auth middleware
-app.use(express.json());           // body parser
-// app.use(cors())  // if you use CORS…
-/* ─── ROUTERS ─────────────────────────────────────── */
-app.use("/api",       require("./auth.routes.cjs"));   // ← NEW: login / 2‑FA / logout
-app.use("/api/admin", require("./admin.routes.cjs"));  // existing admin routes
-
-
-let appSettings = getAppSettings();
-process.env.TZ = appSettings.timezone;
-
-// --- CORS Configuration ---
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'http://localhost:5173',
-  'http://127.0.0.1:3000',
-  'http://127.0.0.1:3001',
-  'http://127.0.0.1:5173',
-  process.env.RENDER_FRONTEND_URL
-].filter(Boolean);
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  }
-}));
-
-
-// =================================================================================
+// =============================================================================
 // DATABASE CONNECTION (PostgreSQL)
-// =================================================================================
-console.log('--- DEBUG --- DATABASE_URL is:', process.env.DATABASE_URL);
+// =============================================================================
+console.log("--- DEBUG --- DATABASE_URL is:", process.env.DATABASE_URL);
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false
-  }
+  ssl: { rejectUnauthorized: false },
 });
+
 console.log("✅ PostgreSQL client initialized.");
+
+// =============================================================================
+//  LOAD APP SETTINGS  (local JSON)
+// =============================================================================
+const appSettingsFilePath     = path.join(__dirname, "appSettings.json");
+const printerSettingsFilePath = path.join(__dirname, "printerSettings.json");
+
+const getAppSettings = () => {
+  try   { return JSON.parse(fs.readFileSync(appSettingsFilePath, "utf8")); }
+  catch { return { timezone: "America/New_York", reportStartHour: 8, archiveCronSchedule: "0 2 * * *" }; }
+};
+
+let appSettings = getAppSettings();
+process.env.TZ  = appSettings.timezone;
+
+
 
 // =================================================================================
 // HELPER AND UTILITY FUNCTIONS
@@ -1125,46 +1111,49 @@ app.post("/api/login", async (req, res, next) => {
 
 
 
-// =================================================================================
-// SERVER INITIALIZATION
-// =================================================================================
+
+// =============================================================================
+// SERVER INITIALIZATION  (kept as‑is, but PORT matches the one above)
+// =============================================================================
 let cronJob;
 
 const startCronJob = () => {
-    if (cronJob) {
-        cronJob.stop();
-    }
-
-    cronJob = cron.schedule(
-        appSettings.archiveCronSchedule,
-        async function () { // Renamed for clarity, original was 'archiveOrders'
-            console.log(`[Cron Job] Running archiveOrders at ${new Date().toLocaleTimeString()}`);
-
-            try {
-                // Rectified: Use Luxon to get the previous day in the app's timezone for robust comparison.
-                const yesterdayInAppTimezone = DateTime.now().setZone(appSettings.timezone).minus({ days: 1 }).endOf('day');
-                const archiveCutoffISO = yesterdayInAppTimezone.toISO();
-
-                const result = await pool.query(`
-                    UPDATE orders
-                    SET archived = TRUE
-                    WHERE created_at <= $1 -- Rectified: Compare with a specific timestamp
-                      AND archived = FALSE;
-                `, [archiveCutoffISO]); // Rectified: Pass the calculated date as a parameter
-                
-                console.log(`[Cron Job] Archived ${result.rowCount} old unprocessed orders.`);
-            } catch (err) {
-                console.error("[Cron Job] Failed to archive orders:", err);
-            }
-        },
-        {
-            scheduled: true,
-            timezone: appSettings.timezone
-        }
-    );
-
-    console.log(`[Cron Job] Scheduled to run at: ${appSettings.archiveCronSchedule} in timezone ${appSettings.timezone}`);
+  if (cronJob) cronJob.stop();
+  cronJob = cron.schedule(
+    appSettings.archiveCronSchedule,
+    async () => {
+      console.log(`[Cron Job] Running archiveOrders at ${new Date().toLocaleTimeString()}`);
+      try {
+        const cutoff = DateTime.now().setZone(appSettings.timezone).minus({ days: 1 }).endOf("day").toISO();
+        const result = await pool.query(
+          `UPDATE orders SET archived = TRUE WHERE created_at <= $1 AND archived = FALSE`, [cutoff]
+        );
+        console.log(`[Cron Job] Archived ${result.rowCount} orders.`);
+      } catch (err) {
+        console.error("[Cron Job] Failed:", err);
+      }
+    },
+    { scheduled: true, timezone: appSettings.timezone }
+  );
+  console.log(`[Cron Job] Scheduled: ${appSettings.archiveCronSchedule} (${appSettings.timezone})`);
 };
+
+pool.connect()
+  .then(() => {
+    console.log("✅ Database connection successful.");
+    startCronJob();
+
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running at http://localhost:${PORT}`);
+      if (process.env.RENDER_URL) {
+        console.log(`🌍 Public URL: ${process.env.RENDER_URL}`);
+      }
+    });
+  })
+  .catch(err => {
+    console.error("❌ Failed to connect DB or start server:", err.message);
+    process.exit(1);
+  });
 
 
         
@@ -1196,25 +1185,6 @@ async function generateAccessToken(user) {
   return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "24h" });
 }
 
-pool.connect()
-    .then(() => {
-        console.log("✅ Database connection successful.");
-        startCronJob();
-        
-        // Admin API - these should be *inside* the .then block's callback
-        app.use("/api/admin", authenticateToken, adminRoutes);
-
-        app.listen(PORT, () => {
-            console.log(`🚀 Server running at http://localhost:${PORT}`);
-            if (process.env.RENDER_URL) {
-                console.log(`✅ Server is publicly available at: ${process.env.RENDER_URL}`);
-            }
-        });
-    }) // This closing brace and parenthesis correctly close the .then() block's callback and the .then() method itself
-    .catch(err => {
-        console.error("❌ Failed to connect to the database and start server:", err.message);
-        process.exit(1);
-    });
 
 // Utility to save app settings - this function was missing but called by app.post('/api/app-settings')
 const saveAppSettings = async (settings) => {
