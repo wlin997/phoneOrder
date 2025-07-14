@@ -76,19 +76,29 @@ router.get("/roles/:id/permissions", async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// admin.routes.cjs
 router.put("/roles/:id/permissions", async (req, res, next) => {
+  // Expect { add: [id,id], remove: [id,id] }
+  const { add = [], remove = [] } = req.body;
   try {
     await pool.query("BEGIN");
-    await pool.query(
-      "DELETE FROM role_permissions WHERE role_id=$1",
-      [req.params.id]
-    );
 
-    const insert = `
-      INSERT INTO role_permissions (role_id, permission_id)
-      VALUES ($1,$2)`;
-    for (const pid of req.body) {
-      await pool.query(insert, [req.params.id, pid]);
+    if (remove.length) {
+      await pool.query(
+        `DELETE FROM role_permissions
+         WHERE role_id=$1 AND permission_id = ANY($2::int[])`,
+        [req.params.id, remove]
+      );
+    }
+
+    if (add.length) {
+      const insert = `
+        INSERT INTO role_permissions (role_id, permission_id)
+        VALUES ($1,$2)
+        ON CONFLICT DO NOTHING`;
+      for (const pid of add) {
+        await pool.query(insert, [req.params.id, pid]);
+      }
     }
 
     await pool.query("COMMIT");
@@ -98,6 +108,7 @@ router.put("/roles/:id/permissions", async (req, res, next) => {
     next(e);
   }
 });
+
 
 
 // -------- USERS --------------------------------------------------
