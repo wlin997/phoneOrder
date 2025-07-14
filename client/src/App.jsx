@@ -12,6 +12,7 @@ import RoleManager            from "./RoleManager.jsx";
 
 import { RequireAuth, RequirePerms } from "./AuthContext.jsx";
 import NavMenu from "./components/NavMenu.jsx";
+import Setup2FA from "./Setup2FA.jsx";
 
 /*───────────────────────────────────────────────────────────*/
 /* Shell that shows header + sidebar around protected pages */
@@ -126,8 +127,15 @@ export default function App() {
             </RequirePerms>
           }
         />
+       <Route
+          path="/setup-2fa"
+          element={
+            <RequireAuth>
+              <Setup2FA />
+            </RequireAuth>
+          }
+        /> 
       </Route>
-
       {/* Catch‑all → /login */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
