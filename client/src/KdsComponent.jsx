@@ -1,4 +1,3 @@
-// KdsComponent.jsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import NavMenu from './components/NavMenu';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -74,15 +73,10 @@ const OrderCard = ({ order, onSwipe }) => {
 };
 
 // --- Order Details Modal Component ---
-// We need to pass the *actual time elapsed* from the moment the order appeared
-// to the modal, and then use that same time when marking as prepped.
-// The 'initialTime' prop already carries this.
 const OrderDetailsModal = ({ order, onClose, onPrep, initialTime, readOnly = false }) => {
     if (!order) return null;
 
-    // We still use a timer hook for displaying the time in the modal
-    // but the 'prepTime' passed to onPrep will be 'initialTime'
-    const { formattedTime, start, stop } = useTimer(initialTime); // This timer displays the elapsed time
+    const { formattedTime, start, stop } = useTimer(initialTime);
 
     useEffect(() => {
         if (!readOnly) {
@@ -92,9 +86,7 @@ const OrderDetailsModal = ({ order, onClose, onPrep, initialTime, readOnly = fal
     }, [start, stop, readOnly]);
     
     const handlePrep = () => {
-        // IMPORTANT CHANGE HERE: Pass 'initialTime' (the time from the card)
-        // to onPrep, not the modal's elapsedTime which just started counting.
-        onPrep(order, initialTime); // Pass the initialTime passed to the modal
+        onPrep(order, initialTime);
     };
 
     const formatTime = (timeInMs) => {
@@ -104,10 +96,9 @@ const OrderDetailsModal = ({ order, onClose, onPrep, initialTime, readOnly = fal
         return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     };
 
-    // Determine the time to display in the modal header
     const displayTime = readOnly && order.foodPrepTime !== undefined && order.foodPrepTime !== null 
                         ? formatTime(order.foodPrepTime) 
-                        : formattedTime; // For active orders, use the live timer formatted time
+                        : formattedTime;
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -145,11 +136,8 @@ const OrderDetailsModal = ({ order, onClose, onPrep, initialTime, readOnly = fal
     );
 };
 
-
 // --- Prepped Order Display Component ---
-// This new component will display prepped order details and be clickable.
 const PreppedOrderDisplay = ({ order, onClick }) => {
-    // Format prepped timestamp and prep duration for display
     const formatTime = (timeInMs) => {
         const totalSeconds = Math.floor(timeInMs / 1000);
         const minutes = Math.floor(totalSeconds / 60);
@@ -158,7 +146,7 @@ const PreppedOrderDisplay = ({ order, onClick }) => {
     };
 
     const preppedTimestamp = order.preppedTimestamp ? new Date(order.preppedTimestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : 'N/A';
-    const totalPrepTime = order.foodPrepTime ? formatTime(order.foodPrepTime) : 'N/A'; // Assuming foodPrepTime is in milliseconds
+    const totalPrepTime = order.foodPrepTime ? formatTime(order.foodPrepTime) : 'N/A';
 
     return (
         <div
@@ -172,7 +160,6 @@ const PreppedOrderDisplay = ({ order, onClick }) => {
         </div>
     );
 };
-
 
 // --- Main KDS Page Component ---
 export default function KDS() {
@@ -222,7 +209,7 @@ export default function KDS() {
 
     const handleSwipe = (order, time) => {
         setSelectedOrder(order);
-        setInitialModalTime(time); // This time is correct from the OrderCard
+        setInitialModalTime(time);
         setModalReadOnly(false);
     };
 
@@ -238,9 +225,9 @@ export default function KDS() {
         setModalReadOnly(false);
     };
 
-    const handlePrepOrder = async (order, prepTimeMs) => { // This function receives the correct elapsedTime
+    const handlePrepOrder = async (order, prepTimeMs) => {
         console.log('Prepping order:', order);
-        console.log('Prep time in MS (from frontend):', prepTimeMs); // This log will now show the correct duration
+        console.log('Prep time in MS (from frontend):', prepTimeMs);
 
         if (!order?.id) {
             alert("Order is missing ID and cannot be prepped.");
@@ -266,16 +253,11 @@ export default function KDS() {
         }
     };
     
- return (
+    return (
         <ErrorBoundary>
-            {/* NavMenu is now outside the main content flex container */}
             <NavMenu isMenuOpen={isMenuOpen} handleMenuClose={handleMenuClose} /> 
-
-            {/* This is the main content area that will flex */}
-            <div className="min-h-screen w-screen bg-gray-100 text-gray-800 font-sans flex"> {/* Retain flex, but now only for the content sections */}
-                
-                {/* Active Orders Section */}
-                <div className="flex-grow bg-gray-100 p-6 overflow-y-auto">
+            <div className="min-h-screen bg-gray-100 text-gray-800 font-sans flex flex-col lg:flex-row">
+                <div className="flex-1 bg-gray-100 p-6 overflow-y-auto">
                     <h2 className="text-3xl font-bold mb-6 text-center">Active Orders</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {activeOrders.length === 0 && <p className="text-center text-gray-400 col-span-full mt-12">No active orders in the kitchen.</p>}
@@ -284,18 +266,15 @@ export default function KDS() {
                         ))}
                     </div>
                 </div>
-
-                {/* Recently Prepped Section - this section should be visible on the right */}
-                <div className="flex-none w-80 bg-white p-4 border-l border-gray-200 flex flex-col">
+                <div className="w-full lg:w-80 bg-white p-4 border-t lg:border-t-0 lg:border-l border-gray-200 flex flex-col">
                     <h2 className="text-xl font-bold mb-4 text-center">Recently Prepped</h2>
                     <div className="overflow-y-auto flex-grow">
                         {preppedOrders.length === 0 && <p className="text-center text-gray-500 mt-8">No orders prepped yet.</p>}
                         {preppedOrders.map(order => (
-                             <PreppedOrderDisplay key={order.id} order={order} onClick={handlePreppedOrderClick} />
+                            <PreppedOrderDisplay key={order.id} order={order} onClick={handlePreppedOrderClick} />
                         ))}
                     </div>
                 </div>
-
                 <OrderDetailsModal 
                     order={selectedOrder} 
                     onClose={handleCloseModal} 
@@ -307,10 +286,10 @@ export default function KDS() {
             <style>{`
                 #prep-toggle:checked ~ .dot {
                     transform: translateX(100%);
-                    background-color: #48bb78; /* green-500 */
+                    background-color: #48bb78;
                 }
                 #prep-toggle:checked ~ .block {
-                    background-color: #a0aec0; /* gray-500 */
+                    background-color: #a0aec0;
                 }
             `}</style>
         </ErrorBoundary>
