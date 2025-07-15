@@ -267,10 +267,15 @@ export default function KDS() {
     };
     
  return (
+        return (
         <ErrorBoundary>
-            <div className="min-h-screen w-screen bg-gray-100 text-gray-800 font-sans flex"> {/* REMOVED flex-row-reverse */}
-                <NavMenu isMenuOpen={isMenuOpen} handleMenuClose={handleMenuClose} /> {/* NavMenu first */}
+            {/* NavMenu is now outside the main content flex container */}
+            <NavMenu isMenuOpen={isMenuOpen} handleMenuClose={handleMenuClose} /> 
+
+            {/* This is the main content area that will flex */}
+            <div className="min-h-screen w-screen bg-gray-100 text-gray-800 font-sans flex"> {/* Retain flex, but now only for the content sections */}
                 
+                {/* Active Orders Section */}
                 <div className="flex-grow bg-gray-100 p-6 overflow-y-auto">
                     <h2 className="text-3xl font-bold mb-6 text-center">Active Orders</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -281,6 +286,7 @@ export default function KDS() {
                     </div>
                 </div>
 
+                {/* Recently Prepped Section - this section should be visible on the right */}
                 <div className="flex-none w-80 bg-white p-4 border-l border-gray-200 flex flex-col">
                     <h2 className="text-xl font-bold mb-4 text-center">Recently Prepped</h2>
                     <div className="overflow-y-auto flex-grow">
