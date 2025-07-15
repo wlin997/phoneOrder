@@ -118,6 +118,28 @@ router.put("/users/:id", async (req, res, next) => {
   }
 });
 
+router.put(
+  "/users/:id/role",
+  requirePermission("manage_admin_settings"),
+  async (req, res, next) => {
+    const roleId = Number(req.body.role_id);
+    if (!Number.isInteger(roleId)) {
+      return res.status(400).json({ message: "Invalid role_id" });
+    }
+
+    try {
+      const { rowCount } = await pool.query(
+        "UPDATE users SET role_id = $1 WHERE id = $2",
+        [roleId, req.params.id]
+      );
+      if (!rowCount) return res.status(404).json({ message: "User not found" });
+      res.sendStatus(204);
+    } catch (err) {
+      next(err);          // let the global error handler format 500s
+    }
+  }
+);
+
 router.put("/users/:id/password", async (req, res, next) => {
   const { password } = req.body;
   if (!password) return res.status(400).json({ message: "Password required" });
