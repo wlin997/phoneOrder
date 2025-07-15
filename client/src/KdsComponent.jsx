@@ -267,48 +267,69 @@ export default function KDS() {
         }
     };
     
-    return (
-        <ErrorBoundary>
-            <div className="min-h-screen w-screen bg-gray-100 text-gray-800 font-sans flex flex-row-reverse">
-                <NavMenu isMenuOpen={isMenuOpen} handleMenuClose={handleMenuClose} />
-                
-                <div className="flex-none w-80 bg-white p-4 border-l border-gray-200 flex flex-col">
-                    <h2 className="text-xl font-bold mb-4 text-center">Recently Prepped</h2>
-                    <div className="overflow-y-auto flex-grow">
-                        {preppedOrders.length === 0 && <p className="text-center text-gray-500 mt-8">No orders prepped yet.</p>}
-                        {preppedOrders.map(order => (
-                             <PreppedOrderDisplay key={order.id} order={order} onClick={handlePreppedOrderClick} />
-                        ))}
-                    </div>
-                </div>
+     return (
+    <ErrorBoundary>
+      {/* outer layout */}
+      <div className="min-h-screen w-screen bg-gray-100 text-gray-800 font-sans flex flex-row">
+        {/* side menu (mobile) */}
+        <NavMenu isMenuOpen={isMenuOpen} handleMenuClose={handleMenuClose} />
 
-                <div className="flex-grow bg-gray-100 p-6 overflow-y-auto">
-                    <h2 className="text-3xl font-bold mb-6 text-center">Active Orders</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {activeOrders.length === 0 && <p className="text-center text-gray-400 col-span-full mt-12">No active orders in the kitchen.</p>}
-                        {activeOrders.map(order => (
-                            <OrderCard key={order.id} order={order} onSwipe={handleSwipe} />
-                        ))}
-                    </div>
-                </div>
+        {/* ---------- Active Orders (70 %) ---------- */}
+        <div className="basis-[70%] min-w-0 bg-gray-100 p-6 overflow-y-auto">
+          <h2 className="text-3xl font-bold mb-6 text-center">Active Orders</h2>
 
-                <OrderDetailsModal 
-                    order={selectedOrder} 
-                    onClose={handleCloseModal} 
-                    onPrep={handlePrepOrder} 
-                    initialTime={initialModalTime}
-                    readOnly={modalReadOnly}
-                />
-            </div>
-            <style>{`
-                #prep-toggle:checked ~ .dot {
-                    transform: translateX(100%);
-                    background-color: #48bb78; /* green-500 */
-                }
-                #prep-toggle:checked ~ .block {
-                    background-color: #a0aec0; /* gray-500 */
-                }
-            `}</style>
-        </ErrorBoundary>
-    );
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {activeOrders.length === 0 && (
+              <p className="text-center text-gray-400 col-span-full mt-12">
+                No active orders in the kitchen.
+              </p>
+            )}
+            {activeOrders.map((order) => (
+              <OrderCard key={order.id} order={order} onSwipe={handleSwipe} />
+            ))}
+          </div>
+        </div>
+
+        {/* ---------- Recently Prepped (30 %) ---------- */}
+        <div className="basis-[30%] max-w-[30%] bg-white p-4 border-l border-gray-200 flex flex-col">
+          <h2 className="text-xl font-bold mb-4 text-center">Recently Prepped</h2>
+
+          <div className="overflow-y-auto flex-grow">
+            {preppedOrders.length === 0 && (
+              <p className="text-center text-gray-500 mt-8">
+                No orders prepped yet.
+              </p>
+            )}
+            {preppedOrders.map((order) => (
+              <PreppedOrderDisplay
+                key={order.id}
+                order={order}
+                onClick={handlePreppedOrderClick}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* modal */}
+        <OrderDetailsModal
+          order={selectedOrder}
+          onClose={handleCloseModal}
+          onPrep={handlePrepOrder}
+          initialTime={initialModalTime}
+          readOnly={modalReadOnly}
+        />
+      </div>
+
+      {/* toggle styling (unchanged) */}
+      <style>{`
+        #prep-toggle:checked ~ .dot {
+          transform: translateX(100%);
+          background-color: #48bb78;
+        }
+        #prep-toggle:checked ~ .block {
+          background-color: #a0aec0;
+        }
+      `}</style>
+    </ErrorBoundary>
+  );
 }
