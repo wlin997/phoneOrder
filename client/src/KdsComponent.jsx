@@ -268,73 +268,79 @@ export default function KDS() {
     };
     
    return (
-    <ErrorBoundary>
-      <div className="min-h-screen w-screen bg-gray-100 text-gray-800 font-sans">
+    return (
+  <ErrorBoundary>
+    <div className="min-h-screen w-screen bg-gray-100 text-gray-800 font-sans">
 
-        {/* mobile side‑menu */}
-        <NavMenu isMenuOpen={isMenuOpen} handleMenuClose={handleMenuClose} />
+      {/* mobile side‑menu */}
+      <NavMenu
+        isMenuOpen={isMenuOpen}
+        handleMenuClose={handleMenuClose}
+      />
 
-        {/* ---------- TWO‑COLUMN FLEX ---------- */}
-        {/* use flex-row, no reverse, and prevent overflow */}
-        <div className="w-full overflow-hidden flex flex-row">
+      {/* ============ Two‑column layout ============ */}
+      <div className="w-full overflow-hidden flex flex-row">
 
-          {/* === Recently Prepped – right column (30 %) === */}
-          <div className="basis-[30%] max-w-[30%] bg-white p-4 border-l border-gray-200 flex flex-col">
-            <h2 className="text-xl font-bold mb-4 text-center">Recently Prepped</h2>
+        {/* ----- Active Orders (70 %‑left) ----- */}
+        <div className="basis-[70%] max-w-[70%] min-w-0 bg-gray-100 p-6 overflow-y-auto">
+          <h2 className="text-3xl font-bold mb-6 text-center">Active Orders</h2>
 
-            <div className="overflow-y-auto flex-grow">
-              {preppedOrders.length === 0 && (
-                <p className="text-center text-gray-500 mt-8">
-                  No orders prepped yet.
-                </p>
-              )}
-              {preppedOrders.map(order => (
-                <PreppedOrderDisplay
-                  key={order.id}
-                  order={order}
-                  onClick={handlePreppedOrderClick}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* === Active Orders – left column (70 %) === */}
-          <div className="flex-[7] min-w-0 bg-gray-100 p-6 overflow-y-auto">
-            <h2 className="text-3xl font-bold mb-6 text-center">Active Orders</h2>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {activeOrders.length === 0 && (
-                <p className="text-center text-gray-400 col-span-full mt-12">
-                  No active orders in the kitchen.
-                </p>
-              )}
-              {activeOrders.map(order => (
-                <OrderCard key={order.id} order={order} onSwipe={handleSwipe} />
-              ))}
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {activeOrders.length === 0 && (
+              <p className="text-center text-gray-400 col-span-full mt-12">
+                No active orders in the kitchen.
+              </p>
+            )}
+            {activeOrders.map((order) => (
+              <OrderCard
+                key={order.id}
+                order={order}
+                onSwipe={handleSwipe}
+              />
+            ))}
           </div>
         </div>
 
-        {/* order modal */}
-        <OrderDetailsModal
-          order={selectedOrder}
-          onClose={handleCloseModal}
-          onPrep={handlePrepOrder}
-          initialTime={initialModalTime}
-          readOnly={modalReadOnly}
-        />
+        {/* ----- Recently Prepped (30 %‑right) ----- */}
+        <div className="basis-[30%] max-w-[30%] bg-white p-4 border-l border-gray-200 flex flex-col">
+          <h2 className="text-xl font-bold mb-4 text-center">Recently Prepped</h2>
 
-        {/* slider toggle style (unchanged) */}
-        <style>{`
-          #prep-toggle:checked ~ .dot {
-            transform: translateX(100%);
-            background-color: #48bb78;
-          }
-          #prep-toggle:checked ~ .block {
-            background-color: #a0aec0;
-          }
-        `}</style>
+          <div className="overflow-y-auto flex-grow">
+            {preppedOrders.length === 0 && (
+              <p className="text-center text-gray-500 mt-8">
+                No orders prepped yet.
+              </p>
+            )}
+            {preppedOrders.map((order) => (
+              <PreppedOrderDisplay
+                key={order.id}
+                order={order}
+                onClick={handlePreppedOrderClick}
+              />
+            ))}
+          </div>
+        </div>
       </div>
-    </ErrorBoundary>
-  );
-}
+
+      {/* ----- Order details modal ----- */}
+      <OrderDetailsModal
+        order={selectedOrder}
+        onClose={handleCloseModal}
+        onPrep={handlePrepOrder}
+        initialTime={initialModalTime}
+        readOnly={modalReadOnly}
+      />
+
+      {/* ----- Toggle slider styles ----- */}
+      <style>{`
+        #prep-toggle:checked ~ .dot {
+          transform: translateX(100%);
+          background-color: #48bb78;
+        }
+        #prep-toggle:checked ~ .block {
+          background-color: #a0aec0;
+        }
+      `}</style>
+    </div>
+  </ErrorBoundary>
+);
