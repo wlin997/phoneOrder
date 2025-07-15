@@ -10,62 +10,74 @@ import Admin                from "./Admin.jsx";
 import Login                from "./Login.jsx";
 import RoleManager          from "./RoleManager.jsx";
 
-import { RequireAuth, RequirePerms, useAuth } from "./AuthContext.jsx";  // ← import hook
+import { RequireAuth, RequirePerms, useAuth } from "./AuthContext.jsx";
 import NavMenu from "./components/NavMenu.jsx";
 
-/*────────────────── HEADER with user name ──────────────────*/
+/*────────────────── Layout (header + sidebar) ──────────────────*/
 function ProtectedLayout() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { user } = useAuth();        // ← grab user from context
+  const { user } = useAuth();
 
   return (
     <>
-      <header className="flex justify-between items-center bg-white shadow px-4 py-3">
-        <h1 className="text-xl font-semibold">Synthpify.ai Dashboard</h1>
+      {/* ───── Global header ───── */}
+      <header className="flex justify-between items-start bg-white shadow px-4 py-3">
+        {/* left : brand + signed‑in label */}
+        <div className="flex flex-col">
+          <h1 className="text-xl font-semibold leading-none">
+            Synthpify.ai Dashboard
+          </h1>
+          {user && (
+            <span className="text-sm font-medium text-gray-700 mt-1">
+              Signed in as <strong>{user.name ?? user.email}</strong>
+            </span>
+          )}
+        </div>
 
-        {/* show name if present, otherwise email */}
-        {user && (
-          <span className="text-sm font-medium text-gray-700">
-            Signed in&nbsp;as&nbsp;
-            <strong>{user.name ?? user.email}</strong>
-          </span>
-        )}
-
+        {/* right : hamburger */}
         <button
-          onClick={() => setIsMenuOpen(p => !p)}
+          onClick={() => setIsMenuOpen((p) => !p)}
           className="text-gray-700 ml-4"
           aria-label="Open side menu"
         >
-          {/* hamburger icon */}
-          <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-              d="M4 6h16M4 12h16M4 18h16" />
+          <svg
+            className="w-7 h-7"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M4 6h16M4 12h16M4 18h16"
+            />
           </svg>
         </button>
       </header>
 
-      {/* ---------- FIXED SIDEBAR ---------- */}
+      {/* ───── Fixed sidebar ───── */}
       <NavMenu
         isMenuOpen={isMenuOpen}
         handleMenuClose={() => setIsMenuOpen(false)}
       />
 
-      {/* ---------- PAGE CONTENT ---------- */}
+      {/* ───── Page content ───── */}
       <main className="p-6">
-        <Outlet /> {/* nested protected routes render here */}
+        <Outlet />
       </main>
     </>
   );
 }
 
-/*───────────────────────────────────────────────────────────*/
+/*────────────────── Routes ──────────────────*/
 export default function App() {
   return (
     <Routes>
-      {/* -------- PUBLIC ROUTES -------- */}
+      {/* public */}
       <Route path="/login" element={<Login />} />
 
-      {/* -------- PROTECTED ROUTES -------- */}
+      {/* protected */}
       <Route
         element={
           <RequireAuth>
@@ -121,7 +133,7 @@ export default function App() {
         />
       </Route>
 
-      {/* Catch‑all → /login */}
+      {/* catch‑all */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
