@@ -1,5 +1,5 @@
 // client/src/RoleManager.jsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import clsx from "clsx";
 import toast from "react-hot-toast";
 import { useAuth } from "./AuthContext.jsx";
@@ -7,18 +7,22 @@ import { useAuth } from "./AuthContext.jsx";
 export default function RoleManager() {
   const { api } = useAuth();
 
-  const [roles, setRoles] = useState([]);
-  const [perms, setPerms] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [activeTab, setActiveTab] = useState("permissions");
-  const [dirty, setDirty] = useState(false);
-  const [editedPwd, setEditedPwd] = useState({});
+  /* ─────────────────── state ─────────────────── */
+  const [roles, setRoles]             = useState([]);
+  const [originalRoles, setOriginalRoles] = useState([]);   // ← snapshot for diff
+  const [perms, setPerms]             = useState([]);
+  const [users, setUsers]             = useState([]);
 
-  const [newEmail, setNewEmail] = useState("");
-  const [newPwd, setNewPwd] = useState("");
-  const [newRole, setNewRole] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const [activeTab, setActiveTab]     = useState("permissions");
+  const [dirty, setDirty]             = useState(false);
+  const [editedPwd, setEditedPwd]     = useState({});
 
+  const [newEmail, setNewEmail]       = useState("");
+  const [newPwd, setNewPwd]           = useState("");
+  const [newRole, setNewRole]         = useState("");
+  const [submitting, setSubmitting]   = useState(false);
+
+  /* ─────────────────── initial fetch ─────────────────── */
   useEffect(() => {
     (async () => {
       try {
@@ -27,7 +31,9 @@ export default function RoleManager() {
           api.get("/api/admin/permissions"),
           api.get("/api/admin/users"),
         ]);
+
         setRoles(rolesRes.data);
+        setOriginalRoles(JSON.parse(JSON.stringify(rolesRes.data))); // deep‑clone
         setPerms(permsRes.data);
         setUsers(usersRes.data);
       } catch {
@@ -36,6 +42,7 @@ export default function RoleManager() {
     })();
   }, [api]);
 
+  /* ─────────────────── helpers ─────────────────── */
   const togglePerm = (roleId, permId) => {
     setRoles((prev) =>
       prev.map((r) =>
@@ -55,7 +62,9 @@ export default function RoleManager() {
   const updateUserRole = async (uid, rid) => {
     try {
       await api.put(`/api/admin/users/${uid}/role`, { role_id: rid });
-      setUsers((prev) => prev.map((u) => (u.id === uid ? { ...u, role_id: rid } : u)));
+      setUsers((prev) =>
+        prev.map((u) => (u.id === uid ? { ...u, role_id: rid } : u))
+      );
       toast.success("Role updated");
     } catch (err) {
       toast.error(err.response?.data?.message || "Update failed");
@@ -66,7 +75,9 @@ export default function RoleManager() {
     const newPassword = editedPwd[uid];
     if (!newPassword) return;
     try {
-      await api.put(`/api/admin/users/${uid}/password`, { password: newPassword });
+      await api.put(`/api/admin/users/${uid}/password`, {
+        password: newPassword,
+      });
       setEditedPwd((p) => ({ ...p, [uid]: "" }));
       toast.success("Password updated");
     } catch (err) {
@@ -87,37 +98,42 @@ export default function RoleManager() {
 
   const discardChanges = () => window.location.reload();
 
+  /* ───────────── save permissions diff ───────────── */
   const saveChanges = async () => {
-  try {
-    for (const role of roles) {
-      const orig = originalRoles.find(r => r.id === role.id) || { perms: [] };
+    try {
+      for (const role of roles) {
+        const orig =
+          originalRoles.find((r) => r.id === role.id) || { perms: [] };
 
-      const add = role.perms
-        .filter(p => !orig.perms.includes(p))
-        .map(Number);         // cast to integers
-      const remove = orig.perms
-        .filter(p => !role.perms.includes(p))
-        .map(Number);
+        const add = role.perms
+          .filter((p) => !orig.perms.includes(p))
+          .map(Number); // cast to int
+        const remove = orig.perms
+          .filter((p) => !role.perms.includes(p))
+          .map(Number);
 
-      if (!add.length && !remove.length) continue;   // nothing changed
+        if (!add.length && !remove.length) continue; // nothing changed
 
-      await api.put(`/api/admin/roles/${role.id}/permissions`, { add, remove });
+        await api.put(`/api/admin/roles/${role.id}/permissions`, {
+          add,
+          remove,
+        });
+      }
+
+      toast.success("Changes saved");
+      setDirty(false);
+      // snapshot the new baseline
+      setOriginalRoles(JSON.parse(JSON.stringify(roles)));
+    } catch (err) {
+      console.error(err);
+      toast.error("Save failed");
     }
+  };
 
-    toast.success("Changes saved");
-    setDirty(false);
-
-    // ⚠️ Deep‑clone so future diffs compare to a *stable* copy
-    setOriginalRoles(JSON.parse(JSON.stringify(roles)));
-  } catch (err) {
-    console.error(err);       // helpful during dev
-    toast.error("Save failed");
-  }
-};
-
-
+  /* ───────────── create user ───────────── */
   const createUser = async () => {
-    if (!newEmail || !newPwd || !newRole) return toast.error("Fill all fields");
+    if (!newEmail || !newPwd || !newRole)
+      return toast.error("Fill all fields");
     setSubmitting(true);
     try {
       const res = await api.post("/api/admin/users", {
@@ -126,7 +142,9 @@ export default function RoleManager() {
         role_id: Number(newRole),
       });
       setUsers((prev) => [...prev, res.data]);
-      setNewEmail(""); setNewPwd(""); setNewRole("");
+      setNewEmail("");
+      setNewPwd("");
+      setNewRole("");
       toast.success("User created");
     } catch (err) {
       toast.error(err.response?.data?.message || "Create user failed");
@@ -135,6 +153,7 @@ export default function RoleManager() {
     }
   };
 
+  /* ─────────────────── render ─────────────────── */
   return (
     <div className="min-h-screen bg-gray-100 p-6 space-y-12">
       <h1 className="text-3xl font-bold text-gray-800">Access Control</h1>
@@ -144,15 +163,20 @@ export default function RoleManager() {
           <button
             onClick={saveChanges}
             className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"
-          >Save changes</button>
+          >
+            Save changes
+          </button>
           <button
             onClick={discardChanges}
             className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-          >Discard</button>
+          >
+            Discard
+          </button>
         </div>
       )}
 
       <div className="bg-white rounded-xl shadow p-6">
+        {/* ─── Tabs ─── */}
         <div className="flex gap-6 border-b mb-6">
           {["permissions", "users", "adduser"].map((id) => (
             <button
@@ -164,10 +188,17 @@ export default function RoleManager() {
                   ? "border-b-2 border-cyan-600 text-cyan-700"
                   : "text-gray-500 hover:text-gray-700"
               )}
-            >{id === "permissions" ? "Permissions" : id === "users" ? "Users" : "Add User"}</button>
+            >
+              {id === "permissions"
+                ? "Permissions"
+                : id === "users"
+                ? "Users"
+                : "Add User"}
+            </button>
           ))}
         </div>
 
+        {/* ─── Permissions Matrix ─── */}
         {activeTab === "permissions" && (
           <div className="overflow-auto">
             <table className="min-w-full text-sm">
@@ -175,14 +206,21 @@ export default function RoleManager() {
                 <tr>
                   <th className="p-3 text-left bg-gray-50">Permission</th>
                   {roles.map((role) => (
-                    <th key={role.id} className="p-3 text-center bg-gray-50">{role.name}</th>
+                    <th
+                      key={role.id}
+                      className="p-3 text-center bg-gray-50"
+                    >
+                      {role.name}
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {perms.map((perm, pi) => (
                   <tr key={perm.id} className={pi % 2 ? "bg-gray-50" : ""}>
-                    <td className="p-3 font-medium text-gray-800">{perm.name}</td>
+                    <td className="p-3 font-medium text-gray-800">
+                      {perm.name}
+                    </td>
                     {roles.map((role) => {
                       const enabled = role.perms?.includes?.(perm.id);
                       return (
@@ -194,9 +232,13 @@ export default function RoleManager() {
                           <span
                             className={clsx(
                               "inline-block px-2 py-1 rounded-full text-xs font-semibold",
-                              enabled ? "bg-cyan-600 text-white" : "bg-gray-200 text-gray-600"
+                              enabled
+                                ? "bg-cyan-600 text-white"
+                                : "bg-gray-200 text-gray-600"
                             )}
-                          >{enabled ? "ON" : "OFF"}</span>
+                          >
+                            {enabled ? "ON" : "OFF"}
+                          </span>
                         </td>
                       );
                     })}
@@ -207,6 +249,7 @@ export default function RoleManager() {
           </div>
         )}
 
+        {/* ─── Users List ─── */}
         {activeTab === "users" && (
           <div className="overflow-auto max-w-5xl">
             <table className="min-w-full text-sm">
@@ -236,8 +279,15 @@ export default function RoleManager() {
           </div>
         )}
 
+        {/* ─── Add User ─── */}
         {activeTab === "adduser" && (
-          <form onSubmit={(e) => { e.preventDefault(); createUser(); }} className="max-w-sm space-y-4">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              createUser();
+            }}
+            className="max-w-sm space-y-4"
+          >
             <div>
               <label className="block text-sm font-medium mb-1">Email</label>
               <input
@@ -250,7 +300,9 @@ export default function RoleManager() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Temporary Password</label>
+              <label className="block text-sm font-medium mb-1">
+                Temporary Password
+              </label>
               <input
                 type="password"
                 autoComplete="new-password"
@@ -270,7 +322,9 @@ export default function RoleManager() {
               >
                 <option value="">Choose…</option>
                 {roles.map((r) => (
-                  <option key={r.id} value={r.id}>{r.name}</option>
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -283,7 +337,9 @@ export default function RoleManager() {
                   ? "bg-cyan-300 cursor-not-allowed"
                   : "bg-cyan-600 hover:bg-cyan-700"
               )}
-            >{submitting ? "Creating…" : "Create User"}</button>
+            >
+              {submitting ? "Creating…" : "Create User"}
+            </button>
           </form>
         )}
       </div>
@@ -291,7 +347,16 @@ export default function RoleManager() {
   );
 }
 
-const UserRow = React.memo(function UserRow({ u, roles, editedPwd, setEditedPwd, updateUserRole, updateUserPassword, deleteUser }) {
+/* ─────────────────── User row component ─────────────────── */
+const UserRow = React.memo(function UserRow({
+  u,
+  roles,
+  editedPwd,
+  setEditedPwd,
+  updateUserRole,
+  updateUserPassword,
+  deleteUser,
+}) {
   return (
     <tr className="odd:bg-gray-50">
       <td className="p-3 text-gray-800">{u.email}</td>
@@ -302,7 +367,9 @@ const UserRow = React.memo(function UserRow({ u, roles, editedPwd, setEditedPwd,
           onChange={(e) => updateUserRole(u.id, Number(e.target.value))}
         >
           {roles.map((r) => (
-            <option key={r.id} value={r.id}>{r.name}</option>
+            <option key={r.id} value={r.id}>
+              {r.name}
+            </option>
           ))}
         </select>
       </td>
