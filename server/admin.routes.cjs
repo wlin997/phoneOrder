@@ -155,6 +155,42 @@ router.put("/users/:id/password", async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+/*────────────────────────── create USER ──────────────────────────*/
+/* POST /api/admin/users */
+router.post(
+  "/users",
+  requirePermission("manage_admin_settings"),   // same guard you use elsewhere
+  async (req, res, next) => {
+    const { name, email, password, role_id } = req.body;
+
+    if (!name || !email || !password || !Number.isInteger(role_id)) {
+      return res
+        .status(400)
+        .json({ message: "name, email, password, role_id required" });
+    }
+
+    try {
+      const hash = await bcrypt.hash(password, 10);
+      const insert = `
+        INSERT INTO users (name, email, password_hash, role_id)
+        VALUES ($1,$2,$3,$4)
+        RETURNING id, name, email, role_id`;
+      const { rows } = await pool.query(insert, [
+        name,
+        email,
+        hash,
+        role_id,
+      ]);
+      res.status(201).json(rows[0]);
+    } catch (e) {
+      if (e.code === "23505") {
+        // unique_violation (duplicate email)
+        return res.status(409).json({ message: "Email already exists" });
+      }
+      next(e);
+    }
+  }
+);
 
 /* delete user */
 router.delete("/users/:id", async (req, res, next) => {
