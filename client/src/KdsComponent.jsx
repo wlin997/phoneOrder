@@ -267,7 +267,6 @@ export default function KDS() {
     };
     
  return (
-        return (
         <ErrorBoundary>
             {/* NavMenu is now outside the main content flex container */}
             <NavMenu isMenuOpen={isMenuOpen} handleMenuClose={handleMenuClose} /> 
