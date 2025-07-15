@@ -53,14 +53,16 @@ router.post("/login", async (req, res, next) => {
     }
 
     /* ---------- main login success ---------- */
-    issueCookie(res, {
+    /* ---------- main login success ---------- */
+    const token = issueCookie(res, {
       id:    user.id,
-      name:  user.name,          // ← ADDED
-      email: user.email,         // ← ADDED (optional but handy)
+      name:  user.name,
+      email: user.email,
       permissions: user.permissions,
       mfa: true,
     });
 
+    /* send the token so the front‑end can store it */
     res.json({ token });
     
   } catch (e) {
