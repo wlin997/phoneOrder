@@ -32,14 +32,16 @@ router.post("/login", async (req, res, next) => {
   const { email, password } = req.body;
   try {
     const { rows } = await pool.query(
-      "SELECT * FROM users WHERE email=$1",
+      "SELECT id, name, email, password_hash, permissions, totp_enabled FROM users WHERE email=$1",
       [email]
     );
-    if (!rows.length) return res.status(401).json({ message: "Invalid" });
+    if (!rows.length)
+      return res.status(401).json({ message: "Invalid" });
 
     const user = rows[0];
-    const ok   = await bcrypt.compare(password, user.password_hash);
-    if (!ok)   return res.status(401).json({ message: "Invalid" });
+    const ok = await bcrypt.compare(password, user.password_hash);
+    if (!ok)
+      return res.status(401).json({ message: "Invalid" });
 
     if (user.totp_enabled) {
       const tmp = jwt.sign(
@@ -50,16 +52,21 @@ router.post("/login", async (req, res, next) => {
       return res.json({ need2FA: true, tmp });
     }
 
+    /* ---------- main login success ---------- */
     issueCookie(res, {
-      id: user.id,
+      id:    user.id,
+      name:  user.name,          // ← ADDED
+      email: user.email,         // ← ADDED (optional but handy)
       permissions: user.permissions,
       mfa: true,
     });
+
     res.json({ ok: true });
   } catch (e) {
     next(e);
   }
 });
+
 
 /*────────────────────────────────────────────────────
   LOGIN  — Step 2 (TOTP)

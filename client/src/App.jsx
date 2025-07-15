@@ -13,39 +13,31 @@ import RoleManager          from "./RoleManager.jsx";
 import { RequireAuth, RequirePerms, useAuth } from "./AuthContext.jsx";  // ← import hook
 import NavMenu from "./components/NavMenu.jsx";
 
-/*───────────────────────────────────────────────────────────*/
-/* Shell that shows header + sidebar around protected pages */
+/*────────────────── HEADER with user name ──────────────────*/
 function ProtectedLayout() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const toggleMenu = () => setIsMenuOpen(p => !p);
-
-  const { currentUser } = useAuth();   // ← get user object { id,name,email,… }
+  const { user } = useAuth();        // ← grab user from context
 
   return (
     <>
-      {/* ---------- GLOBAL HEADER ---------- */}
       <header className="flex justify-between items-center bg-white shadow px-4 py-3">
         <h1 className="text-xl font-semibold">Synthpify.ai Dashboard</h1>
 
-        {/* Signed‑in user */}
-        {currentUser && (
+        {/* show name if present, otherwise email */}
+        {user && (
           <span className="text-sm font-medium text-gray-700">
-            Signed in&nbsp;as&nbsp;<strong>{currentUser.name}</strong>
+            Signed in&nbsp;as&nbsp;
+            <strong>{user.name ?? user.email}</strong>
           </span>
         )}
 
-        {/* Hamburger */}
         <button
-          onClick={toggleMenu}
+          onClick={() => setIsMenuOpen(p => !p)}
           className="text-gray-700 ml-4"
           aria-label="Open side menu"
         >
-          <svg
-            className="w-7 h-7"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
+          {/* hamburger icon */}
+          <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
               d="M4 6h16M4 12h16M4 18h16" />
           </svg>
