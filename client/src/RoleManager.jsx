@@ -88,23 +88,33 @@ export default function RoleManager() {
   const discardChanges = () => window.location.reload();
 
   const saveChanges = async () => {
-    try {
-      for (const role of roles) {
-        const orig = originalRoles.find((r) => r.id === role.id) || { perms: [] };
-        const add    = role.perms.filter((p) => !orig.perms.includes(p));
-        const remove = orig.perms.filter((p) => !role.perms.includes(p));
+  try {
+    for (const role of roles) {
+      const orig = originalRoles.find(r => r.id === role.id) || { perms: [] };
 
-        if (!add.length && !remove.length) continue;   // nothing changed for this role
+      const add = role.perms
+        .filter(p => !orig.perms.includes(p))
+        .map(Number);         // cast to integers
+      const remove = orig.perms
+        .filter(p => !role.perms.includes(p))
+        .map(Number);
 
-        await api.put(`/api/admin/roles/${role.id}/permissions`, { add, remove });
-      }
-      toast.success("Changes saved");
-      setDirty(false);
-      setOriginalRoles(roles);  // snapshot the new baseline
-    } catch {
-      toast.error("Save failed");
+      if (!add.length && !remove.length) continue;   // nothing changed
+
+      await api.put(`/api/admin/roles/${role.id}/permissions`, { add, remove });
     }
-  };
+
+    toast.success("Changes saved");
+    setDirty(false);
+
+    // ⚠️ Deep‑clone so future diffs compare to a *stable* copy
+    setOriginalRoles(JSON.parse(JSON.stringify(roles)));
+  } catch (err) {
+    console.error(err);       // helpful during dev
+    toast.error("Save failed");
+  }
+};
+
 
   const createUser = async () => {
     if (!newEmail || !newPwd || !newRole) return toast.error("Fill all fields");
