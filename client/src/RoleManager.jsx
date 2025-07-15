@@ -29,7 +29,7 @@ export default function RoleManager() {
         const [rolesRes, permsRes, usersRes] = await Promise.all([
           api.get("/api/admin/roles"),
           api.get("/api/admin/permissions"),
-          api.get("/api/admin/users"),
+          api.get("/api/admin/users"),        // ← must return name/email/role_id
         ]);
         setRoles(rolesRes.data);
         setOriginalRoles(JSON.parse(JSON.stringify(rolesRes.data)));
@@ -102,9 +102,9 @@ export default function RoleManager() {
   /*────────────────────────── update user helper ────────────*/
   const saveUser = async payload => {
     const { id, ...body } = payload;
-    await api.put(`/api/admin/users/${id}`, body);
+    const { data } = await api.put(`/api/admin/users/${id}`, body);  // ← use DB echo
     setUsers(prev =>
-      prev.map(u => (u.id === id ? { ...u, ...body, password_hash: undefined } : u))
+      prev.map(u => (u.id === id ? data : u))
     );
   };
 
@@ -166,21 +166,12 @@ export default function RoleManager() {
 
         {/* Permissions matrix */}
         {activeTab === "permissions" && (
-          <PermissionMatrix
-            perms={perms}
-            roles={roles}
-            togglePerm={togglePerm}
-          />
+          <PermissionMatrix perms={perms} roles={roles} togglePerm={togglePerm} />
         )}
 
         {/* Users list */}
         {activeTab === "users" && (
-          <UserTable
-            users={users}
-            roles={roles}
-            saveUser={saveUser}
-            deleteUser={deleteUser}
-          />
+          <UserTable users={users} roles={roles} saveUser={saveUser} deleteUser={deleteUser} />
         )}
 
         {/* Add‑user form */}
@@ -203,7 +194,6 @@ export default function RoleManager() {
     </div>
   );
 }
-
 /*────────────────── sub‑components ──────────────────*/
 const PermissionMatrix = ({ perms, roles, togglePerm }) => (
   <div className="overflow-auto">
@@ -272,7 +262,7 @@ const UserTable = ({ users, roles, saveUser, deleteUser }) => (
             deleteUser={deleteUser}
           />
         ))}
-      </tbody>
+    </tbody>
     </table>
   </div>
 );

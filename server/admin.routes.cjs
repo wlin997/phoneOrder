@@ -76,12 +76,17 @@ router.get("/permissions", async (_, res, next) => {
   } catch (e) { next(e); }
 });
 
-/*────────────────────────── USERS ───────────────────────────*/
+
+/* ───────── USERS ───────── */
 router.get("/users", async (_, res, next) => {
   try {
     const sql = `
-      SELECT u.id, u.email, u.role_id, r.name AS role_name
-      FROM   users u
+      SELECT u.id,
+             u.name,                   -- include name
+             u.email,
+             u.role_id,
+             r.name AS role_name
+      FROM users u
       LEFT JOIN roles r ON r.id = u.role_id
       ORDER BY u.id`;
     const { rows } = await pool.query(sql);
@@ -89,57 +94,77 @@ router.get("/users", async (_, res, next) => {
   } catch (e) { next(e); }
 });
 
-/* update email / password / role */
-router.put("/users/:id", async (req, res, next) => {
-  const { email, password, role_id } = req.body;
-  const fields = [];
-  const vals   = [];
-  let idx = 1;
-
-  if (email)   { fields.push(`email=$${idx++}`);          vals.push(email); }
-  if (password){
-    const hash = await bcrypt.hash(password, 10);
-    fields.push(`password_hash=$${idx++}`);               vals.push(hash);
-  }
-  if (role_id !== undefined){
-    fields.push(`role_id=$${idx++}`);                     vals.push(role_id);
-  }
-  if (!fields.length) return res.status(400).json({ message: "Nothing to update" });
-
-  vals.push(req.params.id); // where id param
-  const sql = `UPDATE users SET ${fields.join(",")} WHERE id=$${idx} RETURNING *`;
+router.post("/users", async (req, res, next) => {
+  const { name, email, password, role_id } = req.body;
+  if (!name || !email || !password || !role_id)
+    return res.status(400).json({ message: "name, email, password, role_id required" });
   try {
-    const result = await pool.query(sql, vals);
-    if (!result.rowCount) return res.status(404).json({ message: "User not found" });
-    res.json(result.rows[0]);
+    const hash = await bcrypt.hash(password, 10);
+    const sql = `
+      INSERT INTO users (name,email,password_hash,role_id)
+      VALUES ($1,$2,$3,$4)
+      RETURNING id,name,email,role_id`;
+    const { rows } = await pool.query(sql, [name, email, hash, role_id]);
+    res.status(201).json(rows[0]);
   } catch (e) {
-    if (e.code === "23505") return res.status(409).json({ message: "Email already exists" });
+    if (e.code === "23505")
+      return res.status(409).json({ message: "Email already exists" });
     next(e);
   }
 });
 
+/* generic UPDATE (name/email/role/password) */
+router.put("/users/:id", async (req, res, next) => {
+  const { name, email, role_id, password } = req.body;
+  const fields = [];
+  const vals   = [];
+  let idx = 1;
+
+  if (name !== undefined)    { fields.push(`name=$${idx++}`);    vals.push(name); }
+  if (email !== undefined)   { fields.push(`email=$${idx++}`);   vals.push(email); }
+  if (role_id !== undefined) { fields.push(`role_id=$${idx++}`); vals.push(role_id); }
+  if (password) {
+    const hash = await bcrypt.hash(password, 10);
+    fields.push(`password_hash=$${idx++}`);
+    vals.push(hash);
+  }
+  if (!fields.length)
+    return res.status(400).json({ message: "Nothing to update" });
+
+  vals.push(req.params.id);
+  const sql =
+    `UPDATE users SET ${fields.join(",")}
+     WHERE id=$${idx}
+     RETURNING id,name,email,role_id`;
+  try {
+    const { rows, rowCount } = await pool.query(sql, vals);
+    if (!rowCount)
+      return res.status(404).json({ message: "User not found" });
+    res.json(rows[0]);
+  } catch (e) { next(e); }
+});
+
+/* ‑‑‑‑‑‑‑‑‑ dedicated ROLE endpoint (still used by front‑end) ‑‑‑‑‑‑‑‑‑ */
 router.put(
   "/users/:id/role",
   requirePermission("manage_admin_settings"),
   async (req, res, next) => {
     const roleId = Number(req.body.role_id);
-    if (!Number.isInteger(roleId)) {
+    if (!Number.isInteger(roleId))
       return res.status(400).json({ message: "Invalid role_id" });
-    }
 
     try {
       const { rowCount } = await pool.query(
-        "UPDATE users SET role_id = $1 WHERE id = $2",
+        "UPDATE users SET role_id=$1 WHERE id=$2",
         [roleId, req.params.id]
       );
       if (!rowCount) return res.status(404).json({ message: "User not found" });
       res.sendStatus(204);
-    } catch (err) {
-      next(err);          // let the global error handler format 500s
-    }
+    } catch (err) { next(err); }
   }
 );
 
+/* ‑‑‑‑‑‑‑‑‑ dedicated PASSWORD endpoint (still used) ‑‑‑‑‑‑‑‑‑ */
 router.put("/users/:id/password", async (req, res, next) => {
   const { password } = req.body;
   if (!password) return res.status(400).json({ message: "Password required" });
@@ -147,7 +172,10 @@ router.put("/users/:id/password", async (req, res, next) => {
   try {
     const hash = await bcrypt.hash(password, 10);
     const result = await pool.query(
-      "UPDATE users SET password_hash=$1 WHERE id=$2 RETURNING id, email",
+      `UPDATE users
+          SET password_hash=$1
+        WHERE id=$2
+        RETURNING id,name,email`,
       [hash, req.params.id]
     );
     if (!result.rowCount) return res.status(404).json({ message: "Not found" });
@@ -155,48 +183,12 @@ router.put("/users/:id/password", async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-/*────────────────────────── create USER ──────────────────────────*/
-/* POST /api/admin/users */
-router.post(
-  "/users",
-  requirePermission("manage_admin_settings"),   // same guard you use elsewhere
-  async (req, res, next) => {
-    const { name, email, password, role_id } = req.body;
-
-    if (!name || !email || !password || !Number.isInteger(role_id)) {
-      return res
-        .status(400)
-        .json({ message: "name, email, password, role_id required" });
-    }
-
-    try {
-      const hash = await bcrypt.hash(password, 10);
-      const insert = `
-        INSERT INTO users (name, email, password_hash, role_id)
-        VALUES ($1,$2,$3,$4)
-        RETURNING id, name, email, role_id`;
-      const { rows } = await pool.query(insert, [
-        name,
-        email,
-        hash,
-        role_id,
-      ]);
-      res.status(201).json(rows[0]);
-    } catch (e) {
-      if (e.code === "23505") {
-        // unique_violation (duplicate email)
-        return res.status(409).json({ message: "Email already exists" });
-      }
-      next(e);
-    }
-  }
-);
-
-/* delete user */
+/* DELETE user */
 router.delete("/users/:id", async (req, res, next) => {
   try {
-    const result = await pool.query("DELETE FROM users WHERE id=$1", [req.params.id]);
-    if (!result.rowCount) return res.status(404).json({ message: "User not found" });
+    const del = await pool.query("DELETE FROM users WHERE id=$1", [req.params.id]);
+    if (!del.rowCount)
+      return res.status(404).json({ message: "User not found" });
     res.sendStatus(204);
   } catch (e) { next(e); }
 });
