@@ -1085,26 +1085,45 @@ app.post('/api/daily-specials/postgres', async (req, res) => { // Changed the ro
 
 
 // ── Login route (inline) ─────────────────────────────────
-
 app.post("/api/login", async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    const { rows } = await pool.query("SELECT * FROM users WHERE email=$1", [email]);
-    if (!rows.length) return res.status(401).json({ message: "Invalid credentials" });
+
+    /* 1️⃣  select name in addition to id + email */
+    const { rows } = await pool.query(
+      "SELECT id, name, email, password_hash FROM users WHERE email=$1",
+      [email]
+    );
+    if (!rows.length)
+      return res.status(401).json({ message: "Invalid credentials" });
+
     const user = rows[0];
 
+    /* 2️⃣  verify password */
     const ok = await bcrypt.compare(password, user.password_hash);
-    if (!ok) return res.status(401).json({ message: "Invalid credentials" });
+    if (!ok)
+      return res.status(401).json({ message: "Invalid credentials" });
 
+    /* 3️⃣  look up permissions (unchanged) */
     const permissions = await getUserPermissions(user.id);
+
+    /* 4️⃣  include name in the JWT payload */
     const token = jwt.sign(
-      { id: user.id, email: user.email, permissions },
+      {
+        id:    user.id,
+        name:  user.name,     // ← ADDED
+        email: user.email,    // ← keeps fallback
+        permissions,
+      },
       process.env.JWT_SECRET,
       { expiresIn: "24h" }
     );
 
+    /* 5️⃣  return the token to front‑end */
     res.json({ token });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 });
 
 
