@@ -90,13 +90,17 @@ export default function RoleManager() {
   const saveChanges = async () => {
     try {
       for (const role of roles) {
-        await api.put(`/api/admin/roles/${role.id}/permissions`, {
-          add: role.perms,
-          remove: [], // could diff from original if needed
-        });
+        const orig = originalRoles.find((r) => r.id === role.id) || { perms: [] };
+        const add    = role.perms.filter((p) => !orig.perms.includes(p));
+        const remove = orig.perms.filter((p) => !role.perms.includes(p));
+
+        if (!add.length && !remove.length) continue;   // nothing changed for this role
+
+        await api.put(`/api/admin/roles/${role.id}/permissions`, { add, remove });
       }
       toast.success("Changes saved");
       setDirty(false);
+      setOriginalRoles(roles);  // snapshot the new baseline
     } catch {
       toast.error("Save failed");
     }
