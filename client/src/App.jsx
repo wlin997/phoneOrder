@@ -2,31 +2,42 @@
 import React, { useState } from "react";
 import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 
-import Dashboard              from "./Dashboard.jsx";
-import Report                 from "./Report.jsx";
-import KDS                    from "./KdsComponent.jsx";
-import DailySpecialsManager   from "./dailySpecials.jsx";
-import Admin                  from "./Admin.jsx";
-import Login                  from "./Login.jsx";
-import RoleManager            from "./RoleManager.jsx";
+import Dashboard            from "./Dashboard.jsx";
+import Report               from "./Report.jsx";
+import KDS                  from "./KdsComponent.jsx";
+import DailySpecialsManager from "./dailySpecials.jsx";
+import Admin                from "./Admin.jsx";
+import Login                from "./Login.jsx";
+import RoleManager          from "./RoleManager.jsx";
 
-import { RequireAuth, RequirePerms } from "./AuthContext.jsx";
+import { RequireAuth, RequirePerms, useAuth } from "./AuthContext.jsx";  // ← import hook
 import NavMenu from "./components/NavMenu.jsx";
 
 /*───────────────────────────────────────────────────────────*/
 /* Shell that shows header + sidebar around protected pages */
 function ProtectedLayout() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const toggleMenu = () => setIsMenuOpen((p) => !p);
+  const toggleMenu = () => setIsMenuOpen(p => !p);
+
+  const { currentUser } = useAuth();   // ← get user object { id,name,email,… }
 
   return (
     <>
       {/* ---------- GLOBAL HEADER ---------- */}
       <header className="flex justify-between items-center bg-white shadow px-4 py-3">
         <h1 className="text-xl font-semibold">Synthpify.ai Dashboard</h1>
+
+        {/* Signed‑in user */}
+        {currentUser && (
+          <span className="text-sm font-medium text-gray-700">
+            Signed in&nbsp;as&nbsp;<strong>{currentUser.name}</strong>
+          </span>
+        )}
+
+        {/* Hamburger */}
         <button
           onClick={toggleMenu}
-          className="text-gray-700"
+          className="text-gray-700 ml-4"
           aria-label="Open side menu"
         >
           <svg
@@ -35,12 +46,8 @@ function ProtectedLayout() {
             stroke="currentColor"
             viewBox="0 0 24 24"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              d="M4 6h16M4 12h16M4 18h16"
-            />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+              d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
       </header>
@@ -74,10 +81,8 @@ export default function App() {
           </RequireAuth>
         }
       >
-        {/* Dashboard (no extra perms) */}
         <Route index element={<Dashboard />} />
 
-        {/* KDS */}
         <Route
           path="kds"
           element={
@@ -87,7 +92,6 @@ export default function App() {
           }
         />
 
-        {/* Reports */}
         <Route
           path="report"
           element={
@@ -97,7 +101,6 @@ export default function App() {
           }
         />
 
-        {/* Daily Specials */}
         <Route
           path="daily-specials"
           element={
@@ -107,7 +110,6 @@ export default function App() {
           }
         />
 
-        {/* Admin Settings */}
         <Route
           path="admin"
           element={
@@ -117,7 +119,6 @@ export default function App() {
           }
         />
 
-        {/* Role Manager */}
         <Route
           path="roles"
           element={
