@@ -268,7 +268,7 @@ export default function KDS() {
     };
     
    return (
-    return (
+
   <ErrorBoundary>
     <div className="min-h-screen w-screen bg-gray-100 text-gray-800 font-sans">
 
