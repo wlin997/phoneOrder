@@ -175,7 +175,6 @@ const PreppedOrderDisplay = ({ order, onClick }) => {
 
 
 // --- Main KDS Page Component ---
-// --- Main KDS Page Component --- (No changes needed here for logic related to passing initialModalTime, it's correct)
 export default function KDS() {
     const [activeOrders, setActiveOrders] = useState([]);
     const [preppedOrders, setPreppedOrders] = useState([]);
@@ -269,25 +268,25 @@ export default function KDS() {
     
  return (
         <ErrorBoundary>
-            <div className="min-h-screen w-screen bg-gray-100 text-gray-800 font-sans flex flex-row-reverse">
-                <NavMenu isMenuOpen={isMenuOpen} handleMenuClose={handleMenuClose} />
+            <div className="min-h-screen w-screen bg-gray-100 text-gray-800 font-sans flex"> {/* REMOVED flex-row-reverse */}
+                <NavMenu isMenuOpen={isMenuOpen} handleMenuClose={handleMenuClose} /> {/* NavMenu first */}
                 
-                <div className="flex-none w-80 bg-white p-4 border-l border-gray-200 flex flex-col">
-                    <h2 className="text-xl font-bold mb-4 text-center">Recently Prepped</h2>
-                    <div className="overflow-y-auto flex-grow">
-                        {preppedOrders.length === 0 && <p className="text-center text-gray-500 mt-8">No orders prepped yet.</p>}
-                        {preppedOrders.map(order => (
-                             <PreppedOrderDisplay key={order.id} order={order} onClick={handlePreppedOrderClick} />
-                        ))}
-                    </div>
-                </div>
-
                 <div className="flex-grow bg-gray-100 p-6 overflow-y-auto">
                     <h2 className="text-3xl font-bold mb-6 text-center">Active Orders</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {activeOrders.length === 0 && <p className="text-center text-gray-400 col-span-full mt-12">No active orders in the kitchen.</p>}
                         {activeOrders.map(order => (
                             <OrderCard key={order.id} order={order} onSwipe={handleSwipe} />
+                        ))}
+                    </div>
+                </div>
+
+                <div className="flex-none w-80 bg-white p-4 border-l border-gray-200 flex flex-col">
+                    <h2 className="text-xl font-bold mb-4 text-center">Recently Prepped</h2>
+                    <div className="overflow-y-auto flex-grow">
+                        {preppedOrders.length === 0 && <p className="text-center text-gray-500 mt-8">No orders prepped yet.</p>}
+                        {preppedOrders.map(order => (
+                             <PreppedOrderDisplay key={order.id} order={order} onClick={handlePreppedOrderClick} />
                         ))}
                     </div>
                 </div>
