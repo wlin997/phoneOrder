@@ -8,19 +8,20 @@ export default function RoleManager() {
   const { api } = useAuth();
 
   /* ─────────────────── state ─────────────────── */
-  const [roles, setRoles]             = useState([]);
-  const [originalRoles, setOriginalRoles] = useState([]);   // ← snapshot for diff
-  const [perms, setPerms]             = useState([]);
-  const [users, setUsers]             = useState([]);
+  const [roles, setRoles]                 = useState([]);
+  const [originalRoles, setOriginalRoles] = useState([]);
+  const [perms, setPerms]                 = useState([]);
+  const [users, setUsers]                 = useState([]);
 
-  const [activeTab, setActiveTab]     = useState("permissions");
-  const [dirty, setDirty]             = useState(false);
-  const [editedPwd, setEditedPwd]     = useState({});
+  const [activeTab, setActiveTab]         = useState("permissions");
+  const [dirty, setDirty]                 = useState(false);
+  const [editedPwd, setEditedPwd]         = useState({});
 
-  const [newEmail, setNewEmail]       = useState("");
-  const [newPwd, setNewPwd]           = useState("");
-  const [newRole, setNewRole]         = useState("");
-  const [submitting, setSubmitting]   = useState(false);
+  const [newName, setNewName]             = useState("");
+  const [newEmail, setNewEmail]           = useState("");
+  const [newPwd, setNewPwd]               = useState("");
+  const [newRole, setNewRole]             = useState("");
+  const [submitting, setSubmitting]       = useState(false);
 
   /* ─────────────────── initial fetch ─────────────────── */
   useEffect(() => {
@@ -33,7 +34,7 @@ export default function RoleManager() {
         ]);
 
         setRoles(rolesRes.data);
-        setOriginalRoles(JSON.parse(JSON.stringify(rolesRes.data))); // deep‑clone
+        setOriginalRoles(JSON.parse(JSON.stringify(rolesRes.data)));
         setPerms(permsRes.data);
         setUsers(usersRes.data);
       } catch {
@@ -42,7 +43,7 @@ export default function RoleManager() {
     })();
   }, [api]);
 
-  /* ─────────────────── helpers ─────────────────── */
+  /* ─────────────────── permission toggle ─────────────────── */
   const togglePerm = (roleId, permId) => {
     setRoles((prev) =>
       prev.map((r) =>
@@ -59,6 +60,7 @@ export default function RoleManager() {
     setDirty(true);
   };
 
+  /* ─────────────────── user helpers ─────────────────── */
   const updateUserRole = async (uid, rid) => {
     try {
       await api.put(`/api/admin/users/${uid}/role`, { role_id: rid });
@@ -96,9 +98,9 @@ export default function RoleManager() {
     }
   };
 
+  /* ─────────────────── permissions save ─────────────────── */
   const discardChanges = () => window.location.reload();
 
-  /* ───────────── save permissions diff ───────────── */
   const saveChanges = async () => {
     try {
       for (const role of roles) {
@@ -107,12 +109,12 @@ export default function RoleManager() {
 
         const add = role.perms
           .filter((p) => !orig.perms.includes(p))
-          .map(Number); // cast to int
+          .map(Number);
         const remove = orig.perms
           .filter((p) => !role.perms.includes(p))
           .map(Number);
 
-        if (!add.length && !remove.length) continue; // nothing changed
+        if (!add.length && !remove.length) continue;
 
         await api.put(`/api/admin/roles/${role.id}/permissions`, {
           add,
@@ -122,7 +124,6 @@ export default function RoleManager() {
 
       toast.success("Changes saved");
       setDirty(false);
-      // snapshot the new baseline
       setOriginalRoles(JSON.parse(JSON.stringify(roles)));
     } catch (err) {
       console.error(err);
@@ -130,18 +131,20 @@ export default function RoleManager() {
     }
   };
 
-  /* ───────────── create user ───────────── */
+  /* ─────────────────── create user ─────────────────── */
   const createUser = async () => {
-    if (!newEmail || !newPwd || !newRole)
+    if (!newName || !newEmail || !newPwd || !newRole)
       return toast.error("Fill all fields");
     setSubmitting(true);
     try {
       const res = await api.post("/api/admin/users", {
+        name: newName,
         email: newEmail,
         password: newPwd,
         role_id: Number(newRole),
       });
       setUsers((prev) => [...prev, res.data]);
+      setNewName("");
       setNewEmail("");
       setNewPwd("");
       setNewRole("");
@@ -206,10 +209,7 @@ export default function RoleManager() {
                 <tr>
                   <th className="p-3 text-left bg-gray-50">Permission</th>
                   {roles.map((role) => (
-                    <th
-                      key={role.id}
-                      className="p-3 text-center bg-gray-50"
-                    >
+                    <th key={role.id} className="p-3 text-center bg-gray-50">
                       {role.name}
                     </th>
                   ))}
@@ -255,6 +255,7 @@ export default function RoleManager() {
             <table className="min-w-full text-sm">
               <thead>
                 <tr>
+                  <th className="p-3 bg-gray-50 text-left">Name</th>
                   <th className="p-3 bg-gray-50 text-left">Email</th>
                   <th className="p-3 bg-gray-50 text-left">Role</th>
                   <th className="p-3 bg-gray-50 text-left">Temp Password</th>
@@ -288,6 +289,16 @@ export default function RoleManager() {
             }}
             className="max-w-sm space-y-4"
           >
+            <div>
+              <label className="block text-sm font-medium mb-1">Name</label>
+              <input
+                type="text"
+                required
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
             <div>
               <label className="block text-sm font-medium mb-1">Email</label>
               <input
@@ -330,10 +341,12 @@ export default function RoleManager() {
             </div>
             <button
               type="submit"
-              disabled={submitting || !newEmail || !newPwd || !newRole}
+              disabled={
+                submitting || !newName || !newEmail || !newPwd || !newRole
+              }
               className={clsx(
                 "w-full py-2 rounded-lg text-white font-semibold transition",
-                submitting || !newEmail || !newPwd || !newRole
+                submitting || !newName || !newEmail || !newPwd || !newRole
                   ? "bg-cyan-300 cursor-not-allowed"
                   : "bg-cyan-600 hover:bg-cyan-700"
               )}
@@ -359,6 +372,7 @@ const UserRow = React.memo(function UserRow({
 }) {
   return (
     <tr className="odd:bg-gray-50">
+      <td className="p-3 text-gray-800">{u.name}</td>
       <td className="p-3 text-gray-800">{u.email}</td>
       <td className="p-3">
         <select
