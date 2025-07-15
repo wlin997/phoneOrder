@@ -61,7 +61,8 @@ router.post("/login", async (req, res, next) => {
       mfa: true,
     });
 
-    res.json({ ok: true });
+    res.json({ token });
+    
   } catch (e) {
     next(e);
   }
