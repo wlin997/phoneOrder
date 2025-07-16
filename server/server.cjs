@@ -1,13 +1,13 @@
-/*====================================================
-  SERVER  (server.cjs — MODIFIED)
-====================================================*/
+// =================================================================================
+// SETUP & CONFIGURATION
+// =================================================================================
 process.env.TZ = 'America/New_York'; // Set default timezone
 
 const express = require("express");
-const cookieParser = require('cookie-parser'); // NEW: Import cookie-parser
+const cookieParser = require('cookie-parser'); // Import cookie-parser
 const adminRoutes = require("./admin.routes.cjs");
-const authRoutes = require("./auth.routes.cjs"); // NEW: Import auth routes
-const { authenticateToken, authorizePermissions } = require("./auth.middleware.cjs"); // authorizePermissions is not used in this file.
+const authRoutes = require("./auth.routes.cjs"); // Import auth routes
+const { authenticateToken, authorizePermissions } = require("./auth.middleware.cjs");
 
 const fs = require("fs");
 const fsp = require("fs").promises;
@@ -22,18 +22,12 @@ const { Pool } = require('pg');
 const { DateTime } = require('luxon');
 const FormData = require('form-data');
 
-// --- REMOVE THESE - Login logic moved to auth.routes.cjs ---
-// const bcrypt = require("bcryptjs");
-// const jwt    = require("jsonwebtoken");
-// const { getUserPermissions } = require("./rbac.service.cjs");
-// -----------------------------------------------------------
-
 const app = express();
 const PORT = process.env.PORT || 3001;
 const appSettingsFilePath = path.join(__dirname, 'appSettings.json');
 const printerSettingsFilePath = path.join(__dirname, 'printerSettings.json');
 
-const getAppSettings = () => { /* */
+const getAppSettings = () => {
   try {
     const data = fs.readFileSync(appSettingsFilePath, 'utf8');
     return JSON.parse(data);
@@ -49,7 +43,7 @@ const getAppSettings = () => { /* */
 let appSettings = getAppSettings();
 process.env.TZ = appSettings.timezone;
 
-// --- CORS Configuration (MODIFIED) ---
+// --- CORS Configuration ---
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
@@ -57,10 +51,9 @@ const allowedOrigins = [
   'http://127.0.0.1:3000',
   'http://127.0.0.1:3001',
   'http://127.0.0.1:5173',
-  // Add your RENDER_FRONTEND_URL for production (if it's different from backend's)
-  process.env.RENDER_FRONTEND_URL, // Assuming this is your frontend's deployed URL
-  'https://synthpify-phoneorder-front.qorender.com' // Explicitly add the frontend URL from your screenshot error
-].filter(Boolean); //
+  process.env.RENDER_FRONTEND_URL,
+  'https://synthpify-phoneorder-front.qorender.com'
+].filter(Boolean);
 
 app.use(cors({
   origin: function (origin, callback) {
@@ -70,19 +63,19 @@ app.use(cors({
       callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: true, // IMPORTANT: Allows cookies to be sent
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allow necessary HTTP methods
-  allowedHeaders: ['Content-Type', 'Authorization'], // Allow necessary headers
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 app.use(express.json());
-app.use(cookieParser()); // NEW: Add cookie-parser middleware here
+app.use(cookieParser()); // Add cookie-parser middleware here
 
 // =================================================================================
 // DATABASE CONNECTION (PostgreSQL)
 // =================================================================================
 console.log('--- DEBUG --- DATABASE_URL is:', process.env.DATABASE_URL);
-const pool = new Pool({ /* */
+const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
     rejectUnauthorized: false
@@ -94,7 +87,7 @@ console.log("✅ PostgreSQL client initialized.");
 // HELPER AND UTILITY FUNCTIONS
 // =================================================================================
 let cloudPrintJobs = [];
-async function getOrdersFromDB() { /* */
+async function getOrdersFromDB() {
     const query = `
         SELECT
             o.id AS order_id,
@@ -208,7 +201,7 @@ async function archiveOrders() {
 // =================================================================================
 
 app.get("/", (req, res) => res.send("✅ Backend server is alive"));
-const isTodayFilter = (order) => { /* */
+const isTodayFilter = (order) => {
     if (!order || !order.timeOrdered) return false;
     const orderDateTime = DateTime.fromJSDate(order.timeOrdered).setZone(appSettings.timezone || 'America/New_York');
 
@@ -220,7 +213,7 @@ const isTodayFilter = (order) => { /* */
     console.log(`[isTodayFilter] Result: ${orderDateTime.toISODate() === nowDateTime.toISODate()}`);
     return orderDateTime.toISODate() === nowDateTime.toISODate();
 };
-app.get("/api/list", async (req, res) => { /* */
+app.get("/api/list", async (req, res) => {
   try {
     const allOrders = await getOrdersFromDB();
     const incomingOrdersToday = allOrders
@@ -234,7 +227,7 @@ app.get("/api/list", async (req, res) => { /* */
   }
 });
 
-app.get("/api/updating", async (req, res) => { /* */
+app.get("/api/updating", async (req, res) => {
     try {
         const allOrders = await getOrdersFromDB();
         const updatingOrdersToday = allOrders
@@ -245,7 +238,7 @@ app.get("/api/updating", async (req, res) => { /* */
         res.status(500).json({ error: "Failed to fetch updating orders: " + err.message });
     }
 });
-app.get("/api/printed", async (req, res) => { /* */
+app.get("/api/printed", async (req, res) => {
     try {
         const allOrders = await getOrdersFromDB();
         const processedOrders = allOrders
@@ -257,7 +250,7 @@ app.get("/api/printed", async (req, res) => { /* */
     }
 });
 
-app.get("/api/order-by-row/:orderId", async (req, res) => { /* */
+app.get("/api/order-by-row/:orderId", async (req, res) => {
     try {
         const orderId = parseInt(req.params.orderId, 10);
         if (isNaN(orderId)) return res.status(400).json({ error: "Invalid orderId." });
@@ -274,7 +267,7 @@ app.get("/api/order-by-row/:orderId", async (req, res) => { /* */
 // =================================================================================
 // REPORTING AND SETTINGS ENDPOINTS (Refactored for PostgreSQL)
 // =================================================================================
-app.get('/api/today-stats', async (req, res) => { /* */
+app.get('/api/today-stats', async (req, res) => {
     try {
         const nowInNY = DateTime.now().setZone(appSettings.timezone);
         const todayNYStart = nowInNY.startOf('day');
@@ -299,7 +292,7 @@ app.get('/api/today-stats', async (req, res) => { /* */
         res.status(500).json({ error: 'Failed to fetch today\'s stats: ' + error.message });
     }
 });
-app.get('/api/order-stats', async (req, res) => { /* */
+app.get('/api/order-stats', async (req, res) => {
     try {
         const { range } = req.query;
         const days = range === 'YTD' ? 365 : parseInt(range, 10);
@@ -322,7 +315,7 @@ app.get('/api/order-stats', async (req, res) => { /* */
         res.status(500).json({ error: 'Failed to fetch order stats: ' + error.message });
     }
 });
-app.get('/api/popular-items', async (req, res) => { /* */
+app.get('/api/popular-items', async (req, res) => {
     try {
         const { range } = req.query;
         const days = range === 'YTD' ? 365 : parseInt(range, 10);
@@ -345,7 +338,7 @@ app.get('/api/popular-items', async (req, res) => { /* */
         res.status(500).json({ error: 'Failed to fetch popular items: ' + error.message });
     }
 });
-app.get('/api/hourly-orders', async (req, res) => { /* */
+app.get('/api/hourly-orders', async (req, res) => {
     try {
         const startHour = parseInt(appSettings.reportStartHour, 10) || 0;
         const endHour = 23;
@@ -362,7 +355,7 @@ app.get('/api/hourly-orders', async (req, res) => { /* */
                 EXTRACT(HOUR FROM created_at AT TIME ZONE $1) as hour,
                 COUNT(*) as count
             FROM orders
-            WHERE created_at >= $2 AND created_at <= $3 
+            WHERE created_at >= $2 AND created_at <= $3
             GROUP BY hour
             ORDER BY hour;
         `;
@@ -386,7 +379,7 @@ app.get('/api/hourly-orders', async (req, res) => { /* */
         res.status(500).json({ error: 'Failed to fetch hourly orders: ' + error.message });
             }
         });
-app.get('/api/customer-stats', async (req, res) => { /* */
+app.get('/api/customer-stats', async (req, res) => {
     try {
         const { range } = req.query;
         const days = range === 'YTD' ? 365 : parseInt(range, 10);
@@ -417,13 +410,12 @@ app.get('/api/customer-stats', async (req, res) => { /* */
 
 // Settings Endpoints
 app.get('/api/app-settings', (req, res) => res.json(appSettings));
-app.post('/api/app-settings', async (req, res) => { /* */
+app.post('/api/app-settings', async (req, res) => {
     try {
         const newSettings = req.body;
         await saveAppSettings(newSettings);
         appSettings = newSettings;
 
-        // 🔁 Restart the cron job with updated schedule
         if (cronJob) cronJob.stop();
         startCronJob();
 
@@ -433,7 +425,7 @@ app.post('/api/app-settings', async (req, res) => { /* */
         res.status(500).json({ error: "Failed to update app settings" });
     }
 });
-app.get('/api/print-settings', async (req, res) => { /* */
+app.get('/api/print-settings', async (req, res) => {
     try {
         const data = await fsp.readFile(printerSettingsFilePath, 'utf8');
         res.json(JSON.parse(data));
@@ -441,7 +433,7 @@ app.get('/api/print-settings', async (req, res) => { /* */
         res.status(404).json({ error: 'Printer settings not found.' });
     }
 });
-app.post('/api/print-settings', async (req, res) => { /* */
+app.post('/api/print-settings', async (req, res) => {
     try {
         await fsp.writeFile(printerSettingsFilePath, JSON.stringify(req.body, null, 2));
         res.json(req.body);
@@ -452,8 +444,7 @@ app.post('/api/print-settings', async (req, res) => { /* */
 // =================================================================================
 // MAIN PRINTING AND KDS ENDPOINTS (Refactored)
 // =================================================================================
-// Preserved helper functions for printing
-function printViaLan(printerIp, payload) { /* */
+function printViaLan(printerIp, payload) {
     return new Promise((resolve, reject) => {
         const port = 9100;
         const client = new net.Socket();
@@ -478,7 +469,7 @@ function printViaLan(printerIp, payload) { /* */
     });
 }
 
-async function testPrinterConnectivity(printerUrl, mode = 'LAN') { /* */
+async function testPrinterConnectivity(printerUrl, mode = 'LAN') {
     if (mode === 'LAN') {
         return new Promise((resolve) => {
             const client = new net.Socket();
@@ -540,7 +531,7 @@ async function testPrinterConnectivity(printerUrl, mode = 'LAN') { /* */
     });
 }
 
-function buildOrderHTML(order) { /* */
+function buildOrderHTML(order) {
     const items = order.items.map(item => {
         const name = item.item || 'Unknown Item';
         const qty = item.qty || '1';
@@ -571,7 +562,7 @@ ${totalLine}Fired at: ${firedAt}
 </pre>`;
 }
 
-app.post("/api/fire-order", async (req, res) => { /* */
+app.post("/api/fire-order", async (req, res) => {
     const { rowIndex: orderId } = req.body;
     if (!orderId || typeof orderId !== "number") {
         return res.status(400).json({ error: "Invalid order ID" });
@@ -668,7 +659,7 @@ app.post("/api/fire-order", async (req, res) => { /* */
         res.status(500).json({ error: "Failed to process order", details: err.message });
     }
 });
-app.get("/api/kds/active-orders", async (req, res) => { /* */
+app.get("/api/kds/active-orders", async (req, res) => {
     try {
         const allOrders = await getOrdersFromDB();
         const activeKitchenOrders = allOrders
@@ -677,7 +668,7 @@ app.get("/api/kds/active-orders", async (req, res) => { /* */
 
         const formattedOrders = activeKitchenOrders.map(order => ({
             ...order,
-            id: order.id // <-- this ensures frontend gets the DB id
+            id: order.id
         }));
 
         res.json(formattedOrders);
@@ -687,7 +678,7 @@ app.get("/api/kds/active-orders", async (req, res) => { /* */
         res.status(500).json({ error: "Failed to fetch active kitchen orders", details: err.message });
     }
 });
-app.post("/api/kds/prep-order/:orderId", async (req, res) => { /* */
+app.post("/api/kds/prep-order/:orderId", async (req, res) => {
     const { orderId } = req.params;
     const { prepTimeMs, prepTimestamp } = req.body;
 
@@ -723,7 +714,7 @@ app.post("/api/kds/prep-order/:orderId", async (req, res) => { /* */
     }
 });
 
-app.get("/api/kds/prepped-orders", async (req, res) => { /* */
+app.get("/api/kds/prepped-orders", async (req, res) => {
     try {
         const allOrders = await getOrdersFromDB();
         console.log("🔎 Raw orders from DB:", allOrders);
@@ -743,8 +734,7 @@ app.get("/api/kds/prepped-orders", async (req, res) => { /* */
         res.status(500).json({ error: "Failed to fetch prepped orders", details: err.message });
     }
 });
-// ** PRESERVED PRINTER AND SETTINGS CODE **
-app.post("/api/cloudprnt", (req, res) => { /* */
+app.post("/api/cloudprnt", (req, res) => {
     if (req.body && req.body.jobToken) {
         const jobIndex = cloudPrintJobs.findIndex(job => job.jobId === req.body.jobToken);
         if (jobIndex > -1) cloudPrintJobs.splice(jobIndex, 1);
@@ -760,7 +750,7 @@ app.post("/api/cloudprnt", (req, res) => { /* */
         res.json({ jobReady: false, pollInterval: 30000 });
     }
 });
-app.get('/api/cloudprnt-content/:jobId', (req, res) => { /* */
+app.get('/api/cloudprnt-content/:jobId', (req, res) => {
     const job = cloudPrintJobs.find(j => j.jobId === req.params.jobId);
     if (job) {
         res.type(job.contentType).send(job.content);
@@ -768,7 +758,7 @@ app.get('/api/cloudprnt-content/:jobId', (req, res) => { /* */
         res.status(404).send('Job not found.');
     }
 });
-app.get('/api/printer-status', async (req, res) => { /* */
+app.get('/api/printer-status', async (req, res) => {
     try {
         const data = await fsp.readFile(printerSettingsFilePath, 'utf8');
         const settings = JSON.parse(data);
@@ -786,7 +776,7 @@ app.get('/api/printer-status', async (req, res) => { /* */
 // =================================================================================
 
 // Get VAPI settings from PostgreSQL
-app.get('/api/vapi-settings', async (req, res) => { /* */
+app.get('/api/vapi-settings', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT api_key, assistant_id, file_id FROM vapi_settings WHERE id = 1');
     if (rows.length === 0) {
@@ -800,7 +790,7 @@ app.get('/api/vapi-settings', async (req, res) => { /* */
 });
 
 // Save/Update VAPI settings to PostgreSQL (UPSERT logic)
-app.post('/api/vapi-settings', async (req, res) => { /* */
+app.post('/api/vapi-settings', async (req, res) => {
   try {
     const { apiKey, assistantId, fileId } = req.body;
     const result = await pool.query(
@@ -822,7 +812,7 @@ app.post('/api/vapi-settings', async (req, res) => { /* */
 });
 
 // NEW ENDPOINT: Get list of files from VAPI
-app.get('/api/vapi/files', async (req, res) => { /* */
+app.get('/api/vapi/files', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT api_key, assistant_id FROM vapi_settings WHERE id = 1');
     if (rows.length === 0 || !rows[0].api_key || !rows[0].assistant_id) {
@@ -841,7 +831,7 @@ app.get('/api/vapi/files', async (req, res) => { /* */
   }
 });
 // NEW ENDPOINT: Get content of a specific file from VAPI (Updated to VAPI spec)
-app.get('/api/vapi/files/:fileId/content', async (req, res) => { /* */
+app.get('/api/vapi/files/:fileId/content', async (req, res) => {
   try {
     const { fileId } = req.params;
     const { rows } = await pool.query('SELECT api_key FROM vapi_settings WHERE id = 1');
@@ -875,7 +865,7 @@ app.get('/api/vapi/files/:fileId/content', async (req, res) => { /* */
 });
 
 // NEW ENDPOINT: Delete a file from VAPI
-app.delete('/api/vapi/files/:fileId', async (req, res) => { /* */
+app.delete('/api/vapi/files/:fileId', async (req, res) => {
     try {
         const { fileId } = req.params;
         const { rows } = await pool.query('SELECT api_key FROM vapi_settings WHERE id = 1');
@@ -899,7 +889,7 @@ app.delete('/api/vapi/files/:fileId', async (req, res) => { /* */
 });
 
 // MODIFIED ENDPOINT: Update daily specials in VAPI (Implements delete and re-upload)
-app.post('/api/daily-specials', async (req, res) => { /* */
+app.post('/api/daily-specials', async (req, res) => {
   try {
     const newContent = req.body;
     const { rows } = await pool.query('SELECT api_key, file_id AS vapi_file_id FROM vapi_settings WHERE id = 1');
@@ -962,10 +952,11 @@ app.post('/api/daily-specials', async (req, res) => { /* */
   }
 });
 
+
 //=================================================================================
 // get daily special from postgre
 //=================================================================================
-app.get('/api/businesses', async (req, res) => { /* */
+app.get('/api/businesses', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT business_id, business_name FROM businesses');
     res.json(rows);
@@ -974,7 +965,7 @@ app.get('/api/businesses', async (req, res) => { /* */
     res.status(500).json({ error: 'Failed to fetch businesses: ' + err.message });
   }
 });
-app.get('/api/daily-specials', async (req, res) => { /* */
+app.get('/api/daily-specials', async (req, res) => {
   try {
     const { business_id } = req.query;
     if (!business_id) return res.status(400).json({ error: 'business_id is required' });
@@ -990,7 +981,7 @@ app.get('/api/daily-specials', async (req, res) => { /* */
 });
 
 // NEW/MODIFIED ENDPOINT: Update daily specials in PostgreSQL
-app.post('/api/daily-specials/postgres', async (req, res) => { /* */
+app.post('/api/daily-specials/postgres', async (req, res) => {
   try {
     const { business_id, daily_specials } = req.body;
     if (!business_id || !daily_specials) return res.status(400).json({ error: 'business_id and daily_specials are required' });
@@ -1014,46 +1005,15 @@ app.post('/api/daily-specials/postgres', async (req, res) => { /* */
 });
 
 // --- REMOVE THE INLINE LOGIN ROUTE ---
-/*
-app.post("/api/login", async (req, res, next) => {
-  try {
-    const { email, password } = req.body;
-    const { rows } = await pool.query(
-      "SELECT id, name, email, password_hash FROM users WHERE email=$1",
-      [email]
-    );
-    if (!rows.length)
-      return res.status(401).json({ message: "Invalid credentials" });
-
-    const user = rows[0];
-    const ok = await bcrypt.compare(password, user.password_hash);
-    if (!ok)
-      return res.status(401).json({ message: "Invalid credentials" });
-
-    const permissions = await getUserPermissions(user.id);
-    const token = jwt.sign(
-      {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        permissions,
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "24h" }
-    );
-    res.json({ token });
-  } catch (err) {
-    next(err);
-  }
-});
-*/
+// The old login route was here. It has been removed.
+// The new, consolidated login route is in auth.routes.cjs.
 // --- END REMOVE ---
 
 // =================================================================================
 // SERVER INITIALIZATION
 // =================================================================================
 let cronJob;
-const startCronJob = () => { /* */
+const startCronJob = () => {
     if (cronJob) {
         cronJob.stop();
     }
@@ -1086,29 +1046,6 @@ const startCronJob = () => { /* */
     );
     console.log(`[Cron Job] Scheduled to run at: ${appSettings.archiveCronSchedule} in timezone ${appSettings.timezone}`);
 };
-// ===== RBAC additions =====
-// This generateAccessToken function is specifically for the old inline login route.
-// It's going to be removed along with that route.
-/*
-async function generateAccessToken(user) {
-  const sql = `
-    SELECT p.name
-    FROM   users u
-    JOIN   role_permissions rp ON rp.role_id = u.role_id
-    JOIN   permissions p  ON p.id = rp.permission_id
-    WHERE  u.id = $1;
-  `;
-  const { rows } = await pool.query(sql, [user.id]);
-  const permissions = rows.map(r => r.name);
-  const payload = {
-    id: user.id,
-    email: user.email,
-    role_id: user.role_id,
-    permissions
-  };
-  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "24h" });
-}
-*/
 
 pool.connect()
     .then(() => {
@@ -1117,7 +1054,7 @@ pool.connect()
 
         // Admin API - these should be *inside* the .then block's callback
         app.use("/api/admin", authenticateToken, adminRoutes);
-        app.use("/api/auth", authRoutes); // NEW: Mount auth.routes.cjs under /api/auth
+        app.use("/api/auth", authRoutes); // Mount auth.routes.cjs under /api/auth
 
         app.listen(PORT, () => {
             console.log(`🚀 Server running at http://localhost:${PORT}`);
@@ -1131,7 +1068,7 @@ pool.connect()
         process.exit(1);
     });
 
-const saveAppSettings = async (settings) => { /* */
+const saveAppSettings = async (settings) => {
     try {
         await fsp.writeFile(appSettingsFilePath, JSON.stringify(settings, null, 2));
     } catch (err) {
