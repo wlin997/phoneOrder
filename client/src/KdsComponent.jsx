@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import NavMenu from './components/NavMenu';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useSwipeable } from 'react-swipeable';
 
@@ -166,7 +165,6 @@ export default function KDS() {
     const [activeOrders, setActiveOrders] = useState([]);
     const [preppedOrders, setPreppedOrders] = useState([]);
     const [selectedOrder, setSelectedOrder] = useState(null);
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [initialModalTime, setInitialModalTime] = useState(0);
     const [modalReadOnly, setModalReadOnly] = useState(false);
 
@@ -203,9 +201,6 @@ export default function KDS() {
         const intervalId = setInterval(fetchData, 15000);
         return () => clearInterval(intervalId);
     }, [fetchData]);
-    
-    const handleMenuOpen = () => setIsMenuOpen(true);
-    const handleMenuClose = () => setIsMenuOpen(false);
 
     const handleSwipe = (order, time) => {
         setSelectedOrder(order);
@@ -227,7 +222,7 @@ export default function KDS() {
 
     const handlePrepOrder = async (order, prepTimeMs) => {
         console.log('Prepping order:', order);
-        console.log('Prep time in MS (from frontend):', personally);
+        console.log('Prep time in MS (from frontend):', prepTimeMs);
         if (!order?.id) {
             alert("Order is missing ID and cannot be prepped.");
             return;
@@ -255,7 +250,6 @@ export default function KDS() {
     return (
         <ErrorBoundary>
             <div className="min-h-screen bg-gray-100 text-gray-800 font-sans">
-                <NavMenu isMenuOpen={isMenuOpen} handleMenuClose={handleMenuClose} />
                 <div className="max-w-[1190px] mx-auto flex flex-col lg:flex-row">
                     <div className="flex-1 p-6 overflow-y-auto">
                         <h2 className="text-3xl font-bold mb-6 text-center">Active Orders</h2>
