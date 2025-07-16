@@ -22,7 +22,7 @@ const useTimer = (initialElapsedTime = 0) => {
         }
     }, []);
 
-    const reset = useCallback() => {
+    const reset = useCallback(() => {
         stop();
         setElapsedTime(0);
     }, [stop]);
