@@ -27,11 +27,11 @@ export default function UnauthorizedPage() {
     if (countdown === 0) {
       clearInterval(timer); // Stop the interval
 
-      // Prioritize admin/dashboard access for users with those permissions
-      if (user?.permissions.includes("manage_admin_settings")) {
+      // Prioritize dashboard access first, then admin, then other pages
+      if (user?.permissions.includes("view_dashboard")) {
+        navigate("/dashboard", { replace: true }); // Dashboard is now primary
+      } else if (user?.permissions.includes("manage_admin_settings")) {
         navigate("/admin", { replace: true }); // Admin panel for full admins
-      } else if (user?.permissions.includes("view_dashboard")) {
-        navigate("/dashboard", { replace: true }); // Dashboard for users with dashboard access
       } else if (user?.permissions.includes("manage_kds")) {
         navigate("/kds", { replace: true });
       } else if (user?.permissions.includes("view_reports")) {
@@ -68,10 +68,11 @@ export default function UnauthorizedPage() {
         <button
           onClick={() => {
             // Immediately navigate if user clicks button
-            if (user?.permissions.includes("manage_admin_settings")) {
-              navigate("/admin", { replace: true });
-            } else if (user?.permissions.includes("view_dashboard")) {
+            // Prioritize dashboard access first, then admin, then other pages
+            if (user?.permissions.includes("view_dashboard")) {
               navigate("/dashboard", { replace: true });
+            } else if (user?.permissions.includes("manage_admin_settings")) {
+              navigate("/admin", { replace: true });
             } else if (user?.permissions.includes("manage_kds")) {
               navigate("/kds", { replace: true });
             } else if (user?.permissions.includes("view_reports")) {
