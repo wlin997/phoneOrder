@@ -4,9 +4,9 @@
 process.env.TZ = 'America/New_York'; // Set default timezone
 
 const express = require("express");
-const cookieParser = require('cookie-parser'); // Import cookie-parser
+const cookieParser = require('cookie-parser');
 const adminRoutes = require("./admin.routes.cjs");
-const authRoutes = require("./auth.routes.cjs"); // Import auth routes
+const authRoutes = require("./auth.routes.cjs");
 const { authenticateToken, authorizePermissions } = require("./auth.middleware.cjs");
 
 const fs = require("fs");
@@ -116,7 +116,7 @@ async function getOrdersFromDB() {
             m.id AS modifier_id,
             m.modifier_name,
             m.price_delta,
-            o.prepped_at_timestamp -- ADDED: Select the new column
+            o.prepped_at_timestamp
         FROM orders o
         JOIN customers c ON o.customer_id = c.id
         LEFT JOIN order_items i ON o.id = i.order_id
@@ -132,7 +132,7 @@ async function getOrdersFromDB() {
         if (!ordersMap.has(row.order_id)) {
             ordersMap.set(row.order_id, {
                 id: row.order_id,
-                rowIndex: row.order_id, // For backward compatibility with frontend
+                rowIndex: row.order_id,
                 orderNum: row.order_id,
                 orderType: row.order_type,
                 totalCost: row.total_price,
@@ -142,9 +142,9 @@ async function getOrdersFromDB() {
                 category: row.category,
                 orderUpdateStatus: row.order_update_status,
                 printedCount: row.printed_count,
-                printedTimestamps: row.printed_timestamps || [], // Ensure this is an array
+                printedTimestamps: row.printed_timestamps || [],
                 isTheUsual: row.is_the_usual,
-                orderProcessed: row.printed_count > 0, // Logic: if printed, it's processed
+                orderProcessed: row.printed_count > 0,
                 orderPrepped: row.order_update_status === 'Prepped',
                 cancelled: row.order_update_status === 'Cancelled',
                 callerName: row.customer_name,
@@ -152,8 +152,8 @@ async function getOrdersFromDB() {
                 email: row.customer_email,
                 callerAddress: row.customer_address,
                 items: [],
-                foodPrepTime: row.food_prep_time, // ADDED: Pass this from DB
-                preppedTimestamp: row.prepped_at_timestamp // ADDED: Pass this from DB
+                foodPrepTime: row.food_prep_time,
+                preppedTimestamp: row.prepped_at_timestamp
             });
         }
 
@@ -1004,11 +1004,6 @@ app.post('/api/daily-specials/postgres', async (req, res) => {
   }
 });
 
-// --- REMOVE THE INLINE LOGIN ROUTE ---
-// The old login route was here. It has been removed.
-// The new, consolidated login route is in auth.routes.cjs.
-// --- END REMOVE ---
-
 // =================================================================================
 // SERVER INITIALIZATION
 // =================================================================================
@@ -1052,7 +1047,6 @@ pool.connect()
         console.log("✅ Database connection successful.");
         startCronJob();
 
-        // Admin API - these should be *inside* the .then block's callback
         app.use("/api/admin", authenticateToken, adminRoutes);
         app.use("/api/auth", authRoutes); // Mount auth.routes.cjs under /api/auth
 

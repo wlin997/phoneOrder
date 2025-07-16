@@ -42,7 +42,7 @@ async function issueAuthCookies(res, user) {
         name: user.name,
         email: user.email,
         permissions: user.permissions,
-        // mfa: user.totp_enabled, // Include actual MFA status from user object if available
+        mfa: user.totp_enabled, // Include actual MFA status from user object if available
     };
 
     const accessToken = generateAccessToken(accessTokenPayload);
@@ -55,19 +55,19 @@ async function issueAuthCookies(res, user) {
     // For now, let's assume a `refresh_token` column on the `users` table.
     await pool.query("UPDATE users SET refresh_token=$1 WHERE id=$2", [refreshToken, user.id]);
 
-    // Set Access Token as HTTP-only, Secure, SameSite=Strict cookie
+    // Set Access Token as HTTP-only, Secure, SameSite=Lax cookie (changed from Strict)
     res.cookie("accessToken", accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production', // `secure: true` in production (HTTPS)
-        sameSite: "strict",
+        sameSite: "Lax", // Changed from "strict" to "Lax" for broader compatibility
         maxAge: 15 * 60 * 1000 // 15 minutes (matches accessToken expiry)
     });
 
-    // Set Refresh Token as HTTP-only, Secure, SameSite=Strict cookie
+    // Set Refresh Token as HTTP-only, Secure, SameSite=Lax cookie (changed from Strict)
     res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: "strict",
+        sameSite: "Lax", // Changed from "strict" to "Lax"
         maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days (matches refreshToken expiry)
     });
 
@@ -168,7 +168,7 @@ router.post('/refresh-token', async (req, res) => {
         const decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET);
 
         // Fetch user to ensure refresh token is valid and associated with them
-        const { rows } = await pool.query("SELECT id, name, email, permissions, refresh_token FROM users WHERE id=$1", [decoded.id]);
+        const { rows } = await pool.query("SELECT id, name, email, permissions, refresh_token, totp_enabled FROM users WHERE id=$1", [decoded.id]);
         if (!rows.length) {
             return res.status(403).json({ message: 'User not found for refresh token.' });
         }
@@ -199,7 +199,7 @@ router.post('/refresh-token', async (req, res) => {
         // const newRefreshToken = generateRefreshToken({ id: user.id });
         // await pool.query("UPDATE users SET refresh_token=$1 WHERE id=$2", [newRefreshToken, user.id]);
         // res.cookie("refreshToken", newRefreshToken, {
-        //     httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: "strict",
+        //     httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: "Lax",
         //     maxAge: 7 * 24 * 60 * 60 * 1000
         // });
 
@@ -207,7 +207,7 @@ router.post('/refresh-token', async (req, res) => {
         res.cookie('accessToken', newAccessToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
+            sameSite: 'Lax', // Changed to Lax for broader compatibility
             maxAge: 15 * 60 * 1000 // Matches new accessToken expiry
         });
 
@@ -276,16 +276,16 @@ router.get("/whoami", authenticateToken, (req, res) => {
     "Cache-Control": "no-store, no-cache, must-revalidate, private",
     "Pragma":        "no-cache",
     "Expires":       "0",
-    ETag:            false               // ← prevent 304 by disabling ETag
+    ETag:            false
   });
 
   // Ensure all necessary user fields are sent back, including 'name'
   res.json({
     id:          req.user.id,
-    name:        req.user.name, // Include name
-    email:       req.user.email, // Include email
+    name:        req.user.name,
+    email:       req.user.email,
     permissions: req.user.permissions,
-    mfa:         req.user.mfa // Include mfa status if available in token payload
+    mfa:         req.user.mfa
   });
 });
 
