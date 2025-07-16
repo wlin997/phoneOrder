@@ -14,11 +14,11 @@ import { Toaster } from "react-hot-toast";
  */
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <AuthProvider>
-      <BrowserRouter>
+    <BrowserRouter> {/* <--- BrowserRouter comes FIRST */}
+      <AuthProvider> {/* <--- AuthProvider is now inside BrowserRouter */}
         <App />
-        <Toaster position="top-right" />   {/* NEW */}
-      </BrowserRouter>
-    </AuthProvider>
+        <Toaster position="top-right" />
+      </AuthProvider>
+    </BrowserRouter>
   </React.StrictMode>
 );
