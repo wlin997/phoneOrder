@@ -1,93 +1,51 @@
-// client/src/UnauthorizedPage.jsx
-import React, { useEffect, useState } from "react";
+// client/src/DefaultLandingPage.jsx
+import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext.jsx";
 
-export default function UnauthorizedPage() {
+export default function DefaultLandingPage() {
   const { user, authReady, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const [countdown, setCountdown] = useState(5); // Countdown for redirection
 
   useEffect(() => {
-    // If not authenticated, redirect to login
-    if (authReady && !isAuthenticated) {
+    // If authentication is not yet ready, do nothing and wait for the next render.
+    if (!authReady) {
+      return;
+    }
+
+    // If auth is ready but the user is not authenticated, redirect to login.
+    // This handles cases where a token might be invalid or missing.
+    if (!isAuthenticated) {
       navigate("/login", { replace: true });
       return;
     }
 
-    let timer;
-    if (authReady && isAuthenticated) {
-      // Start countdown
-      timer = setInterval(() => {
-        setCountdown((prev) => prev - 1);
-      }, 1000);
-    }
-
-    // After countdown, redirect to the appropriate page
-    if (countdown === 0) {
-      clearInterval(timer); // Stop the interval
-
-      // Prioritize dashboard access first, then admin, then other pages
-      if (user?.permissions.includes("view_dashboard")) {
-        navigate("/dashboard", { replace: true }); // Dashboard is now primary
-      } else if (user?.permissions.includes("manage_admin_settings")) {
-        navigate("/admin", { replace: true }); // Admin panel for full admins
-      } else if (user?.permissions.includes("manage_kds")) {
+    // Now, auth is ready and user is authenticated. Proceed with permission-based redirection.
+    // Explicitly check if 'user' and 'user.permissions' are available before attempting to navigate.
+    if (user && user.permissions) {
+      if (user.permissions.includes("view_dashboard")) {
+        navigate("/dashboard", { replace: true });
+      } else if (user.permissions.includes("manage_admin_settings")) {
+        navigate("/admin", { replace: true });
+      } else if (user.permissions.includes("manage_kds")) {
         navigate("/kds", { replace: true });
-      } else if (user?.permissions.includes("view_reports")) {
+      } else if (user.permissions.includes("view_reports")) {
         navigate("/report", { replace: true });
-      } else if (user?.permissions.includes("edit_daily_specials")) {
+      } else if (user.permissions.includes("edit_daily_specials")) {
         navigate("/daily-specials", { replace: true });
       } else {
-        // Fallback if no specific permissions lead to a page
-        navigate("/login", { replace: true }); // Redirect to login as a safe fallback
+        // If authenticated but no specific routes match,
+        // navigate to the unauthorized page as a fallback for users with no specific access.
+        navigate("/unauthorized", { replace: true });
       }
     }
+    // If user or user.permissions is not yet available, the useEffect will re-run when they are.
+  }, [user, authReady, isAuthenticated, navigate]);
 
-    return () => clearInterval(timer); // Cleanup on unmount
-  }, [user, authReady, isAuthenticated, navigate, countdown]);
-
-  if (!authReady) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-700">Loading user permissions...</p>
-      </div>
-    );
-  }
-
+  // Render a loading message while waiting for authentication state to be fully resolved.
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="bg-white shadow-xl rounded-lg p-10 text-center space-y-6 max-w-md w-full">
-        <h2 className="text-3xl font-bold text-red-600">Access Denied!</h2>
-        <p className="text-gray-700 text-lg">
-          You do not have permission to view this page.
-        </p>
-        <p className="text-gray-600 text-sm">
-          Redirecting you to an accessible page in {countdown} seconds...
-        </p>
-        <button
-          onClick={() => {
-            // Immediately navigate if user clicks button
-            // Prioritize dashboard access first, then admin, then other pages
-            if (user?.permissions.includes("view_dashboard")) {
-              navigate("/dashboard", { replace: true });
-            } else if (user?.permissions.includes("manage_admin_settings")) {
-              navigate("/admin", { replace: true });
-            } else if (user?.permissions.includes("manage_kds")) {
-              navigate("/kds", { replace: true });
-            } else if (user?.permissions.includes("view_reports")) {
-              navigate("/report", { replace: true });
-            } else if (user?.permissions.includes("edit_daily_specials")) {
-              navigate("/daily-specials", { replace: true });
-            } else {
-              navigate("/login", { replace: true });
-            }
-          }}
-          className="mt-4 px-6 py-2 bg-cyan-600 text-white rounded-lg font-semibold hover:bg-cyan-700 transition-colors"
-        >
-          Go Now
-        </button>
-      </div>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <p className="text-gray-700">Loading your personalized dashboard...</p>
     </div>
   );
 }
