@@ -106,7 +106,7 @@ const OrderDetailsModal = ({ order, onClose, onPrep, initialTime, readOnly = fal
                 <div className="p-4 border-b flex justify-between items-center">
                     <h2 className="text-xl font-bold text-gray-800">Order #{order.orderNum}</h2>
                     <div className="text-2xl font-mono font-bold text-red-500">{displayTime}</div>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-800 text-3xl leading-none">&times;</button>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-800 text-3xl leading-none">×</button>
                 </div>
                 <div className="p-4 max-h-96 overflow-y-auto">
                     <h4 className="font-semibold mb-2 text-gray-700">Items:</h4>
@@ -227,8 +227,7 @@ export default function KDS() {
 
     const handlePrepOrder = async (order, prepTimeMs) => {
         console.log('Prepping order:', order);
-        console.log('Prep time in MS (from frontend):', prepTimeMs);
-
+        console.log('Prep time in MS (from frontend):', personally);
         if (!order?.id) {
             alert("Order is missing ID and cannot be prepped.");
             return;
@@ -255,24 +254,26 @@ export default function KDS() {
     
     return (
         <ErrorBoundary>
-            <NavMenu isMenuOpen={isMenuOpen} handleMenuClose={handleMenuClose} /> 
-            <div className="min-h-screen bg-gray-100 text-gray-800 font-sans flex flex-col lg:flex-row">
-                <div className="flex-1 bg-gray-100 p-6 overflow-y-auto">
-                    <h2 className="text-3xl font-bold mb-6 text-center">Active Orders</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {activeOrders.length === 0 && <p className="text-center text-gray-400 col-span-full mt-12">No active orders in the kitchen.</p>}
-                        {activeOrders.map(order => (
-                            <OrderCard key={order.id} order={order} onSwipe={handleSwipe} />
-                        ))}
+            <div className="min-h-screen bg-gray-100 text-gray-800 font-sans">
+                <NavMenu isMenuOpen={isMenuOpen} handleMenuClose={handleMenuClose} />
+                <div className="max-w-[1190px] mx-auto flex flex-col lg:flex-row">
+                    <div className="flex-1 p-6 overflow-y-auto">
+                        <h2 className="text-3xl font-bold mb-6 text-center">Active Orders</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                            {activeOrders.length === 0 && <p className="text-center text-gray-400 col-span-full mt-12">No active orders in the kitchen.</p>}
+                            {activeOrders.map(order => (
+                                <OrderCard key={order.id} order={order} onSwipe={handleSwipe} />
+                            ))}
+                        </div>
                     </div>
-                </div>
-                <div className="w-full lg:w-80 bg-white p-4 border-t lg:border-t-0 lg:border-l border-gray-200 flex flex-col">
-                    <h2 className="text-xl font-bold mb-4 text-center">Recently Prepped</h2>
-                    <div className="overflow-y-auto flex-grow">
-                        {preppedOrders.length === 0 && <p className="text-center text-gray-500 mt-8">No orders prepped yet.</p>}
-                        {preppedOrders.map(order => (
-                            <PreppedOrderDisplay key={order.id} order={order} onClick={handlePreppedOrderClick} />
-                        ))}
+                    <div className="w-full lg:w-80 p-4 border-t lg:border-t-0 lg:border-l border-gray-200 flex flex-col">
+                        <h2 className="text-xl font-bold mb-4 text-center">Recently Prepped</h2>
+                        <div className="overflow-y-auto flex-grow">
+                            {preppedOrders.length === 0 && <p className="text-center text-gray-500 mt-8">No orders prepped yet.</p>}
+                            {preppedOrders.map(order => (
+                                <PreppedOrderDisplay key={order.id} order={order} onClick={handlePreppedOrderClick} />
+                            ))}
+                        </div>
                     </div>
                 </div>
                 <OrderDetailsModal 
