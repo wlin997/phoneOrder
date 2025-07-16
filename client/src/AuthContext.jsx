@@ -5,8 +5,8 @@ import React, {
   useState,
   useCallback,
 } from "react";
-import { Navigate, useNavigate } from "react-router-dom"; // Import useNavigate
-import { jwtDecode } from "jwt-decode"; // Still useful for decoding `tmpToken` or if you send minimal public user data in body
+import { Navigate, useNavigate } from "react-router-dom";
+import { jwtDecode } from "jwt-decode";
 import axios from "axios";
 
 /*────────────────────────────────────────────────────────────
@@ -48,11 +48,11 @@ export function AuthProvider({ children }) {
   );
 
   /* Function to fetch user details (e.g., permissions) after login/refresh */
-  // This assumes your /api/whoami endpoint returns user details based on the `accessToken` cookie.
+  // This assumes your /api/auth/whoami endpoint returns user details based on the `accessToken` cookie.
   const fetchUserDetails = useCallback(async () => {
     try {
-      // The accessToken cookie will be sent automatically with this request
-      const response = await API.get("/api/whoami");
+      // Corrected API path to include '/auth' prefix as per server.cjs mounting
+      const response = await API.get("/api/auth/whoami");
       setUser(response.data); // Set non-sensitive user data (id, permissions)
       return true;
     } catch (error) {
@@ -62,12 +62,13 @@ export function AuthProvider({ children }) {
     } finally {
       setAuthReady(true); // Always set authReady to true after initial check
     }
-  }, []);
+  }, [API]); // Added API to dependencies since it's used inside useCallback
 
   /* Login function */
   const login = async (email, password) => {
     try {
-      const { data } = await API.post("/api/login", { email, password });
+      // Login endpoint is also under '/api/auth'
+      const { data } = await API.post("/api/auth/login", { email, password });
 
       // If 2FA is needed, server returns { need2FA: true, tmp: tmpToken }
       if (data.need2FA) {
@@ -78,8 +79,7 @@ export function AuthProvider({ children }) {
       }
 
       // If login is successful (no 2FA or 2FA already done), server set cookies
-      await fetchUserDetails(); // Fetch user data from /api/whoami as client can't decode httpOnly token
-      // navigate("/"); // Handled by Login.jsx or DefaultLandingPage.jsx
+      await fetchUserDetails(); // Fetch user data from /api/auth/whoami as client can't decode httpOnly token
       return { success: true };
     } catch (error) {
       console.error("Login failed:", error);
@@ -97,10 +97,10 @@ export function AuthProvider({ children }) {
       throw new Error("No temporary token found for 2FA.");
     }
     try {
-      await API.post("/api/login/step2", { tmpToken, code });
+      // 2FA login endpoint is also under '/api/auth'
+      await API.post("/api/auth/login/step2", { tmpToken, code });
       localStorage.removeItem("tmpToken"); // Clean up temporary token
       await fetchUserDetails(); // Fetch user data after successful 2FA login
-      // navigate("/"); // Handled by Login.jsx or DefaultLandingPage.jsx
       return { success: true };
     } catch (error) {
       console.error("2FA verification failed:", error);
@@ -113,7 +113,8 @@ export function AuthProvider({ children }) {
   /* Logout function */
   const logout = async () => {
     try {
-      await API.post("/api/logout"); // Server clears httpOnly cookies
+      // Logout endpoint is also under '/api/auth'
+      await API.post("/api/auth/logout"); // Server clears httpOnly cookies
     } catch (error) {
       console.error("Logout API call failed:", error);
       // Continue with client-side cleanup even if API call fails
@@ -145,13 +146,12 @@ export function AuthProvider({ children }) {
 
         // If the error is 401 (Unauthorized), and it's not the refresh token endpoint itself,
         // and we haven't already tried to refresh for this request
-        if (error.response?.status === 401 && originalRequest.url !== '/api/refresh-token' && !originalRequest._retry) {
+        if (error.response?.status === 401 && originalRequest.url !== '/api/auth/refresh-token' && !originalRequest._retry) {
             originalRequest._retry = true; // Mark as retried to prevent infinite loops
 
             try {
-                // Attempt to refresh the access token
-                // The refreshToken cookie will be sent automatically
-                await API.post('/api/refresh-token');
+                // Corrected API path for refresh token to include '/auth' prefix
+                await API.post('/api/auth/refresh-token');
                 console.log('Access token refreshed successfully!');
 
                 // After successful refresh, re-fetch user details to update context (optional but good practice)
