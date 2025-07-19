@@ -168,7 +168,23 @@ router.post('/refresh-token', async (req, res) => {
         const decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET);
 
         // Fetch user to ensure refresh token is valid and associated with them
-        const { rows } = await pool.query("SELECT id, name, email, permissions, refresh_token, totp_enabled FROM users WHERE id=$1", [decoded.id]);
+        const { rows } = await pool.query(
+          `SELECT
+            u.id,
+            u.name,
+            u.email,
+            u.password_hash,
+            u.totp_enabled,
+            COALESCE(
+              json_agg(p.name) FILTER (WHERE p.name IS NOT NULL),
+              '[]'
+            ) AS permissions -- Aggregate permission names into a JSON array
+          FROM users u
+          LEFT JOIN roles r ON u.role_id = r.id
+          LEFT JOIN role_permissions rp ON r.id = rp.role_id
+          LEFT JOIN permissions p ON rp.permission_id = p.id
+          WHERE u.id = $1 -- Changed from email to id as per the context of refresh token query
+          GROUP BY u.id, u.name, u.email, u.password_hash, u.totp_enabled;`, [decoded.id]);
         if (!rows.length) {
             return res.status(403).json({ message: 'User not found for refresh token.' });
         }
