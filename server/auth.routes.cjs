@@ -61,6 +61,9 @@ async function issueAuthCookies(res, user) {
         // Do not block the login process for this, but log the error
     }
 
+    // Determine the cookie domain based on environment
+    // For Render, this will typically be '.onrender.com' to allow cross-subdomain access
+    const cookieDomain = process.env.NODE_ENV === 'production' ? '.onrender.com' : 'localhost';
 
     // Set Access Token as HTTP-only, Secure, SameSite=None cookie
     // IMPORTANT: SameSite=None requires Secure=true. This is for cross-site cookie sending.
@@ -68,6 +71,7 @@ async function issueAuthCookies(res, user) {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production', // `secure: true` in production (HTTPS)
         sameSite: "None", // Changed from "Lax" to "None" for cross-site compatibility
+        domain: cookieDomain, // Explicitly set domain for cross-subdomain cookies
         maxAge: 15 * 60 * 1000 // 15 minutes (matches accessToken expiry)
     });
     console.log('→ [Auth] AccessToken cookie set.');
@@ -78,6 +82,7 @@ async function issueAuthCookies(res, user) {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: "None", // Changed from "Lax" to "None"
+        domain: cookieDomain, // Explicitly set domain for cross-subdomain cookies
         maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days (matches refreshToken expiry)
     });
     console.log('→ [Auth] RefreshToken cookie set.');
@@ -298,6 +303,7 @@ router.post('/refresh-token', async (req, res) => {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'None', // Changed to None for broader compatibility
+            domain: cookieDomain, // Explicitly set domain for cross-subdomain cookies
             maxAge: 15 * 60 * 1000 // Matches new accessToken expiry
         });
 
