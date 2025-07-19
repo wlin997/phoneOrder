@@ -41,7 +41,7 @@ async function issueAuthCookies(res, user) {
         id: user.id,
         name: user.name,
         email: user.email,
-        permissions: user.permissions,
+        permissions: user.permissions, // This will now correctly be an array from the DB query
         mfa: user.totp_enabled, // Include actual MFA status from user object if available
     };
 
@@ -75,20 +75,36 @@ async function issueAuthCookies(res, user) {
 }
 
 /*────────────────────────────────────────────────────
-  LOGIN  — Step 1
+  LOGIN  — Step 1
 ────────────────────────────────────────────────────*/
 router.post("/login", async (req, res, next) => {
   const { email, password } = req.body;
   try {
+    // MODIFIED: Fetch permissions using JOINs
     const { rows } = await pool.query(
-      "SELECT id, name, email, password_hash, permissions, totp_enabled FROM users WHERE email=$1",
+      `SELECT
+        u.id,
+        u.name,
+        u.email,
+        u.password_hash,
+        u.totp_enabled,
+        COALESCE(
+          json_agg(p.name) FILTER (WHERE p.name IS NOT NULL),
+          '[]'
+        ) AS permissions
+      FROM users u
+      LEFT JOIN roles r ON u.role_id = r.id
+      LEFT JOIN role_permissions rp ON r.id = rp.role_id
+      LEFT JOIN permissions p ON rp.permission_id = p.id
+      WHERE u.email = $1
+      GROUP BY u.id, u.name, u.email, u.password_hash, u.totp_enabled;`,
       [email]
     );
     if (!rows.length) {
       return res.status(401).json({ message: "Invalid credentials." });
     }
 
-    const user = rows[0];
+    const user = rows[0]; // 'user' object now correctly contains the 'permissions' array
 
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok) {
@@ -97,6 +113,7 @@ router.post("/login", async (req, res, next) => {
 
     if (user.totp_enabled) {
       // For 2FA enabled users, we still issue a temporary token for step 2 verification
+      // The 'permissions' in this tmp token also comes from the 'user' object fetched above
       const tmp = jwt.sign(
         { id: user.id, step: "mfa", name: user.name, email: user.email, permissions: user.permissions },
         ACCESS_TOKEN_SECRET, // Using ACCESS_TOKEN_SECRET for tmp token
@@ -116,7 +133,7 @@ router.post("/login", async (req, res, next) => {
 
 
 /*────────────────────────────────────────────────────
-  LOGIN  — Step 2 (TOTP)
+  LOGIN  — Step 2 (TOTP)
 ────────────────────────────────────────────────────*/
 router.post("/login/step2", async (req, res, next) => {
   const { tmpToken, code } = req.body;
@@ -126,14 +143,29 @@ router.post("/login/step2", async (req, res, next) => {
       return res.status(400).json({ message: "Invalid step" });
     }
 
+    // MODIFIED: Fetch permissions using JOINs for 2FA verification
     const { rows } = await pool.query(
-      "SELECT id, name, email, totp_secret, permissions FROM users WHERE id=$1",
+      `SELECT
+        u.id,
+        u.name,
+        u.email,
+        u.totp_secret,
+        COALESCE(
+          json_agg(p.name) FILTER (WHERE p.name IS NOT NULL),
+          '[]'
+        ) AS permissions
+      FROM users u
+      LEFT JOIN roles r ON u.role_id = r.id
+      LEFT JOIN role_permissions rp ON r.id = rp.role_id
+      LEFT JOIN permissions p ON rp.permission_id = p.id
+      WHERE u.id = $1
+      GROUP BY u.id, u.name, u.email, u.totp_secret;`, // Group by all non-aggregated columns
       [decoded.id]
     );
     if (!rows.length) {
         return res.status(400).json({ message: "User missing" });
     }
-    const user = rows[0];
+    const user = rows[0]; // 'user' object now correctly contains the 'permissions' array
 
     const verified = speakeasy.totp.verify({
       secret: user.totp_secret, // Use totp_secret from fetched user data
@@ -146,7 +178,7 @@ router.post("/login/step2", async (req, res, next) => {
     }
 
     // If 2FA is verified, issue proper access and refresh tokens
-    await issueAuthCookies(res, user); // Pass the full user object
+    await issueAuthCookies(res, user); // Pass the full user object with correct permissions
     res.json({ message: "Logged in successfully with 2FA!" }); // No token in body
   } catch (e) {
     next(e);
@@ -168,6 +200,7 @@ router.post('/refresh-token', async (req, res) => {
         const decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET);
 
         // Fetch user to ensure refresh token is valid and associated with them
+        // This query was already updated and is correct.
         const { rows } = await pool.query(
           `SELECT
             u.id,
@@ -188,7 +221,7 @@ router.post('/refresh-token', async (req, res) => {
         if (!rows.length) {
             return res.status(403).json({ message: 'User not found for refresh token.' });
         }
-        const user = rows[0];
+        const user = rows[0]; // 'user' object now correctly contains the 'permissions' array
 
         // Validate if the refresh token from cookie matches the one stored in DB for this user
         if (user.refresh_token !== refreshToken) {
@@ -204,7 +237,7 @@ router.post('/refresh-token', async (req, res) => {
             id: user.id,
             name: user.name,
             email: user.email,
-            permissions: user.permissions,
+            permissions: user.permissions, // This will now correctly be an array from the DB query
             mfa: user.totp_enabled, // Assuming mfa status carries over
         };
         const newAccessToken = generateAccessToken(newAccessTokenPayload);
@@ -262,6 +295,7 @@ router.post("/2fa/setup", authenticateToken, async (req, res, next) => {
 router.post("/2fa/enable", authenticateToken, async (req, res, next) => {
   const { code } = req.body;
   try {
+    // This query is fine as it only fetches totp_secret
     const { rows } = await pool.query(
       "SELECT totp_secret FROM users WHERE id=$1",
       [req.user.id]
@@ -285,7 +319,7 @@ router.post("/2fa/enable", authenticateToken, async (req, res, next) => {
   }
 });
 /*────────────────────────────────────────────────────
-  WHO AMI  (session probe)
+  WHO AMI  (session probe)
 ────────────────────────────────────────────────────*/
 router.get("/whoami", authenticateToken, (req, res) => {
   res.set({
@@ -295,12 +329,13 @@ router.get("/whoami", authenticateToken, (req, res) => {
     ETag:            false
   });
 
-  // Ensure all necessary user fields are sent back, including 'name'
+  // req.user.permissions will now be correctly populated by the JWT payload
+  // which was created using the updated SQL queries in login/refresh routes.
   res.json({
     id:          req.user.id,
     name:        req.user.name,
     email:       req.user.email,
-    permissions: req.user.permissions,
+    permissions: req.user.permissions, // This should now be an array
     mfa:         req.user.mfa
   });
 });
