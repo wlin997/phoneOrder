@@ -23,9 +23,13 @@ const { DateTime } = require('luxon');
 const FormData = require('form-data');
 
 const app = express();
+
 const PORT = process.env.PORT || 3001;
 const appSettingsFilePath = path.join(__dirname, 'appSettings.json');
 const printerSettingsFilePath = path.join(__dirname, 'printerSettings.json');
+
+const isProduction = process.env.NODE_ENV === 'production';
+app.locals.cookieDomain = isProduction ? '.onrender.com' : undefined;
 
 const getAppSettings = () => {
   try {
