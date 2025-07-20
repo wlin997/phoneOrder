@@ -48,7 +48,7 @@ let appSettings = getAppSettings();
 process.env.TZ = appSettings.timezone;
 
 // --- CORS Configuration ---
-const allowedOrigins = [
+cconst allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
   'http://localhost:5173',
@@ -56,7 +56,7 @@ const allowedOrigins = [
   'http://127.0.0.1:3001',
   'http://127.0.0.1:5173',
   process.env.RENDER_FRONTEND_URL,
-  'https://synthpify-phoneorder-front.qorender.com'
+  'https://synthpify-phoneorder-front.onrender.com'  // ✅ correct origin
 ].filter(Boolean);
 
 app.use(cors({
