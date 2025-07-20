@@ -23,7 +23,6 @@ const { DateTime } = require('luxon');
 const FormData = require('form-data');
 
 const app = express();
-app.locals.cookieDomain = '.onrender.com';
 
 const PORT = process.env.PORT || 3001;
 const appSettingsFilePath = path.join(__dirname, 'appSettings.json');

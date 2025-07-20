@@ -40,6 +40,10 @@ async function issueAuthCookies(req, res, user) {
 
     res.cookie("accessToken", accessToken, {
         httpOnly: true,
+        secure: true,
+        sameSite: "None",
+        domain: cookieDomain,
+        httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: "None",
         domain: cookieDomain,
@@ -48,6 +52,10 @@ async function issueAuthCookies(req, res, user) {
     console.log('→ [Auth] AccessToken cookie set.');
 
     res.cookie("refreshToken", refreshToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "None",
+        domain: cookieDomain,
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: "None",
@@ -171,6 +179,10 @@ router.post('/refresh-token', async (req, res) => {
         const cookieDomain = req.app?.locals?.cookieDomain || 'localhost';
 
         res.cookie('accessToken', newAccessToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "None",
+        domain: cookieDomain,
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'None',
