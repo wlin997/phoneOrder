@@ -36,11 +36,11 @@ async function issueAuthCookies(req, res, user) {
         console.error(`→ [Auth] ERROR storing refresh token:`, dbErr.message);
     }
 
-    const cookieDomain = req.app?.locals?.cookieDomain || process.env.COOKIE_DOMAIN || 'localhost';
+    const cookieDomain = req.app?.locals?.cookieDomain || 'localhost';
 
     res.cookie("accessToken", accessToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: true,
         sameSite: "None",
         domain: cookieDomain,
         maxAge: 15 * 60 * 1000
@@ -49,7 +49,7 @@ async function issueAuthCookies(req, res, user) {
 
     res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: true,
         sameSite: "None",
         domain: cookieDomain,
         maxAge: 7 * 24 * 60 * 60 * 1000
@@ -168,11 +168,11 @@ router.post('/refresh-token', async (req, res) => {
             mfa: user.totp_enabled
         });
 
-        const cookieDomain = req.app?.locals?.cookieDomain || process.env.COOKIE_DOMAIN || 'localhost';
+        const cookieDomain = req.app?.locals?.cookieDomain || 'localhost';
 
         res.cookie('accessToken', newAccessToken, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
+            secure: true,
             sameSite: 'None',
             domain: cookieDomain,
             maxAge: 15 * 60 * 1000
