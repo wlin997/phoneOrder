@@ -48,7 +48,7 @@ let appSettings = getAppSettings();
 process.env.TZ = appSettings.timezone;
 
 // --- CORS Configuration ---
-cconst allowedOrigins = [
+const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
   'http://localhost:5173',
