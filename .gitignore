@@ -4,6 +4,20 @@
 hash_output.txt
 generateHash.cjs
 
+# Generated secret script
+generate-secret.cjs
+generate-secret.js
+
+# Ignore the .env file inside the 'server' directory
+server/.env
+
+# Sensitive backup notes (contains secrets, should not be committed)
+Note/8n8_Node_backup/
+
+# Password hash generation files
+hash_output.txt
+generateHash.cjs
+
 
 # Ignore the .env file inside the 'server' directory
 server/.env

@@ -4,6 +4,7 @@ import React, {
   useEffect,
   useState,
   useCallback,
+  useRef,
 } from "react";
 import { Navigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
@@ -14,6 +15,7 @@ import axios from "axios";
 ────────────────────────────────────────────────────────────*/
 const API = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? "",
+  withCredentials: true,
 });
 
 /*────────────────────────────────────────────────────────────
@@ -26,20 +28,25 @@ export const useAuth = () => useContext(AuthContext);
   Provider
 ────────────────────────────────────────────────────────────*/
 export function AuthProvider({ children }) {
-  /* token persists as "accessToken" */
-  const [token, setToken] = useState(() => localStorage.getItem("accessToken"));
+  /* accessToken persists as "accessToken" */
+  const [accessToken, setAccessToken] = useState(() => localStorage.getItem("accessToken"));
   const [user, setUser]   = useState(() => {
-    if (!token) return null;
+    if (!accessToken) return null;
     try {
-      return jwtDecode(token);
+      return jwtDecode(accessToken);
     } catch { return null; }
   });
-  const [authReady, setAuthReady] = useState(false); // ← NEW
+  const [authReady, setAuthReady] = useState(false);
+  const isRefreshing = useRef(false);
 
-  /* attach header immediately if we already have a token */
-  if (token && !API.defaults.headers.common.Authorization) {
-    API.defaults.headers.common.Authorization = `Bearer ${token}`;
-  }
+  /* Set Authorization header for Axios */
+  useEffect(() => {
+    if (accessToken) {
+      API.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+    } else {
+      delete API.defaults.headers.common.Authorization;
+    }
+  }, [accessToken]);
 
   const isAuthenticated = !!user;
   const userPermissions = user?.permissions || [];
@@ -55,57 +62,121 @@ export function AuthProvider({ children }) {
 
   /* login */
   const login = async (email, password) => {
-    const { data } = await API.post("/api/login", { email, password });
-    localStorage.setItem("accessToken", data.token);
-    API.defaults.headers.common.Authorization = `Bearer ${data.token}`;
-    setToken(data.token);
-    setUser(jwtDecode(data.token));
+    try {
+      const { data } = await API.post("/api/auth/login", { email, password });
+      localStorage.setItem("accessToken", data.accessToken);
+      setAccessToken(data.accessToken);
+      setUser(jwtDecode(data.accessToken));
+      return { success: true };
+    } catch (error) {
+      console.error("Login failed:", error.response?.data?.message || error.message);
+      return { success: false, message: error.response?.data?.message || "Login failed" };
+    }
   };
 
   /* logout */
-  const logout = () => {
-    localStorage.removeItem("accessToken");
-    delete API.defaults.headers.common.Authorization;
-    setToken(null);
-    setUser(null);
-  };
+  const logout = useCallback(async () => {
+    try {
+      await API.post("/api/auth/logout");
+      console.log("Server-side logout initiated successfully.");
+    } catch (error) {
+      console.error("Error during server-side logout:", error.response?.data?.message || error.message);
+    } finally {
+      localStorage.removeItem("accessToken");
+      setAccessToken(null);
+      setUser(null);
+      console.log("Client-side logout completed.");
+    }
+  }, []);
+
+  /*──────────────────────────────────────────────────────────
+    Axios Interceptor for Token Refresh
+  ──────────────────────────────────────────────────────────*/
+  useEffect(() => {
+    const interceptor = API.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        const originalRequest = error.config;
+
+        if (
+          error.response?.status === 401 &&
+          !originalRequest._retry &&
+          !isRefreshing.current &&
+          !originalRequest.url.includes("/api/auth/login") &&
+          !originalRequest.url.includes("/api/auth/refresh") &&
+          !originalRequest.url.includes("/api/auth/logout")
+        ) {
+          originalRequest._retry = true;
+          isRefreshing.current = true;
+
+          try {
+            console.log("Attempting to refresh token...");
+            const refreshResponse = await API.post("/api/auth/refresh");
+            const newAccessToken = refreshResponse.data.accessToken;
+
+            localStorage.setItem("accessToken", newAccessToken);
+            setAccessToken(newAccessToken);
+            setUser(jwtDecode(newAccessToken));
+
+            console.log("Token refreshed. Retrying original request.");
+            originalRequest.headers["Authorization"] = `Bearer ${newAccessToken}`;
+            return API(originalRequest);
+          } catch (refreshError) {
+            console.error("Error refreshing token or refresh token invalid:", refreshError);
+            logout();
+            return Promise.reject(refreshError);
+          } finally {
+            isRefreshing.current = false;
+          }
+        }
+
+        if (error.response?.status === 401) {
+            if (originalRequest.url.includes("/api/auth/refresh")) {
+                console.log("Refresh token endpoint failed, performing full logout.");
+                logout();
+            } else if (originalRequest.url.includes("/api/auth/login")) {
+                console.log("Login failed directly.");
+            }
+        }
+
+        return Promise.reject(error);
+      }
+    );
+
+    return () => {
+      API.interceptors.response.eject(interceptor);
+    };
+  }, [logout, setAccessToken, setUser]);
 
   /*──────────────────────────────────────────────────────────
     Validate / restore token on first load & on every change
   ──────────────────────────────────────────────────────────*/
   useEffect(() => {
-    if (!token) {
+    if (!accessToken) {
       setUser(null);
       setAuthReady(true);
       return;
     }
 
     try {
-      const decoded = jwtDecode(token); // { id, exp, permissions, ... }
+      const decoded = jwtDecode(accessToken);
       const ttl = decoded.exp * 1000 - Date.now();
 
       if (ttl <= 0) {
-        logout();          // token expired
-        setAuthReady(true);
-        return;
+        console.log("Access token expired on load. Will attempt refresh on first protected API call.");
       }
-
-      setUser(decoded);    // restore user info
-      API.defaults.headers.common.Authorization = `Bearer ${token}`;
-
-      /* schedule auto‑logout right before expiry */
-      const id = setTimeout(logout, ttl);
-      return () => clearTimeout(id);
-    } catch {
-      logout();            // invalid token
+      setUser(decoded);
+    } catch (e) {
+      console.error("Invalid access token on load (format error):", e);
+      logout();
     } finally {
-      setAuthReady(true);  // signal that we’re done checking
+      setAuthReady(true);
     }
-  }, [token]);
+  }, [accessToken, logout]);
 
   /* context value */
   const value = {
-    token,
+    accessToken,
     user,
     isAuthenticated,
     userPermissions,
@@ -113,7 +184,7 @@ export function AuthProvider({ children }) {
     login,
     logout,
     api: API,
-    authReady,            // ← expose to consumers
+    authReady,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -128,7 +199,7 @@ export const RequirePerms = ({
   fallback = null,
 }) => {
   const { isAuthenticated, hasPermission, authReady } = useAuth();
-  if (!authReady) return null;          // or a spinner
+  if (!authReady) return null;
   if (!isAuthenticated) return fallback;
   return hasPermission(perms) ? children : fallback;
 };
@@ -138,6 +209,6 @@ export const RequireAuth = ({
   fallback = <Navigate to="/login" replace />,
 }) => {
   const { isAuthenticated, authReady } = useAuth();
-  if (!authReady) return null;          // or a spinner
+  if (!authReady) return null;
   return isAuthenticated ? children : fallback;
 };
