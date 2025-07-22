@@ -34,25 +34,37 @@ function issueRefreshToken(res, payload) {
 }
 
 /*────────────────────────────────────────────────────
-  LOGIN  — Step 1 (MODIFIED)
+  LOGIN  — Step 1 (MODIFIED with Debug Logs)
 ────────────────────────────────────────────────────*/
 router.post("/login", async (req, res, next) => {
   const { email, password } = req.body;
+  console.log(`[Auth] Login attempt for email: ${email}`); // DEBUG: Log incoming email
   try {
     const { rows } = await pool.query(
-      "SELECT id, name, email, password_hash, totp_enabled FROM users WHERE email=$1", // Removed 'permissions' from select
+      "SELECT id, name, email, password_hash, totp_enabled FROM users WHERE email=$1",
       [email]
     );
-    if (!rows.length)
+
+    if (!rows.length) {
+      console.log(`[Auth] User not found for email: ${email}`); // DEBUG: Log if user not found
       return res.status(401).json({ message: "Invalid credentials" });
+    }
 
     const user = rows[0];
+    console.log(`[Auth] User found: ${user.email}, comparing password...`); // DEBUG: Log user found
+    // console.log(`[Auth] Stored hash: ${user.password_hash}`); // DANGER: Do NOT log in production!
+    // console.log(`[Auth] Provided password: ${password}`); // DANGER: Do NOT log in production!
+
     const ok = await bcrypt.compare(password, user.password_hash);
-    if (!ok)
+    if (!ok) {
+      console.log(`[Auth] Password mismatch for email: ${email}`); // DEBUG: Log password mismatch
       return res.status(401).json({ message: "Invalid credentials" });
+    }
+    console.log(`[Auth] Password matched for email: ${email}`); // DEBUG: Log password match
 
     // Fetch permissions dynamically for the access token payload
     const permissions = await getUserPermissions(user.id);
+    console.log(`[Auth] Permissions fetched for ${user.email}:`, permissions); // DEBUG: Log permissions
 
     // Payload for both tokens
     const tokenPayload = {
@@ -63,9 +75,9 @@ router.post("/login", async (req, res, next) => {
     };
 
     if (user.totp_enabled) {
-      // If 2FA is enabled, issue a temporary token for the 2FA step
+      console.log(`[Auth] 2FA enabled for ${user.email}. Issuing temporary token.`); // DEBUG: Log 2FA path
       const tmp = jwt.sign(
-        { id: user.id, step: "mfa", permissions: permissions, name: user.name, email: user.email }, // Include full payload for next step
+        { id: user.id, step: "mfa", permissions: permissions, name: user.name, email: user.email },
         process.env.JWT_SECRET,
         { expiresIn: "5m" }
       );
@@ -74,14 +86,16 @@ router.post("/login", async (req, res, next) => {
 
     /* ---------- main login success ---------- */
     const accessToken = issueAccessToken(tokenPayload);
-    const refreshToken = issueRefreshToken(res, { id: user.id }); // Refresh token only needs user ID
+    const refreshToken = issueRefreshToken(res, { id: user.id });
 
     // Store refresh token in DB
     await pool.query("UPDATE users SET refresh_token = $1 WHERE id = $2", [refreshToken, user.id]);
+    console.log(`[Auth] Login successful for ${user.email}. Tokens issued.`); // DEBUG: Final success log
 
-    res.json({ accessToken }); // Send access token to frontend
+    res.json({ accessToken });
   } catch (e) {
-    next(e);
+    console.error(`[Auth] Login error for email ${req.body.email}:`, e.message); // DEBUG: Log general error
+    next(e); // Pass error to Express error handler
   }
 });
 
@@ -128,7 +142,7 @@ router.post("/login/step2", async (req, res, next) => {
     // Store refresh token in DB
     await pool.query("UPDATE users SET refresh_token = $1 WHERE id = $2", [refreshToken, decoded.id]);
 
-    res.json({ accessToken }); // Send access token to frontend
+    res.json({ accessToken });
   } catch (e) {
     next(e);
   }
@@ -138,7 +152,7 @@ router.post("/login/step2", async (req, res, next) => {
   REFRESH TOKEN (NEW ENDPOINT)
 ────────────────────────────────────────────────────*/
 router.post("/refresh", async (req, res, next) => {
-  const oldRefreshToken = req.cookies.refreshToken; // Get refresh token from httpOnly cookie
+  const oldRefreshToken = req.cookies.refreshToken;
 
   if (!oldRefreshToken) {
     console.log("→ [Auth] Refresh token missing from cookie.");
@@ -149,21 +163,16 @@ router.post("/refresh", async (req, res, next) => {
     const decoded = jwt.verify(oldRefreshToken, process.env.REFRESH_SECRET);
     const userId = decoded.id;
 
-    // Check if the refresh token exists and matches in the database
     const { rows } = await pool.query("SELECT refresh_token FROM users WHERE id = $1", [userId]);
     if (!rows.length || rows[0].refresh_token !== oldRefreshToken) {
       console.log("→ [Auth] Invalid or mismatched refresh token in DB.");
-      // Invalidate any existing token in the DB for this user to prevent reuse
       await pool.query("UPDATE users SET refresh_token = NULL WHERE id = $1", [userId]);
-      res.clearCookie("refreshToken"); // Clear the invalid cookie
+      res.clearCookie("refreshToken");
       return res.status(401).json({ message: "Invalid refresh token" });
     }
 
-    // --- Refresh Token Rotation ---
-    // Invalidate the old refresh token in the database immediately
     await pool.query("UPDATE users SET refresh_token = NULL WHERE id = $1", [userId]);
 
-    // Fetch user details and permissions for the new access token
     const userResult = await pool.query("SELECT id, name, email FROM users WHERE id = $1", [userId]);
     if (!userResult.rows.length) {
         console.log("→ [Auth] User not found during refresh.");
@@ -183,14 +192,13 @@ router.post("/refresh", async (req, res, next) => {
     const newAccessToken = issueAccessToken(tokenPayload);
     const newRefreshToken = issueRefreshToken(res, { id: user.id });
 
-    // Store the new refresh token in the database
     await pool.query("UPDATE users SET refresh_token = $1 WHERE id = $2", [newRefreshToken, user.id]);
 
     console.log("→ [Auth] Token refreshed successfully for user:", userId);
     res.json({ accessToken: newAccessToken });
   } catch (e) {
     console.error("→ [Auth] Error refreshing token:", e.message);
-    res.clearCookie("refreshToken"); // Clear cookie on any refresh error
+    res.clearCookie("refreshToken");
     return res.status(401).json({ message: "Error refreshing token or refresh token invalid" });
   }
 });
@@ -198,7 +206,6 @@ router.post("/refresh", async (req, res, next) => {
 /*────────────────────────────────────────────────────
   2‑FA  Setup  (QR)
 ────────────────────────────────────────────────────*/
-// `authenticateToken` is imported above
 router.post("/2fa/setup", authenticateToken, async (req, res, next) => {
   try {
     const secret = speakeasy.generateSecret({ name: "Synthpify.ai" });
@@ -259,11 +266,10 @@ router.get("/whoami", authenticateToken, (req, res) => {
 /*────────────────────────────────────────────────────
   LOGOUT (MODIFIED)
 ────────────────────────────────────────────────────*/
-router.post("/logout", authenticateToken, async (req, res) => { // Added authenticateToken to ensure user context
+router.post("/logout", authenticateToken, async (req, res) => {
   try {
-    // Clear refresh token from DB
     await pool.query("UPDATE users SET refresh_token = NULL WHERE id = $1", [req.user.id]);
-    res.clearCookie("refreshToken"); // Clear httpOnly refresh token cookie
+    res.clearCookie("refreshToken");
     console.log("→ [Auth] Logout successful. Cookies cleared and DB token removed.");
     res.sendStatus(204);
   } catch (e) {
