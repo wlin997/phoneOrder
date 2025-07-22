@@ -379,7 +379,7 @@ app.get('/api/hourly-orders', async (req, res) => {
                 res.json(hourlyCounts);
             } catch (error) {
                 console.error('Error fetching hourly orders:', error);
-                res.status(500).json({ error: 'Failed to fetch hourly orders: ' + error.message });
+                res.status(500).json({ error: 'Failed to fetch hourly orders: ' + err.message });
             }
         });
 app.get('/api/customer-stats', async (req, res) => {
@@ -407,7 +407,7 @@ app.get('/api/customer-stats', async (req, res) => {
         res.json({ totalOrders, repeatCustomers, topCustomers });
     } catch (error) {
         console.error('Error fetching customer stats:', error);
-        res.status(500).json({ error: 'Failed to fetch customer stats: ' + error.message });
+        res.status(500).json({ error: 'Failed to fetch customer stats: ' + err.message });
     }
 });
 
@@ -1123,6 +1123,9 @@ pool.connect()
         
         // Auth API routes (login, logout, refresh) - MOUNT THESE BEFORE ADMIN ROUTES
         app.use("/api/auth", authRoutes);
+
+        // Add this temporary console.log to check REFRESH_SECRET
+        console.log("DEBUG: REFRESH_SECRET is:", process.env.REFRESH_SECRET ? "SET" : "NOT SET");
 
         // Admin API - these should be *inside* the .then block's callback
         app.use("/api/admin", authenticateToken, adminRoutes);
