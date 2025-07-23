@@ -4,22 +4,25 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext.jsx";
 
 export default function Login() {
-  const { login } = useAuth(); // We only need the login function here
+  const { login } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(""); // State to hold error message
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
-    try {
-      await login(email, password);
-      // Always navigate to the root path after successful login.
-      // DefaultLandingPage will then handle the specific redirection based on permissions.
+    setError(""); // Clear previous errors
+
+    // Call the login function from AuthContext and get its result
+    const result = await login(email, password);
+
+    if (!result.success) {
+      // If login was not successful, display the message from the result
+      setError(result.message);
+    } else {
+      // Login successful, navigate to the root path
       navigate("/", { replace: true });
-    } catch (err) {
-      setError(err.response?.data?.message || "Login failed");
     }
   };
 
