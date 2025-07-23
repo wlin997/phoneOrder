@@ -15,6 +15,12 @@ const { getUserPermissions } = require("./rbac.service.cjs");
 const rateLimit = require("express-rate-limit");
 
 /*────────────────────────────────────────────────────
+  Constants for Account Lockout (NEW)
+────────────────────────────────────────────────────*/
+const MAX_FAILED_ATTEMPTS = 5; // Max consecutive failed login attempts before lockout
+const LOCKOUT_DURATION_MINUTES = 30; // How long an account is locked (in minutes)
+
+/*────────────────────────────────────────────────────
   TOKEN Helpers
 ────────────────────────────────────────────────────*/
 // Helper to issue access token (for client-side Authorization header)
@@ -35,7 +41,7 @@ function issueRefreshToken(res, payload) {
 }
 
 /*────────────────────────────────────────────────────
-  Rate Limiting Middleware (NEW with Debug Logs)
+  Rate Limiting Middleware
 ────────────────────────────────────────────────────*/
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -45,23 +51,23 @@ const loginLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  handler: (req, res, next, options) => { // Custom handler to log when limit is exceeded
+  handler: (req, res, next, options) => {
     console.log(`[RateLimit] IP ${req.ip} exceeded login rate limit (Max: ${options.max} requests in ${options.windowMs / 1000 / 60} minutes).`);
     res.status(options.statusCode).send(options.message);
   },
-  // You can add a `store` option here if you need a persistent store (e.g., Redis)
 });
 
 
 /*────────────────────────────────────────────────────
-  LOGIN  — Step 1 (MODIFIED: Apply Rate Limiter)
+  LOGIN  — Step 1 (MODIFIED: Account Lockout Logic)
 ────────────────────────────────────────────────────*/
 router.post("/login", loginLimiter, async (req, res, next) => {
-  console.log(`[Auth] Incoming login request from IP: ${req.ip}`); // Debug log for every login attempt
+  console.log(`[Auth] Incoming login request from IP: ${req.ip}`);
   const { email, password } = req.body;
   try {
+    // MODIFIED: Select new lockout columns
     const { rows } = await pool.query(
-      "SELECT id, name, email, password_hash, totp_enabled FROM users WHERE email=$1",
+      "SELECT id, name, email, password_hash, totp_enabled, failed_login_attempts, lockout_until FROM users WHERE email=$1",
       [email]
     );
 
@@ -71,10 +77,46 @@ router.post("/login", loginLimiter, async (req, res, next) => {
     }
 
     const user = rows[0];
+
+    // NEW: Check for account lockout
+    if (user.lockout_until && new Date(user.lockout_until) > new Date()) {
+      const remainingTimeMs = new Date(user.lockout_until).getTime() - new Date().getTime();
+      const remainingMinutes = Math.ceil(remainingTimeMs / (1000 * 60));
+      console.log(`[Auth] Account ${email} is locked until ${user.lockout_until}. Remaining: ${remainingMinutes} minutes.`);
+      return res.status(423).json({ // 423 Locked status code
+        message: `Account locked due to too many failed attempts. Please try again in ${remainingMinutes} minutes.`
+      });
+    }
+
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok) {
       console.log(`[Auth] Password mismatch for email: ${email}`);
-      return res.status(401).json({ message: "Invalid credentials" });
+      // NEW: Increment failed login attempts
+      const newFailedAttempts = user.failed_login_attempts + 1;
+      let newLockoutUntil = null;
+      let lockoutMessage = "Invalid credentials";
+
+      if (newFailedAttempts >= MAX_FAILED_ATTEMPTS) {
+        newLockoutUntil = new Date(Date.now() + LOCKOUT_DURATION_MINUTES * 60 * 1000);
+        console.log(`[Auth] Account ${email} locked for ${LOCKOUT_DURATION_MINUTES} minutes.`);
+        lockoutMessage = `Account locked due to too many failed attempts. Please try again in ${LOCKOUT_DURATION_MINUTES} minutes.`;
+      }
+
+      await pool.query(
+        "UPDATE users SET failed_login_attempts = $1, lockout_until = $2 WHERE id = $3",
+        [newFailedAttempts, newLockoutUntil, user.id]
+      );
+
+      return res.status(401).json({ message: lockoutMessage });
+    }
+
+    // NEW: On successful login, reset failed attempts and lockout status
+    if (user.failed_login_attempts > 0 || user.lockout_until) {
+      await pool.query(
+        "UPDATE users SET failed_login_attempts = 0, lockout_until = NULL WHERE id = $1",
+        [user.id]
+      );
+      console.log(`[Auth] Failed login attempts reset for ${email}.`);
     }
 
     const permissions = await getUserPermissions(user.id);
