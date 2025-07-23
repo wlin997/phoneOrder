@@ -1,0 +1,47 @@
+To make the system even more robust against persistent or sophisticated attacks, consider these improvements:
+
+Progressive Lockout Durations:
+
+Instead of a fixed 30-minute lockout, implement increasing lockout durations. For example:
+
+5 failed attempts: 30 minutes lockout
+
+10 failed attempts (after previous lockout expires): 1 hour lockout
+
+15 failed attempts: 24 hours lockout
+
+20+ failed attempts: Permanent manual review/lockout
+
+This requires storing not just lockout_until but also the number of times an account has been locked or a more complex failed_login_attempts tracking that doesn't fully reset until successful login.
+
+Global/Long-Term Failed Attempt Tracking:
+
+Beyond consecutive failed attempts, track the total number of failed attempts over a much longer period (e.g., 24 hours, 7 days).
+
+If a user has, say, 50 failed attempts in 24 hours, even if not consecutive, it could trigger a longer lockout or an alert to an administrator.
+
+Honeypot Fields:
+
+Add a hidden form field (CSS display: none;). Bots often fill in all fields. If this hidden field is filled, it's likely a bot, and you can immediately block the request or flag the IP. This is handled on the frontend.
+
+CAPTCHA Integration (after a few failed attempts):
+
+After 2-3 failed login attempts, introduce a CAPTCHA (e.g., reCAPTCHA v2/v3). This adds a human verification step that is very difficult for bots to bypass. This requires both frontend and backend integration.
+
+IP Blacklisting/Whitelisting (Manual/Automated):
+
+For extreme cases, if an IP is consistently abusive, you might manually blacklist it.
+
+More advanced systems can automatically blacklist IPs that show highly suspicious patterns (e.g., thousands of attempts across many different accounts).
+
+Monitoring and Alerting:
+
+Integrate logging with an alerting system (e.g., Slack, email). If a certain threshold of failed logins or account lockouts is met, an administrator is notified to investigate.
+
+Multi-Factor Authentication (MFA/2FA):
+
+You already have a 2FA setup in your auth.routes.cjs. Encouraging or enforcing MFA for all users significantly increases security, as it requires a second factor (like a code from an authenticator app) even if the password is breached.
+
+Conclusion on Security:
+
+The current implementation (IP rate limiting + account lockout) is a strong foundation and addresses the most common brute-force attacks effectively for many applications. However, for applications with extremely high-value data or very strict security requirements, the more advanced measures listed above would be considered.

@@ -340,7 +340,7 @@ app.get('/api/popular-items', async (req, res) => {
     }, {});
     res.json(itemCounts);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch popular items: ' + error.message });
+    res.status(500).json({ error: 'Failed to fetch popular items: ' + err.message });
   }
 });
 app.get('/api/hourly-orders', async (req, res) => {
@@ -919,7 +919,7 @@ app.post('/api/daily-specials', async (req, res) => {
       });
       console.log(`[VAPI Update Flow] Old file ${old_vapi_file_id} deleted successfully.`);
     } catch (deleteErr) {
-      console.warn(`[VAPI Update Flow] Warning: Failed to delete old file ${old_vapi_file_id}. Error: ${deleteErr.response ? deleteErr.response.data : deleteErr.message}`);
+      console.warn(`[VAPI Update Flow] Warning: Failed to delete old file ${old_vapi_file_id}. Error: ${deleteErr.response ? deleteErr.response.data : err.message}`);
     }
 
     console.log('[VAPI Update Flow] Uploading new file with updated content using FormData...');
