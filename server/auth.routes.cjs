@@ -8,25 +8,26 @@ const speakeasy  = require("speakeasy");
 const qrcode     = require("qrcode");
 const pool       = require("./db.js");
 const router     = express.Router();
-const { authenticateToken } = require("./auth.middleware.cjs"); // Import here for logout and 2FA setup/enable
-const { getUserPermissions } = require("./rbac.service.cjs"); // Import rbac service for permissions
+const { authenticateToken } = require("./auth.middleware.cjs");
+const { getUserPermissions } = require("./rbac.service.cjs");
+
+// NEW: Import express-rate-limit
+const rateLimit = require("express-rate-limit");
 
 /*────────────────────────────────────────────────────
-  TOKEN Helpers (NEW/MODIFIED)
+  TOKEN Helpers
 ────────────────────────────────────────────────────*/
 // Helper to issue access token (for client-side Authorization header)
 function issueAccessToken(payload) {
-  // Access tokens should be relatively short-lived (e.g., 15-30 minutes)
   return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "15m" });
 }
 
 // Helper to issue refresh token (for httpOnly cookie)
 function issueRefreshToken(res, payload) {
-  // Refresh tokens are longer-lived (e.g., 7 days or more)
   const refreshToken = jwt.sign(payload, process.env.REFRESH_SECRET, { expiresIn: "7d" });
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
-    secure:   process.env.NODE_ENV === "production", // Use secure in production
+    secure:   process.env.NODE_ENV === "production",
     sameSite: "strict",
     maxAge:   7 * 24 * 3600e3, // 7 days in milliseconds
   });
@@ -34,11 +35,27 @@ function issueRefreshToken(res, payload) {
 }
 
 /*────────────────────────────────────────────────────
-  LOGIN  — Step 1 (MODIFIED with Debug Logs)
+  Rate Limiting Middleware (NEW)
 ────────────────────────────────────────────────────*/
-router.post("/login", async (req, res, next) => {
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 login requests per windowMs
+  message: {
+    message: "Too many login attempts from this IP, please try again after 15 minutes."
+  },
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  // You can add a `store` option here if you need a persistent store (e.g., Redis)
+  // For a single Render instance, the default in-memory store is usually fine.
+});
+
+
+/*────────────────────────────────────────────────────
+  LOGIN  — Step 1 (MODIFIED: Apply Rate Limiter)
+────────────────────────────────────────────────────*/
+router.post("/login", loginLimiter, async (req, res, next) => { // Apply loginLimiter here
   const { email, password } = req.body;
-  console.log(`[Auth] Login attempt for email: ${email}`); // DEBUG: Log incoming email
+  // Removed all previous DEBUG console.log statements
   try {
     const { rows } = await pool.query(
       "SELECT id, name, email, password_hash, totp_enabled FROM users WHERE email=$1",
@@ -46,36 +63,27 @@ router.post("/login", async (req, res, next) => {
     );
 
     if (!rows.length) {
-      console.log(`[Auth] User not found for email: ${email}`); // DEBUG: Log if user not found
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
     const user = rows[0];
-    console.log(`[Auth] User found: ${user.email}, comparing password...`); // DEBUG: Log user found
-    // console.log(`[Auth] Stored hash: ${user.password_hash}`); // DANGER: Do NOT log in production!
-    // console.log(`[Auth] Provided password: ${password}`); // DANGER: Do NOT log in production!
-
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok) {
-      console.log(`[Auth] Password mismatch for email: ${email}`); // DEBUG: Log password mismatch
       return res.status(401).json({ message: "Invalid credentials" });
     }
-    console.log(`[Auth] Password matched for email: ${email}`); // DEBUG: Log password match
 
     // Fetch permissions dynamically for the access token payload
     const permissions = await getUserPermissions(user.id);
-    console.log(`[Auth] Permissions fetched for ${user.email}:`, permissions); // DEBUG: Log permissions
 
     // Payload for both tokens
     const tokenPayload = {
       id: user.id,
       name: user.name,
       email: user.email,
-      permissions: permissions, // Include permissions in access token
+      permissions: permissions,
     };
 
     if (user.totp_enabled) {
-      console.log(`[Auth] 2FA enabled for ${user.email}. Issuing temporary token.`); // DEBUG: Log 2FA path
       const tmp = jwt.sign(
         { id: user.id, step: "mfa", permissions: permissions, name: user.name, email: user.email },
         process.env.JWT_SECRET,
@@ -90,18 +98,18 @@ router.post("/login", async (req, res, next) => {
 
     // Store refresh token in DB
     await pool.query("UPDATE users SET refresh_token = $1 WHERE id = $2", [refreshToken, user.id]);
-    console.log(`[Auth] Login successful for ${user.email}. Tokens issued.`); // DEBUG: Final success log
 
     res.json({ accessToken });
   } catch (e) {
-    console.error(`[Auth] Login error for email ${req.body.email}:`, e.message); // DEBUG: Log general error
-    next(e); // Pass error to Express error handler
+    // Keep this error log for general unexpected errors
+    console.error(`[Auth] Login error for email ${req.body.email}:`, e.message);
+    next(e);
   }
 });
 
 
 /*────────────────────────────────────────────────────
-  LOGIN  — Step 2 (TOTP) (MODIFIED)
+  LOGIN  — Step 2 (TOTP)
 ────────────────────────────────────────────────────*/
 router.post("/login/step2", async (req, res, next) => {
   const { tmpToken, code } = req.body;
@@ -126,7 +134,6 @@ router.post("/login/step2", async (req, res, next) => {
     });
     if (!verified) return res.status(401).json({ message: "Bad code" });
 
-    // Fetch permissions dynamically for the final token
     const permissions = await getUserPermissions(decoded.id);
 
     const tokenPayload = {
@@ -139,7 +146,6 @@ router.post("/login/step2", async (req, res, next) => {
     const accessToken = issueAccessToken(tokenPayload);
     const refreshToken = issueRefreshToken(res, { id: decoded.id });
 
-    // Store refresh token in DB
     await pool.query("UPDATE users SET refresh_token = $1 WHERE id = $2", [refreshToken, decoded.id]);
 
     res.json({ accessToken });
@@ -149,7 +155,7 @@ router.post("/login/step2", async (req, res, next) => {
 });
 
 /*────────────────────────────────────────────────────
-  REFRESH TOKEN (NEW ENDPOINT)
+  REFRESH TOKEN
 ────────────────────────────────────────────────────*/
 router.post("/refresh", async (req, res, next) => {
   const oldRefreshToken = req.cookies.refreshToken;
@@ -264,7 +270,7 @@ router.get("/whoami", authenticateToken, (req, res) => {
 });
 
 /*────────────────────────────────────────────────────
-  LOGOUT (MODIFIED)
+  LOGOUT
 ────────────────────────────────────────────────────*/
 router.post("/logout", authenticateToken, async (req, res) => {
   try {
