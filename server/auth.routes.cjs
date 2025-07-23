@@ -35,7 +35,7 @@ function issueRefreshToken(res, payload) {
 }
 
 /*────────────────────────────────────────────────────
-  Rate Limiting Middleware (NEW)
+  Rate Limiting Middleware (NEW with Debug Logs)
 ────────────────────────────────────────────────────*/
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -43,19 +43,22 @@ const loginLimiter = rateLimit({
   message: {
     message: "Too many login attempts from this IP, please try again after 15 minutes."
   },
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res, next, options) => { // Custom handler to log when limit is exceeded
+    console.log(`[RateLimit] IP ${req.ip} exceeded login rate limit (Max: ${options.max} requests in ${options.windowMs / 1000 / 60} minutes).`);
+    res.status(options.statusCode).send(options.message);
+  },
   // You can add a `store` option here if you need a persistent store (e.g., Redis)
-  // For a single Render instance, the default in-memory store is usually fine.
 });
 
 
 /*────────────────────────────────────────────────────
   LOGIN  — Step 1 (MODIFIED: Apply Rate Limiter)
 ────────────────────────────────────────────────────*/
-router.post("/login", loginLimiter, async (req, res, next) => { // Apply loginLimiter here
+router.post("/login", loginLimiter, async (req, res, next) => {
+  console.log(`[Auth] Incoming login request from IP: ${req.ip}`); // Debug log for every login attempt
   const { email, password } = req.body;
-  // Removed all previous DEBUG console.log statements
   try {
     const { rows } = await pool.query(
       "SELECT id, name, email, password_hash, totp_enabled FROM users WHERE email=$1",
@@ -63,19 +66,19 @@ router.post("/login", loginLimiter, async (req, res, next) => { // Apply loginLi
     );
 
     if (!rows.length) {
+      console.log(`[Auth] User not found for email: ${email}`);
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
     const user = rows[0];
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok) {
+      console.log(`[Auth] Password mismatch for email: ${email}`);
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    // Fetch permissions dynamically for the access token payload
     const permissions = await getUserPermissions(user.id);
 
-    // Payload for both tokens
     const tokenPayload = {
       id: user.id,
       name: user.name,
@@ -84,6 +87,7 @@ router.post("/login", loginLimiter, async (req, res, next) => { // Apply loginLi
     };
 
     if (user.totp_enabled) {
+      console.log(`[Auth] 2FA enabled for ${user.email}. Issuing temporary token.`);
       const tmp = jwt.sign(
         { id: user.id, step: "mfa", permissions: permissions, name: user.name, email: user.email },
         process.env.JWT_SECRET,
@@ -96,12 +100,11 @@ router.post("/login", loginLimiter, async (req, res, next) => { // Apply loginLi
     const accessToken = issueAccessToken(tokenPayload);
     const refreshToken = issueRefreshToken(res, { id: user.id });
 
-    // Store refresh token in DB
     await pool.query("UPDATE users SET refresh_token = $1 WHERE id = $2", [refreshToken, user.id]);
+    console.log(`[Auth] Login successful for ${user.email}. Tokens issued.`);
 
     res.json({ accessToken });
   } catch (e) {
-    // Keep this error log for general unexpected errors
     console.error(`[Auth] Login error for email ${req.body.email}:`, e.message);
     next(e);
   }
