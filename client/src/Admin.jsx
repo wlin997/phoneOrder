@@ -8,8 +8,44 @@ const generateRange = (start, end) => {
 
 const padZero = (num) => String(num).padStart(2, '0');
 
+/*────────────────────────────────────────────────────
+  Password Policy Constants (Mirror Backend)
+────────────────────────────────────────────────────*/
+const PASSWORD_POLICY = {
+  minLength: 12,
+  requireUppercase: true,
+  requireLowercase: true,
+  requireNumber: true,
+  requireSpecialChar: true,
+};
+
+/*────────────────────────────────────────────────────
+  Password Validation Helper (Mirror Backend)
+────────────────────────────────────────────────────*/
+function validatePassword(password) {
+  if (password.length === 0) {
+    return null; // Allow empty password for optional update, backend will handle 'required'
+  }
+  if (password.length < PASSWORD_POLICY.minLength) {
+    return `Password must be at least ${PASSWORD_POLICY.minLength} characters long.`;
+  }
+  if (PASSWORD_POLICY.requireUppercase && !/[A-Z]/.test(password)) {
+    return "Password must contain at least one uppercase letter.";
+  }
+  if (PASSWORD_POLICY.requireLowercase && !/[a-z]/.test(password)) {
+    return "Password must contain at least one lowercase letter.";
+  }
+  if (PASSWORD_POLICY.requireNumber && !/[0-9]/.test(password)) {
+    return "Password must contain at least one number.";
+  }
+  if (PASSWORD_POLICY.requireSpecialChar && !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+    return "Password must contain at least one special character.";
+  }
+  return null; // Password is valid
+}
+
+
 export default function Admin() {
-  // State separated for clarity
   const [printerSettings, setPrinterSettings] = useState({
     mode: 'LAN',
     url: '',
@@ -24,12 +60,29 @@ export default function Admin() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
-  // Updated VAPI settings to include fileId
   const [vapiSettings, setVapiSettings] = useState({
     apiKey: '',
     assistantId: '',
-    fileId: '', // New field for file ID
+    fileId: '',
   });
+
+  // NEW: State for new user form
+  const [newUser, setNewUser] = useState({
+    name: '',
+    email: '',
+    password: '',
+    role_id: '',
+  });
+  const [newUserPasswordError, setNewUserPasswordError] = useState(null); // NEW: Password validation error for new user
+  const [newUserError, setNewUserError] = useState(null); // NEW: General error for new user creation
+
+  // NEW: State for user list and roles for user management section
+  const [users, setUsers] = useState([]);
+  const [roles, setRoles] = useState([]);
+  const [editingUser, setEditingUser] = useState(null); // User currently being edited
+  const [editPassword, setEditPassword] = useState(''); // Password for editing user
+  const [editPasswordError, setEditPasswordError] = useState(null); // Password validation error for editing user
+  const [editUserError, setEditUserError] = useState(null); // General error for editing user
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -79,6 +132,33 @@ export default function Admin() {
     const intervalId = setInterval(checkPrinterStatus, 60000);
     return () => clearInterval(intervalId);
   }, [printerSettings.url]);
+
+  // NEW: Load users and roles for user management
+  useEffect(() => {
+    const loadUsersAndRoles = async () => {
+      try {
+        const usersRes = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users`);
+        if (usersRes.ok) {
+          const usersData = await usersRes.json();
+          setUsers(usersData);
+        } else {
+          console.error(`Failed to fetch users: ${usersRes.status}`);
+        }
+
+        const rolesRes = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/roles`);
+        if (rolesRes.ok) {
+          const rolesData = await rolesRes.json();
+          setRoles(rolesData);
+        } else {
+          console.error(`Failed to fetch roles: ${rolesRes.status}`);
+        }
+      } catch (err) {
+        console.error('Error loading users or roles:', err.message);
+      }
+    };
+    loadUsersAndRoles();
+  }, []);
+
 
   const handleMenuOpen = () => setIsMenuOpen((prev) => !prev);
   const handleMenuClose = () => setIsMenuOpen(false);
@@ -154,7 +234,7 @@ export default function Admin() {
           setVapiSettings({
             apiKey: data.api_key || '',
             assistantId: data.assistant_id || '',
-            fileId: data.file_id || '', // Load file ID from backend
+            fileId: data.file_id || '',
           });
         }
       } catch (err) {
@@ -186,9 +266,141 @@ export default function Admin() {
     }
   };
 
+  // NEW: Handle new user form changes
+  const handleNewUserChange = (e) => {
+    const { name, value } = e.target;
+    setNewUser((prev) => {
+      const updatedUser = { ...prev, [name]: value };
+      if (name === 'password') {
+        setNewUserPasswordError(validatePassword(value)); // Validate password on change
+      }
+      return updatedUser;
+    });
+  };
+
+  // NEW: Handle new user submission
+  const handleCreateUser = async () => {
+    setNewUserError(null);
+    const passwordError = validatePassword(newUser.password);
+    if (passwordError) {
+      setNewUserPasswordError(passwordError);
+      return;
+    }
+
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newUser),
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || `Failed to create user: ${res.status}`);
+      }
+      alert('User created successfully!');
+      setNewUser({ name: '', email: '', password: '', role_id: '' }); // Clear form
+      setNewUserPasswordError(null);
+      // Refresh user list
+      const usersRes = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users`);
+      if (usersRes.ok) {
+        setUsers(await usersRes.json());
+      }
+    } catch (err) {
+      console.error('Error creating user:', err.message);
+      setNewUserError(err.message);
+    }
+  };
+
+  // NEW: Handle editing user
+  const handleEditUser = (user) => {
+    setEditingUser({ ...user, password: '' }); // Load user data, clear password
+    setEditPassword(''); // Clear edit password field
+    setEditPasswordError(null);
+    setEditUserError(null);
+  };
+
+  // NEW: Handle changes in editing user form
+  const handleEditingUserChange = (e) => {
+    const { name, value } = e.target;
+    setEditingUser((prev) => {
+      const updatedUser = { ...prev, [name]: value };
+      if (name === 'password') {
+        setEditPassword(value);
+        setEditPasswordError(validatePassword(value)); // Validate password on change
+      }
+      return updatedUser;
+    });
+  };
+
+  // NEW: Handle save edited user
+  const handleSaveEditedUser = async () => {
+    setEditUserError(null);
+    if (editPassword && editPasswordError) { // Check if password is provided AND has an error
+      return;
+    }
+
+    const payload = {
+      name: editingUser.name,
+      email: editingUser.email,
+      role_id: editingUser.role_id,
+    };
+    if (editPassword) { // Only include password if it's been changed
+      payload.password = editPassword;
+    }
+
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users/${editingUser.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || `Failed to update user: ${res.status}`);
+      }
+      alert('User updated successfully!');
+      setEditingUser(null); // Close edit form
+      setEditPassword('');
+      setEditPasswordError(null);
+      // Refresh user list
+      const usersRes = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users`);
+      if (usersRes.ok) {
+        setUsers(await usersRes.json());
+      }
+    } catch (err) {
+      console.error('Error updating user:', err.message);
+      setEditUserError(err.message);
+    }
+  };
+
+  // NEW: Handle delete user
+  const handleDeleteUser = async (userId) => {
+    if (!window.confirm('Are you sure you want to delete this user?')) {
+      return;
+    }
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users/${userId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || `Failed to delete user: ${res.status}`);
+      }
+      alert('User deleted successfully!');
+      // Refresh user list
+      const usersRes = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users`);
+      if (usersRes.ok) {
+        setUsers(await usersRes.json());
+      }
+    } catch (err) {
+      console.error('Error deleting user:', err.message);
+      alert(`Failed to delete user: ${err.message}`);
+    }
+  };
+
+
   const [cronMinute, cronHour] = appSettings.archiveCronSchedule.split(' ');
 
-  // Define a common button class string
   const commonButtonClasses = "w-full py-2 rounded-lg transition-colors shadow-md focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-opacity-50 bg-cyan-500 text-white hover:bg-cyan-600";
 
   return (
@@ -267,8 +479,7 @@ export default function Admin() {
             </div>
             <button
               onClick={handleSaveAppSettings}
-              // Applied common button classes
-              className={commonButtonClasses + " mt-6"} 
+              className={commonButtonClasses + " mt-6"}
             >
               Save Application Settings
             </button>
@@ -313,7 +524,6 @@ export default function Admin() {
             />
             <button
               onClick={handleSavePrinterSettings}
-              // Retained original specific styling for "Save Printer Settings" as per request
               className="w-full bg-cyan-500 text-white py-2 rounded-lg hover:bg-cyan-600 transition-colors"
             >
               Save Printer Settings
@@ -361,12 +571,183 @@ export default function Admin() {
               <button
                 onClick={handleSaveVapiSettings}
                 type="button"
-                // Applied common button classes
                 className={commonButtonClasses + " mt-6"}
               >
                 Save VAPI Settings
               </button>
             </form>
+          </div>
+
+          {/* User Management Section (NEW) */}
+          <div className="mb-8 p-4 border rounded-lg bg-gray-50">
+            <h3 className="text-xl font-semibold mb-4 text-gray-700">User Management</h3>
+
+            {/* Create New User Form */}
+            <h4 className="text-lg font-semibold mb-3 text-gray-700">Create New User</h4>
+            <div className="space-y-3 mb-4">
+              <input
+                type="text"
+                name="name"
+                value={newUser.name}
+                onChange={handleNewUserChange}
+                placeholder="Name"
+                className="w-full p-2 border rounded"
+                required
+              />
+              <input
+                type="email"
+                name="email"
+                value={newUser.email}
+                onChange={handleNewUserChange}
+                placeholder="Email"
+                className="w-full p-2 border rounded"
+                required
+              />
+              <input
+                type="password"
+                name="password"
+                value={newUser.password}
+                onChange={handleNewUserChange}
+                placeholder="Password"
+                className="w-full p-2 border rounded"
+                required
+              />
+              {newUserPasswordError && (
+                <p className="text-red-500 text-sm">{newUserPasswordError}</p>
+              )}
+              <select
+                name="role_id"
+                value={newUser.role_id}
+                onChange={handleNewUserChange}
+                className="w-full p-2 border rounded bg-white"
+                required
+              >
+                <option value="">Select Role</option>
+                {roles.map((role) => (
+                  <option key={role.id} value={role.id}>{role.name}</option>
+                ))}
+              </select>
+            </div>
+            {newUserError && (
+              <p className="text-red-500 text-sm mb-4">{newUserError}</p>
+            )}
+            <button
+              onClick={handleCreateUser}
+              className={commonButtonClasses + " mb-8"}
+              disabled={!!newUserPasswordError} // Disable if password has client-side error
+            >
+              Create User
+            </button>
+
+            {/* User List */}
+            <h4 className="text-lg font-semibold mb-3 text-gray-700">Existing Users</h4>
+            <div className="overflow-x-auto">
+              <table className="min-w-full bg-white rounded-lg shadow overflow-hidden">
+                <thead className="bg-gray-200">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Name</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Email</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Role</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {users.map((user) => (
+                    <tr key={user.id}>
+                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-800">{user.name}</td>
+                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-800">{user.email}</td>
+                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-800">{user.role_name}</td>
+                      <td className="px-4 py-2 whitespace-nowrap text-sm">
+                        <button
+                          onClick={() => handleEditUser(user)}
+                          className="text-indigo-600 hover:text-indigo-900 mr-3"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(user.id)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Edit User Modal/Form */}
+            {editingUser && (
+              <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex justify-center items-center">
+                <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
+                  <h4 className="text-xl font-semibold mb-4 text-gray-700">Edit User</h4>
+                  <div className="space-y-3 mb-4">
+                    <label className="block text-sm font-medium text-gray-700">Name</label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={editingUser.name}
+                      onChange={handleEditingUserChange}
+                      className="w-full p-2 border rounded"
+                      required
+                    />
+                    <label className="block text-sm font-medium text-gray-700">Email</label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={editingUser.email}
+                      onChange={handleEditingUserChange}
+                      className="w-full p-2 border rounded"
+                      required
+                    />
+                    <label className="block text-sm font-medium text-gray-700">New Password (optional)</label>
+                    <input
+                      type="password"
+                      name="password"
+                      value={editPassword} // Use separate state for edit password input
+                      onChange={handleEditingUserChange}
+                      placeholder="Leave blank to keep current password"
+                      className="w-full p-2 border rounded"
+                    />
+                    {editPasswordError && (
+                      <p className="text-red-500 text-sm">{editPasswordError}</p>
+                    )}
+                    <label className="block text-sm font-medium text-gray-700">Role</label>
+                    <select
+                      name="role_id"
+                      value={editingUser.role_id}
+                      onChange={handleEditingUserChange}
+                      className="w-full p-2 border rounded bg-white"
+                      required
+                    >
+                      <option value="">Select Role</option>
+                      {roles.map((role) => (
+                        <option key={role.id} value={role.id}>{role.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {editUserError && (
+                    <p className="text-red-500 text-sm mb-4">{editUserError}</p>
+                  )}
+                  <div className="flex justify-end space-x-3">
+                    <button
+                      onClick={() => setEditingUser(null)}
+                      className="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSaveEditedUser}
+                      className={commonButtonClasses + " w-auto px-4"}
+                      disabled={!!editPasswordError} // Disable if password has client-side error
+                    >
+                      Save Changes
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

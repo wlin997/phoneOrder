@@ -7,6 +7,40 @@ const pool    = require("./db.js");
 const { requirePermission } = require("./auth.middleware.cjs");
 router.use(requirePermission("manage_admin_settings"));   // guard all admin routes
 
+/*────────────────────────────────────────────────────
+  Password Policy Constants (NEW)
+────────────────────────────────────────────────────*/
+const PASSWORD_POLICY = {
+  minLength: 12,
+  requireUppercase: true,
+  requireLowercase: true,
+  requireNumber: true,
+  requireSpecialChar: true,
+};
+
+/*────────────────────────────────────────────────────
+  Password Validation Helper (NEW)
+────────────────────────────────────────────────────*/
+function validatePassword(password) {
+  if (password.length < PASSWORD_POLICY.minLength) {
+    return `Password must be at least ${PASSWORD_POLICY.minLength} characters long.`;
+  }
+  if (PASSWORD_POLICY.requireUppercase && !/[A-Z]/.test(password)) {
+    return "Password must contain at least one uppercase letter.";
+  }
+  if (PASSWORD_POLICY.requireLowercase && !/[a-z]/.test(password)) {
+    return "Password must contain at least one lowercase letter.";
+  }
+  if (PASSWORD_POLICY.requireNumber && !/[0-9]/.test(password)) {
+    return "Password must contain at least one number.";
+  }
+  if (PASSWORD_POLICY.requireSpecialChar && !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+    return "Password must contain at least one special character.";
+  }
+  return null; // Password is valid
+}
+
+
 /*──────────────────────────  ROLES  ──────────────────────────*/
 router.get("/roles", async (_, res, next) => {
   try {
@@ -82,7 +116,7 @@ router.get("/users", async (_, res, next) => {
   try {
     const sql = `
       SELECT u.id,
-             u.name,                   -- include name
+             u.name,
              u.email,
              u.role_id,
              r.name AS role_name
@@ -98,6 +132,13 @@ router.post("/users", async (req, res, next) => {
   const { name, email, password, role_id } = req.body;
   if (!name || !email || !password || !role_id)
     return res.status(400).json({ message: "name, email, password, role_id required" });
+
+  // NEW: Validate password complexity for new user creation
+  const passwordError = validatePassword(password);
+  if (passwordError) {
+    return res.status(400).json({ message: passwordError });
+  }
+
   try {
     const hash = await bcrypt.hash(password, 10);
     const sql = `
@@ -123,7 +164,13 @@ router.put("/users/:id", async (req, res, next) => {
   if (name !== undefined)    { fields.push(`name=$${idx++}`);    vals.push(name); }
   if (email !== undefined)   { fields.push(`email=$${idx++}`);   vals.push(email); }
   if (role_id !== undefined) { fields.push(`role_id=$${idx++}`); vals.push(role_id); }
+  
+  // NEW: Validate password complexity if password is being updated
   if (password) {
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      return res.status(400).json({ message: passwordError });
+    }
     const hash = await bcrypt.hash(password, 10);
     fields.push(`password_hash=$${idx++}`);
     vals.push(hash);
@@ -168,6 +215,12 @@ router.put(
 router.put("/users/:id/password", async (req, res, next) => {
   const { password } = req.body;
   if (!password) return res.status(400).json({ message: "Password required" });
+
+  // NEW: Validate password complexity for dedicated password change
+  const passwordError = validatePassword(password);
+  if (passwordError) {
+    return res.status(400).json({ message: passwordError });
+  }
 
   try {
     const hash = await bcrypt.hash(password, 10);
