@@ -1,5 +1,5 @@
 // client/src/Login.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext.jsx";
 
@@ -8,21 +8,72 @@ export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState(""); // State to hold error message
+  const [error, setError] = useState("");
+  const [requiresCaptcha, setRequiresCaptcha] = useState(false); // NEW: State to control CAPTCHA visibility
+  const recaptchaRef = useRef(null); // NEW: Ref for reCAPTCHA widget
+
+  // NEW: Load reCAPTCHA script dynamically
+  useEffect(() => {
+    if (requiresCaptcha && !document.getElementById('recaptcha-script')) {
+      const script = document.createElement('script');
+      script.id = 'recaptcha-script';
+      script.src = `https://www.google.com/recaptcha/api.js?render=explicit`; // Use explicit render
+      script.async = true;
+      script.defer = true;
+      document.body.appendChild(script);
+      script.onload = () => {
+        // Render the reCAPTCHA widget once the script is loaded
+        if (recaptchaRef.current && window.grecaptcha) {
+          window.grecaptcha.render(recaptchaRef.current, {
+            sitekey: import.meta.env.VITE_RECAPTCHA_SITE_KEY, // Your reCAPTCHA Site Key from .env
+            callback: (token) => {
+              // Token is automatically sent with form submission if widget is part of form
+              // For explicit render, you might capture it here if needed for custom submission
+            },
+            'error-callback': () => {
+              setError("reCAPTCHA encountered an error. Please refresh the page.");
+            },
+            'expired-callback': () => {
+              setError("reCAPTCHA expired. Please re-verify.");
+              if (window.grecaptcha) {
+                window.grecaptcha.reset(); // Reset widget on expiry
+              }
+            }
+          });
+        }
+      };
+    }
+  }, [requiresCaptcha]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(""); // Clear previous errors
+    setError("");
 
-    // Call the login function from AuthContext and get its result
-    const result = await login(email, password);
+    let recaptchaToken = null;
+    if (requiresCaptcha && window.grecaptcha) {
+      // Get the reCAPTCHA token from the widget
+      recaptchaToken = window.grecaptcha.getResponse();
+      if (!recaptchaToken) {
+        setError("Please complete the reCAPTCHA verification.");
+        return;
+      }
+    }
+
+    const result = await login(email, password, recaptchaToken); // NEW: Pass recaptchaToken
 
     if (!result.success) {
-      // If login was not successful, display the message from the result
       setError(result.message);
+      if (result.requiresCaptcha) { // NEW: Check if backend explicitly requires CAPTCHA
+        setRequiresCaptcha(true);
+        if (window.grecaptcha) {
+          window.grecaptcha.reset(); // Reset CAPTCHA widget on failed attempt
+        }
+      } else {
+        setRequiresCaptcha(false); // Hide CAPTCHA if not explicitly required
+      }
     } else {
-      // Login successful, navigate to the root path
       navigate("/", { replace: true });
+      setRequiresCaptcha(false); // Hide CAPTCHA on successful login
     }
   };
 
@@ -59,6 +110,13 @@ export default function Login() {
           className="w-full border rounded p-3 focus:outline-none focus:ring-2 focus:ring-cyan-500"
           required
         />
+
+        {/* NEW: reCAPTCHA Widget */}
+        {requiresCaptcha && (
+          <div className="flex justify-center mt-4">
+            <div ref={recaptchaRef} id="recaptcha-container"></div>
+          </div>
+        )}
 
         <button
           type="submit"

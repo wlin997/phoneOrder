@@ -10,14 +10,14 @@ const pool       = require("./db.js");
 const router     = express.Router();
 const { authenticateToken } = require("./auth.middleware.cjs");
 const { getUserPermissions } = require("./rbac.service.cjs");
+const axios      = require("axios"); // NEW: Import axios for reCAPTCHA verification
 
 const rateLimit = require("express-rate-limit");
 
 /*────────────────────────────────────────────────────
-  Constants for Account Lockout (MODIFIED for Progressive)
+  Constants for Account Lockout
 ────────────────────────────────────────────────────*/
 const MAX_FAILED_ATTEMPTS = 5; // Max consecutive failed login attempts before lockout
-// NEW: Define progressive lockout durations in minutes
 const LOCKOUT_DURATIONS = [
   30,   // 1st lockout: 30 minutes
   60,   // 2nd lockout: 1 hour
@@ -25,6 +25,12 @@ const LOCKOUT_DURATIONS = [
   1440, // 4th lockout: 24 hours
   10080 // 5th+ lockout: 7 days (effectively permanent for most users)
 ];
+
+/*────────────────────────────────────────────────────
+  Constants for CAPTCHA (NEW)
+────────────────────────────────────────────────────*/
+const CAPTCHA_REQUIRED_AFTER_ATTEMPTS = 3; // Number of failed attempts before CAPTCHA is required
+const RECAPTCHA_SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY; // Your reCAPTCHA Secret Key
 
 /*────────────────────────────────────────────────────
   TOKEN Helpers
@@ -47,7 +53,7 @@ function issueRefreshToken(res, payload) {
 }
 
 /*────────────────────────────────────────────────────
-  Rate Limiting Middleware (MODIFIED for Precedence)
+  Rate Limiting Middleware
 ────────────────────────────────────────────────────*/
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -62,7 +68,6 @@ const loginLimiter = rateLimit({
     let user = null;
     if (email) {
       try {
-        // MODIFIED: Fetch lockout_until AND lockout_count for handler check
         const { rows } = await pool.query(
           "SELECT lockout_until, lockout_count FROM users WHERE email=$1",
           [email]
@@ -76,16 +81,12 @@ const loginLimiter = rateLimit({
     }
 
     if (user && user.lockout_until && new Date(user.lockout_until) > new Date()) {
-      // If the account is locked, override the rate limit message with the lockout message
       const remainingTimeMs = new Date(user.lockout_until).getTime() - new Date().getTime();
       const remainingMinutes = Math.ceil(remainingTimeMs / (1000 * 60));
-      // console.log removed: `[RateLimitHandler] Account ${email} is locked and also hit IP rate limit. Returning lockout message.`
-      return res.status(423).json({ // 423 Locked status code
+      return res.status(423).json({
         message: `Account locked due to too many failed attempts. Please try again in ${remainingMinutes} minutes.`
       });
     } else {
-      // If account is not locked, but IP rate limit is hit, return generic rate limit message
-      // console.log removed: `[RateLimit] IP ${req.ip} exceeded login rate limit (Max: ${options.max} requests in ${options.windowMs / 1000 / 60} minutes).`
       res.status(options.statusCode).send(options.message);
     }
   },
@@ -93,20 +94,18 @@ const loginLimiter = rateLimit({
 
 
 /*────────────────────────────────────────────────────
-  LOGIN  — Step 1 (MODIFIED: Progressive Lockout Logic)
+  LOGIN  — Step 1 (MODIFIED: CAPTCHA Logic)
 ────────────────────────────────────────────────────*/
 router.post("/login", loginLimiter, async (req, res, next) => {
-  // console.log removed: `[Auth] Incoming login request from IP: ${req.ip}`
-  const { email, password } = req.body;
+  const { email, password, recaptchaToken } = req.body; // NEW: Destructure recaptchaToken
   try {
-    // MODIFIED: Select new lockout_count column
+    // MODIFIED: Select new lockout_count column and failed_login_attempts for CAPTCHA
     const { rows } = await pool.query(
       "SELECT id, name, email, password_hash, totp_enabled, failed_login_attempts, lockout_until, lockout_count FROM users WHERE email=$1",
       [email]
     );
 
     if (!rows.length) {
-      // console.log removed: `[Auth] User not found for email: ${email}`
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
@@ -116,31 +115,50 @@ router.post("/login", loginLimiter, async (req, res, next) => {
     if (user.lockout_until && new Date(user.lockout_until) > new Date()) {
       const remainingTimeMs = new Date(user.lockout_until).getTime() - new Date().getTime();
       const remainingMinutes = Math.ceil(remainingTimeMs / (1000 * 60));
-      // console.log removed: `[Auth] Account ${email} is locked until ${user.lockout_until}. Remaining: ${remainingMinutes} minutes.`
-      return res.status(423).json({ // 423 Locked status code
+      return res.status(423).json({
         message: `Account locked due to too many failed attempts. Please try again in ${remainingMinutes} minutes.`
       });
     }
 
+    // NEW: CAPTCHA Check Logic
+    // If failed_login_attempts is at or above the threshold, require CAPTCHA
+    if (user.failed_login_attempts >= CAPTCHA_REQUIRED_AFTER_ATTEMPTS) {
+      if (!recaptchaToken) {
+        // Frontend needs to display CAPTCHA
+        return res.status(412).json({ // 412 Precondition Failed
+          message: "CAPTCHA verification required.",
+          requiresCaptcha: true
+        });
+      }
+
+      // Verify reCAPTCHA token with Google
+      const googleVerifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${RECAPTCHA_SECRET_KEY}&response=${recaptchaToken}`;
+      const googleResponse = await axios.post(googleVerifyUrl);
+      const { success, score } = googleResponse.data;
+
+      if (!success) { // For v2 checkbox, score is not relevant, just success
+        return res.status(400).json({ message: "CAPTCHA verification failed. Please try again.", requiresCaptcha: true });
+      }
+      // If CAPTCHA is successful, proceed. No need to reset failed_login_attempts here,
+      // it will be reset on successful password match below.
+    }
+
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok) {
-      // console.log removed: `[Auth] Password mismatch for email: ${email}`
       // Increment failed login attempts
       const newFailedAttempts = user.failed_login_attempts + 1;
       let newLockoutUntil = null;
       let lockoutMessage = "Invalid credentials";
-      let newLockoutCount = user.lockout_count; // Keep current lockout count initially
+      let newLockoutCount = user.lockout_count;
 
       if (newFailedAttempts >= MAX_FAILED_ATTEMPTS) {
-        // NEW: Increment lockout_count and determine lockout duration
         newLockoutCount = user.lockout_count + 1;
         const durationIndex = Math.min(newLockoutCount - 1, LOCKOUT_DURATIONS.length - 1);
-        const lockoutDuration = LOCKOUT_DURATIONS[durationIndex]; // Get duration from array
+        const lockoutDuration = LOCKOUT_DURATIONS[durationIndex];
 
         newLockoutUntil = new Date(Date.now() + lockoutDuration * 60 * 1000);
         lockoutMessage = `Account locked due to too many failed attempts. Please try again in ${lockoutDuration} minutes.`;
         
-        // NEW: Reset failed_login_attempts when account gets locked
         await pool.query(
           "UPDATE users SET failed_login_attempts = 0, lockout_until = $1, lockout_count = $2 WHERE id = $3",
           [newLockoutUntil, newLockoutCount, user.id]
@@ -153,6 +171,10 @@ router.post("/login", loginLimiter, async (req, res, next) => {
           "UPDATE users SET failed_login_attempts = $1 WHERE id = $2",
           [newFailedAttempts, user.id]
         );
+        // If CAPTCHA was required and passed, but password was wrong, we still need to tell frontend
+        if (user.failed_login_attempts >= CAPTCHA_REQUIRED_AFTER_ATTEMPTS) {
+            return res.status(401).json({ message: lockoutMessage, requiresCaptcha: true });
+        }
         return res.status(401).json({ message: lockoutMessage });
       }
 
@@ -164,11 +186,9 @@ router.post("/login", loginLimiter, async (req, res, next) => {
         "UPDATE users SET failed_login_attempts = 0, lockout_until = NULL WHERE id = $1",
         [user.id]
       );
-      // console.log removed: `[Auth] Failed login attempts reset for ${email}.`
     }
 
     const permissions = await getUserPermissions(user.id);
-    // console.log removed: `[Auth] Permissions fetched for ${user.email}:`, permissions
 
     const tokenPayload = {
       id: user.id,
@@ -178,7 +198,6 @@ router.post("/login", loginLimiter, async (req, res, next) => {
     };
 
     if (user.totp_enabled) {
-      // console.log removed: `[Auth] 2FA enabled for ${user.email}. Issuing temporary token.`
       const tmp = jwt.sign(
         { id: user.id, step: "mfa", permissions: permissions, name: user.name, email: user.email },
         process.env.JWT_SECRET,
@@ -192,11 +211,10 @@ router.post("/login", loginLimiter, async (req, res, next) => {
     const refreshToken = issueRefreshToken(res, { id: user.id });
 
     await pool.query("UPDATE users SET refresh_token = $1 WHERE id = $2", [refreshToken, user.id]);
-    // console.log removed: `[Auth] Login successful for ${user.email}. Tokens issued.`
 
     res.json({ accessToken });
   } catch (e) {
-    console.error(`[Auth] Login error for email ${req.body.email}:`, e.message); // Keep this for general error monitoring
+    console.error(`[Auth] Login error for email ${req.body.email}:`, e.message);
     next(e);
   }
 });
@@ -255,7 +273,7 @@ router.post("/refresh", async (req, res, next) => {
   const oldRefreshToken = req.cookies.refreshToken;
 
   if (!oldRefreshToken) {
-    console.log("→ [Auth] Refresh token missing from cookie."); // Keep this for debugging token refresh flow
+    console.log("→ [Auth] Refresh token missing from cookie.");
     return res.status(401).json({ message: "Refresh token required" });
   }
 
@@ -265,7 +283,7 @@ router.post("/refresh", async (req, res, next) => {
 
     const { rows } = await pool.query("SELECT refresh_token FROM users WHERE id = $1", [userId]);
     if (!rows.length || rows[0].refresh_token !== oldRefreshToken) {
-      console.log("→ [Auth] Invalid or mismatched refresh token in DB."); // Keep this for debugging token refresh flow
+      console.log("→ [Auth] Invalid or mismatched refresh token in DB.");
       await pool.query("UPDATE users SET refresh_token = NULL WHERE id = $1", [userId]);
       res.clearCookie("refreshToken");
       return res.status(401).json({ message: "Invalid refresh token" });
@@ -275,7 +293,7 @@ router.post("/refresh", async (req, res, next) => {
 
     const userResult = await pool.query("SELECT id, name, email FROM users WHERE id = $1", [userId]);
     if (!userResult.rows.length) {
-        console.log("→ [Auth] User not found during refresh."); // Keep this for debugging token refresh flow
+        console.log("→ [Auth] User not found during refresh.");
         res.clearCookie("refreshToken");
         return res.status(401).json({ message: "User not found" });
     }
@@ -294,10 +312,10 @@ router.post("/refresh", async (req, res, next) => {
 
     await pool.query("UPDATE users SET refresh_token = $1 WHERE id = $2", [newRefreshToken, user.id]);
 
-    console.log("→ [Auth] Token refreshed successfully for user:", userId); // Keep this for debugging token refresh flow
+    console.log("→ [Auth] Token refreshed successfully for user:", userId);
     res.json({ accessToken: newAccessToken });
   } catch (e) {
-    console.error("→ [Auth] Error refreshing token:", e.message); // Keep this for general error monitoring
+    console.error("→ [Auth] Error refreshing token:", e.message);
     res.clearCookie("refreshToken");
     return res.status(401).json({ message: "Error refreshing token or refresh token invalid" });
   }
@@ -335,15 +353,14 @@ router.post("/2fa/enable", authenticateToken, async (req, res, next) => {
       token: code,
       window: 1,
     });
-    if (!verified)
-return res.status(400).json({ message: "Invalid code" });
+    if (!verified) return res.status(400).json({ message: "Invalid code" });
 
     await pool.query("UPDATE users SET totp_enabled=true WHERE id=$1", [
       req.user.id,
     ]);
     res.sendStatus(204);
   } catch (e) {
-    next(e);
+    next(e);a
   }
 });
 /*────────────────────────────────────────────────────
