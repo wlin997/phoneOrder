@@ -55,7 +55,7 @@ function issueRefreshToken(res, payload) {
 ────────────────────────────────────────────────────*/
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5, // Keep at 5, but CAPTCHA will intervene earlier
+  max: 5,
   message: {
     message: "Too many login attempts from this IP, please try again after 15 minutes."
   },
@@ -92,7 +92,7 @@ const loginLimiter = rateLimit({
 
 
 /*────────────────────────────────────────────────────
-  LOGIN  — Step 1 (FIXED CAPTCHA Logic)
+  LOGIN  — Step 1 (Debugging Failed Login Attempts Update)
 ────────────────────────────────────────────────────*/
 router.post("/login", loginLimiter, async (req, res, next) => {
   const { email, password, recaptchaToken } = req.body;
@@ -107,6 +107,7 @@ router.post("/login", loginLimiter, async (req, res, next) => {
     }
 
     const user = rows[0];
+    console.log(`[Auth Debug] Initial failed_login_attempts for ${user.email}: ${user.failed_login_attempts}`); // DEBUG
 
     if (user.lockout_until && new Date(user.lockout_until) > new Date()) {
       const remainingTimeMs = new Date(user.lockout_until).getTime() - new Date().getTime();
@@ -116,32 +117,32 @@ router.post("/login", loginLimiter, async (req, res, next) => {
       });
     }
 
-    // NEW: Check password first, then handle failed attempts and CAPTCHA
     const ok = await bcrypt.compare(password, user.password_hash);
 
     if (!ok) {
       const newFailedAttempts = user.failed_login_attempts + 1;
-      let newLockoutUntil = null;
-      let lockoutMessage = "Invalid credentials";
-      let newLockoutCount = user.lockout_count;
+      console.log(`[Auth Debug] Password mismatch. newFailedAttempts: ${newFailedAttempts}`); // DEBUG
 
-      // Update failed_login_attempts in DB immediately after a failed attempt
+      // Perform the update first
       await pool.query(
         "UPDATE users SET failed_login_attempts = $1 WHERE id = $2",
         [newFailedAttempts, user.id]
       );
+      console.log(`[Auth Debug] Database update for failed_login_attempts sent for ${user.email}.`); // DEBUG
 
-      // Re-fetch user data to get the most up-to-date failed_login_attempts from DB
+      // Re-fetch user data to get the most up-to-date values from DB
       // This is crucial to ensure the CAPTCHA and lockout logic uses the incremented value correctly
       const updatedUserResult = await pool.query(
         "SELECT failed_login_attempts, lockout_until, lockout_count FROM users WHERE id=$1",
         [user.id]
       );
       const updatedUser = updatedUserResult.rows[0];
+      console.log(`[Auth Debug] Re-fetched failed_login_attempts for ${user.email}: ${updatedUser.failed_login_attempts}`); // DEBUG
 
 
       // CAPTCHA Check Logic (after failed attempt count is updated)
       if (updatedUser.failed_login_attempts >= CAPTCHA_REQUIRED_AFTER_ATTEMPTS) {
+        console.log(`[Auth Debug] CAPTCHA required. Current attempts: ${updatedUser.failed_login_attempts}`); // DEBUG
         if (!recaptchaToken) {
           return res.status(412).json({
             message: "CAPTCHA verification required.",
@@ -154,14 +155,18 @@ router.post("/login", loginLimiter, async (req, res, next) => {
         const { success, score } = googleResponse.data;
 
         if (!success) {
+          console.log(`[Auth Debug] CAPTCHA verification failed for ${user.email}.`); // DEBUG
           return res.status(400).json({ message: "CAPTCHA verification failed. Please try again.", requiresCaptcha: true });
         }
-        // If CAPTCHA is successful, but password was wrong, continue to lockout check
+        console.log(`[Auth Debug] CAPTCHA verification successful for ${user.email}. Score: ${score}`); // DEBUG
       }
 
       // Account Lockout Logic (after failed attempt count is updated and CAPTCHA if applicable)
       if (updatedUser.failed_login_attempts >= MAX_FAILED_ATTEMPTS) {
-        newLockoutCount = updatedUser.lockout_count + 1;
+        let newLockoutUntil = null;
+        let lockoutMessage = "Invalid credentials";
+        let newLockoutCount = updatedUser.lockout_count + 1; // Use updatedUser's lockout_count
+
         const durationIndex = Math.min(newLockoutCount - 1, LOCKOUT_DURATIONS.length - 1);
         const lockoutDuration = LOCKOUT_DURATIONS[durationIndex];
 
@@ -172,14 +177,17 @@ router.post("/login", loginLimiter, async (req, res, next) => {
           "UPDATE users SET failed_login_attempts = 0, lockout_until = $1, lockout_count = $2 WHERE id = $3",
           [newLockoutUntil, newLockoutCount, user.id]
         );
+        console.log(`[Auth Debug] Account ${user.email} locked. Lockout count: ${newLockoutCount}`); // DEBUG
         return res.status(401).json({ message: lockoutMessage });
 
       } else {
         // If not yet locked, and no CAPTCHA needed yet, return generic invalid credentials
         // If CAPTCHA was required and passed, but password was wrong, we still need to tell frontend
         if (updatedUser.failed_login_attempts >= CAPTCHA_REQUIRED_AFTER_ATTEMPTS) {
+            console.log(`[Auth Debug] CAPTCHA required, but not yet locked for ${user.email}.`); // DEBUG
             return res.status(401).json({ message: lockoutMessage, requiresCaptcha: true });
         }
+        console.log(`[Auth Debug] Returning invalid credentials for ${user.email}. Attempts: ${updatedUser.failed_login_attempts}`); // DEBUG
         return res.status(401).json({ message: lockoutMessage });
       }
 
@@ -191,6 +199,7 @@ router.post("/login", loginLimiter, async (req, res, next) => {
         "UPDATE users SET failed_login_attempts = 0, lockout_until = NULL WHERE id = $1",
         [user.id]
       );
+      console.log(`[Auth Debug] Successful login. Failed attempts reset for ${user.email}.`); // DEBUG
     }
 
     const permissions = await getUserPermissions(user.id);
