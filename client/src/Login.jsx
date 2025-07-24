@@ -24,13 +24,14 @@ export default function Login() {
     }
   }, [requiresCaptcha]);
 
-  // NEW: Effect to render/reset reCAPTCHA when requiresCaptcha state changes
+  // Effect to render/reset reCAPTCHA when requiresCaptcha state changes
   useEffect(() => {
+    // NEW DEBUG LOG: Check the site key value
+    console.log("DEBUG: VITE_RECAPTCHA_SITE_KEY:", import.meta.env.VITE_RECAPTCHA_SITE_KEY);
+
     if (requiresCaptcha) {
-      // Ensure grecaptcha is available and the container is in the DOM
       const renderCaptcha = () => {
         if (window.grecaptcha && recaptchaRef.current) {
-          // Check if it's already rendered to avoid re-rendering the same div
           if (recaptchaRef.current.dataset.recaptchaRendered !== 'true') {
             window.grecaptcha.render(recaptchaRef.current, {
               sitekey: import.meta.env.VITE_RECAPTCHA_SITE_KEY,
@@ -43,25 +44,22 @@ export default function Login() {
                 window.grecaptcha.reset();
               }
             });
-            recaptchaRef.current.dataset.recaptchaRendered = 'true'; // Mark as rendered
+            recaptchaRef.current.dataset.recaptchaRendered = 'true';
           } else {
-            // If already rendered, just reset it for a new challenge
             window.grecaptcha.reset();
           }
         } else {
-          // If grecaptcha or ref not ready, wait and try again
           setTimeout(renderCaptcha, 100);
         }
       };
       renderCaptcha();
     } else {
-      // When CAPTCHA is no longer required, reset it if it was rendered
       if (window.grecaptcha && recaptchaRef.current && recaptchaRef.current.dataset.recaptchaRendered === 'true') {
         window.grecaptcha.reset();
-        delete recaptchaRef.current.dataset.recaptchaRendered; // Clear marker
+        delete recaptchaRef.current.dataset.recaptchaRendered;
       }
     }
-  }, [requiresCaptcha]); // Depend on requiresCaptcha state
+  }, [requiresCaptcha]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -82,7 +80,6 @@ export default function Login() {
       setError(result.message);
       if (result.requiresCaptcha) {
         setRequiresCaptcha(true);
-        // The useEffect above will handle rendering/resetting the CAPTCHA
       } else {
         setRequiresCaptcha(false);
       }
