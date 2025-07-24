@@ -10,52 +10,20 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [requiresCaptcha, setRequiresCaptcha] = useState(false);
-  const recaptchaRef = useRef(null);
-
-  // Define the global callback function for reCAPTCHA readiness
-  // This must be defined BEFORE the script loads.
-  // We attach it to window directly and use a useEffect for cleanup.
-  useEffect(() => {
-    window.onRecaptchaLoadCallback = () => {
-      // This function is called by Google's reCAPTCHA script when grecaptcha is ready.
-      // If CAPTCHA is currently required, try to render the widget.
-      if (requiresCaptcha && recaptchaRef.current) {
-        renderRecaptchaWidget();
-      }
-    };
-
-    // Cleanup: Remove the global callback when the component unmounts
-    return () => {
-      delete window.onRecaptchaLoadCallback;
-    };
-  }, [requiresCaptcha]); // Dependency on requiresCaptcha ensures renderRecaptchaWidget uses latest state
-
-  // Effect to load the reCAPTCHA script when needed
-  useEffect(() => {
-    console.log("DEBUG: VITE_RECAPTCHA_SITE_KEY:", import.meta.env.VITE_RECAPTCHA_SITE_KEY);
-
-    if (requiresCaptcha && !document.getElementById('recaptcha-script')) {
-      const script = document.createElement('script');
-      script.id = 'recaptcha-script';
-      // Use onload callback for grecaptcha readiness
-      script.src = `https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoadCallback&render=explicit`;
-      script.async = true;
-      script.defer = true;
-      document.body.appendChild(script);
-    }
-  }, [requiresCaptcha]); // Depend on requiresCaptcha state
+  const recaptchaRef = useRef(null); // Ref for the reCAPTCHA widget container
 
   // Function to render the reCAPTCHA widget
   const renderRecaptchaWidget = () => {
-    // Only attempt to render if grecaptcha is available and the ref is attached
+    // Ensure grecaptcha is available and the container div is mounted
     if (window.grecaptcha && recaptchaRef.current) {
       // Check if it's already rendered into this specific div to avoid re-rendering
       // and instead just reset it for a new challenge.
       if (recaptchaRef.current.dataset.recaptchaRendered !== 'true') {
         try {
+          recaptchaRef.current.innerHTML = ''; // Clear any previous content in the div
           window.grecaptcha.render(recaptchaRef.current, {
             sitekey: import.meta.env.VITE_RECAPTCHA_SITE_KEY,
-            callback: (token) => { /* token is handled in handleSubmit */ },
+            callback: (token) => { /* Token is handled in handleSubmit */ },
             'error-callback': () => {
               setError("reCAPTCHA encountered an error. Please refresh the page.");
             },
@@ -65,32 +33,60 @@ export default function Login() {
             }
           });
           recaptchaRef.current.dataset.recaptchaRendered = 'true'; // Mark as rendered
-          console.log("DEBUG: reCAPTCHA widget rendered successfully."); // NEW Debug Log
+          console.log("DEBUG: reCAPTCHA widget rendered successfully.");
         } catch (e) {
-          console.error("ERROR: Failed to render reCAPTCHA widget:", e); // NEW Error Log
-          setError("Failed to load CAPTCHA. Please try again later.");
+          console.error("ERROR: Failed to render reCAPTCHA widget:", e);
+          setError("Failed to load CAPTCHA. Please try again later. (Error details in console)");
         }
       } else {
         // If already rendered, just reset it for a new challenge
         window.grecaptcha.reset();
-        console.log("DEBUG: reCAPTCHA widget reset."); // NEW Debug Log
+        console.log("DEBUG: reCAPTCHA widget reset.");
       }
+    } else {
+      console.log("DEBUG: renderRecaptchaWidget called, but grecaptcha or ref not ready for render.", {
+          grecaptchaReady: !!window.grecaptcha,
+          recaptchaRefCurrent: !!recaptchaRef.current
+      });
     }
   };
 
-  // Effect to trigger rendering if CAPTCHA is required and grecaptcha is already loaded
-  // This handles cases where requiresCaptcha becomes true after initial page load
+  // Effect to load the reCAPTCHA script and manage rendering based on requiresCaptcha
   useEffect(() => {
-    if (requiresCaptcha && window.grecaptcha && recaptchaRef.current) {
+    console.log("DEBUG: VITE_RECAPTCHA_SITE_KEY:", import.meta.env.VITE_RECAPTCHA_SITE_KEY);
+
+    // Only load the script if CAPTCHA is required and the script isn't already there
+    if (requiresCaptcha && !document.getElementById('recaptcha-script')) {
+      const script = document.createElement('script');
+      script.id = 'recaptcha-script';
+      script.src = `https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoadCallback&render=explicit`;
+      script.async = true;
+      script.defer = true;
+      document.body.appendChild(script);
+
+      // Define the global callback function.
+      // This MUST be defined before the script's onload fires.
+      // We ensure it's defined only once.
+      if (typeof window.onRecaptchaLoadCallback === 'undefined') {
+        window.onRecaptchaLoadCallback = () => {
+          console.log("DEBUG: onRecaptchaLoadCallback fired. grecaptcha is ready.");
+          // When grecaptcha is ready, if CAPTCHA is currently required, render it.
+          if (requiresCaptcha && recaptchaRef.current) {
+            renderRecaptchaWidget();
+          }
+        };
+      }
+    } else if (requiresCaptcha && window.grecaptcha && recaptchaRef.current) {
+      // If CAPTCHA is required AND script is already loaded AND ref is ready,
+      // attempt to render immediately (e.g., on subsequent renders of Login component)
       renderRecaptchaWidget();
     } else if (!requiresCaptcha && window.grecaptcha && recaptchaRef.current && recaptchaRef.current.dataset.recaptchaRendered === 'true') {
       // When CAPTCHA is no longer required, reset it and clear marker
       window.grecaptcha.reset();
       delete recaptchaRef.current.dataset.recaptchaRendered;
-      console.log("DEBUG: reCAPTCHA widget hidden/reset due to requiresCaptcha=false."); // NEW Debug Log
+      console.log("DEBUG: reCAPTCHA widget hidden/reset due to requiresCaptcha=false.");
     }
   }, [requiresCaptcha]); // Depend on requiresCaptcha state
-
 
   const handleSubmit = async (e) => {
     e.preventDefault();
