@@ -139,13 +139,15 @@ router.post("/login", loginLimiter, async (req, res, next) => {
       const updatedUser = updatedUserResult.rows[0];
       console.log(`[Auth Debug] Re-fetched failed_login_attempts for ${user.email}: ${updatedUser.failed_login_attempts}`); // DEBUG
 
+      let lockoutMessage = "Invalid credentials"; // FIX: Initialize lockoutMessage here
 
       // CAPTCHA Check Logic (after failed attempt count is updated)
       if (updatedUser.failed_login_attempts >= CAPTCHA_REQUIRED_AFTER_ATTEMPTS) {
         console.log(`[Auth Debug] CAPTCHA required. Current attempts: ${updatedUser.failed_login_attempts}`); // DEBUG
+        lockoutMessage = "CAPTCHA verification required."; // Set message for CAPTCHA
         if (!recaptchaToken) {
           return res.status(412).json({
-            message: "CAPTCHA verification required.",
+            message: lockoutMessage, // Use the defined message
             requiresCaptcha: true
           });
         }
@@ -156,7 +158,8 @@ router.post("/login", loginLimiter, async (req, res, next) => {
 
         if (!success) {
           console.log(`[Auth Debug] CAPTCHA verification failed for ${user.email}.`); // DEBUG
-          return res.status(400).json({ message: "CAPTCHA verification failed. Please try again.", requiresCaptcha: true });
+          lockoutMessage = "CAPTCHA verification failed. Please try again."; // Update message
+          return res.status(400).json({ message: lockoutMessage, requiresCaptcha: true });
         }
         console.log(`[Auth Debug] CAPTCHA verification successful for ${user.email}. Score: ${score}`); // DEBUG
       }
@@ -164,7 +167,6 @@ router.post("/login", loginLimiter, async (req, res, next) => {
       // Account Lockout Logic (after failed attempt count is updated and CAPTCHA if applicable)
       if (updatedUser.failed_login_attempts >= MAX_FAILED_ATTEMPTS) {
         let newLockoutUntil = null;
-        let lockoutMessage = "Invalid credentials";
         let newLockoutCount = updatedUser.lockout_count + 1; // Use updatedUser's lockout_count
 
         const durationIndex = Math.min(newLockoutCount - 1, LOCKOUT_DURATIONS.length - 1);
@@ -183,12 +185,12 @@ router.post("/login", loginLimiter, async (req, res, next) => {
       } else {
         // If not yet locked, and no CAPTCHA needed yet, return generic invalid credentials
         // If CAPTCHA was required and passed, but password was wrong, we still need to tell frontend
-        if (updatedUser.failed_login_attempts >= CAPTCHA_REQUIRED_AFTER_ATTEMPTS) {
-            console.log(`[Auth Debug] CAPTCHA required, but not yet locked for ${user.email}.`); // DEBUG
-            return res.status(401).json({ message: lockoutMessage, requiresCaptcha: true });
+        if (updatedUser.failed_login_attempts < CAPTCHA_REQUIRED_AFTER_ATTEMPTS) { // FIX: Ensure this condition is correct for initial invalid credentials
+            lockoutMessage = "Invalid credentials"; // Default message if no CAPTCHA/lockout
         }
+        // The message is now correctly defined based on CAPTCHA/lockout status
         console.log(`[Auth Debug] Returning invalid credentials for ${user.email}. Attempts: ${updatedUser.failed_login_attempts}`); // DEBUG
-        return res.status(401).json({ message: lockoutMessage });
+        return res.status(401).json({ message: lockoutMessage, requiresCaptcha: (updatedUser.failed_login_attempts >= CAPTCHA_REQUIRED_AFTER_ATTEMPTS) }); // FIX: Ensure requiresCaptcha is sent if needed
       }
 
     }
