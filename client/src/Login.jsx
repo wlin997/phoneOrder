@@ -12,9 +12,9 @@ export default function Login() {
   const [requiresCaptcha, setRequiresCaptcha] = useState(false);
   const recaptchaRef = useRef(null);
 
-  // Load reCAPTCHA script dynamically
-  useEffect(() => {
-    if (requiresCaptcha && !document.getElementById('recaptcha-script')) {
+  // Function to load the reCAPTCHA script
+  const loadRecaptchaScript = () => {
+    if (!document.getElementById('recaptcha-script')) {
       const script = document.createElement('script');
       script.id = 'recaptcha-script';
       script.src = `https://www.google.com/recaptcha/api.js?render=explicit`;
@@ -22,16 +22,21 @@ export default function Login() {
       script.defer = true;
       document.body.appendChild(script);
     }
-  }, [requiresCaptcha]);
+  };
 
-  // Effect to render/reset reCAPTCHA when requiresCaptcha state changes
+  // Effect to handle reCAPTCHA rendering and resetting
   useEffect(() => {
     // NEW DEBUG LOG: Check the site key value
     console.log("DEBUG: VITE_RECAPTCHA_SITE_KEY:", import.meta.env.VITE_RECAPTCHA_SITE_KEY);
 
     if (requiresCaptcha) {
-      const renderCaptcha = () => {
+      loadRecaptchaScript(); // Ensure script is loaded when CAPTCHA is required
+
+      const interval = setInterval(() => {
         if (window.grecaptcha && recaptchaRef.current) {
+          clearInterval(interval); // Stop checking once ready
+
+          // Only render if not already rendered into this div
           if (recaptchaRef.current.dataset.recaptchaRendered !== 'true') {
             window.grecaptcha.render(recaptchaRef.current, {
               sitekey: import.meta.env.VITE_RECAPTCHA_SITE_KEY,
@@ -44,19 +49,22 @@ export default function Login() {
                 window.grecaptcha.reset();
               }
             });
-            recaptchaRef.current.dataset.recaptchaRendered = 'true';
+            recaptchaRef.current.dataset.recaptchaRendered = 'true'; // Mark as rendered
           } else {
+            // If already rendered, just reset it for a new challenge
             window.grecaptcha.reset();
           }
-        } else {
-          setTimeout(renderCaptcha, 100);
         }
+      }, 200); // Check every 200ms
+
+      return () => {
+        clearInterval(interval); // Cleanup interval on unmount or if requiresCaptcha becomes false
       };
-      renderCaptcha();
     } else {
+      // When CAPTCHA is no longer required, reset it if it was rendered
       if (window.grecaptcha && recaptchaRef.current && recaptchaRef.current.dataset.recaptchaRendered === 'true') {
         window.grecaptcha.reset();
-        delete recaptchaRef.current.dataset.recaptchaRendered;
+        delete recaptchaRef.current.dataset.recaptchaRendered; // Clear marker
       }
     }
   }, [requiresCaptcha]);
