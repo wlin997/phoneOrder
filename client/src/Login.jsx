@@ -3,6 +3,18 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext.jsx";
 
+// Define the global callback function for reCAPTCHA readiness.
+// This MUST be globally accessible BEFORE the reCAPTCHA script loads.
+// We use a guard to prevent re-definition warnings in React Strict Mode.
+if (typeof window !== 'undefined' && typeof window.onRecaptchaLoadCallback === 'undefined') {
+  window.onRecaptchaLoadCallback = () => {
+    console.log("DEBUG: onRecaptchaLoadCallback fired. grecaptcha is ready.");
+    // Dispatch a custom event so React components can react to grecaptcha being ready
+    const event = new Event('recaptchaLoaded');
+    window.dispatchEvent(event);
+  };
+}
+
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -14,7 +26,7 @@ export default function Login() {
 
   // Function to render the reCAPTCHA widget
   const renderRecaptchaWidget = () => {
-    // Ensure grecaptcha is available and the container div is mounted
+    // Only attempt to render if grecaptcha is available and the ref is attached
     if (window.grecaptcha && recaptchaRef.current) {
       // Check if it's already rendered into this specific div to avoid re-rendering
       // and instead just reset it for a new challenge.
@@ -52,30 +64,30 @@ export default function Login() {
   };
 
   // Effect to load the reCAPTCHA script and manage rendering based on requiresCaptcha
+  // This useEffect now LISTENS for the 'recaptchaLoaded' event
   useEffect(() => {
     console.log("DEBUG: VITE_RECAPTCHA_SITE_KEY:", import.meta.env.VITE_RECAPTCHA_SITE_KEY);
 
-    // Only load the script if CAPTCHA is required and the script isn't already there
+    // Handler for when reCAPTCHA API is ready
+    const handleRecaptchaReady = () => {
+      console.log("DEBUG: recaptchaLoaded event received.");
+      if (requiresCaptcha && window.grecaptcha && recaptchaRef.current) {
+        renderRecaptchaWidget();
+      }
+    };
+
+    // Attach listener for the custom event
+    window.addEventListener("recaptchaLoaded", handleRecaptchaReady);
+
+    // Load the script if CAPTCHA is required and the script isn't already there
     if (requiresCaptcha && !document.getElementById('recaptcha-script')) {
       const script = document.createElement('script');
       script.id = 'recaptcha-script';
+      // Script src now includes onload=onRecaptchaLoadCallback
       script.src = `https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoadCallback&render=explicit`;
       script.async = true;
       script.defer = true;
       document.body.appendChild(script);
-
-      // Define the global callback function.
-      // This MUST be defined before the script's onload fires.
-      // We ensure it's defined only once.
-      if (typeof window.onRecaptchaLoadCallback === 'undefined') {
-        window.onRecaptchaLoadCallback = () => {
-          console.log("DEBUG: onRecaptchaLoadCallback fired. grecaptcha is ready.");
-          // When grecaptcha is ready, if CAPTCHA is currently required, render it.
-          if (requiresCaptcha && recaptchaRef.current) {
-            renderRecaptchaWidget();
-          }
-        };
-      }
     } else if (requiresCaptcha && window.grecaptcha && recaptchaRef.current) {
       // If CAPTCHA is required AND script is already loaded AND ref is ready,
       // attempt to render immediately (e.g., on subsequent renders of Login component)
@@ -86,6 +98,11 @@ export default function Login() {
       delete recaptchaRef.current.dataset.recaptchaRendered;
       console.log("DEBUG: reCAPTCHA widget hidden/reset due to requiresCaptcha=false.");
     }
+
+    // Cleanup: Remove the event listener when the component unmounts or dependencies change
+    return () => {
+      window.removeEventListener("recaptchaLoaded", handleRecaptchaReady);
+    };
   }, [requiresCaptcha]); // Depend on requiresCaptcha state
 
   const handleSubmit = async (e) => {
