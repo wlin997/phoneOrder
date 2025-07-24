@@ -47,7 +47,7 @@ function issueRefreshToken(res, payload) {
 }
 
 /*────────────────────────────────────────────────────
-  Rate Limiting Middleware
+  Rate Limiting Middleware (MODIFIED for Precedence)
 ────────────────────────────────────────────────────*/
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -71,19 +71,21 @@ const loginLimiter = rateLimit({
           user = rows[0];
         }
       } catch (error) {
-        console.error(`[RateLimitHandler] Error fetching user for lockout check: ${error.message}`);
+        // console.error removed: `[RateLimitHandler] Error fetching user for lockout check: ${error.message}`
       }
     }
 
     if (user && user.lockout_until && new Date(user.lockout_until) > new Date()) {
-      // Calculate remaining time for locked account
+      // If the account is locked, override the rate limit message with the lockout message
       const remainingTimeMs = new Date(user.lockout_until).getTime() - new Date().getTime();
       const remainingMinutes = Math.ceil(remainingTimeMs / (1000 * 60));
-      return res.status(423).json({
+      // console.log removed: `[RateLimitHandler] Account ${email} is locked and also hit IP rate limit. Returning lockout message.`
+      return res.status(423).json({ // 423 Locked status code
         message: `Account locked due to too many failed attempts. Please try again in ${remainingMinutes} minutes.`
       });
     } else {
       // If account is not locked, but IP rate limit is hit, return generic rate limit message
+      // console.log removed: `[RateLimit] IP ${req.ip} exceeded login rate limit (Max: ${options.max} requests in ${options.windowMs / 1000 / 60} minutes).`
       res.status(options.statusCode).send(options.message);
     }
   },
@@ -94,6 +96,7 @@ const loginLimiter = rateLimit({
   LOGIN  — Step 1 (MODIFIED: Progressive Lockout Logic)
 ────────────────────────────────────────────────────*/
 router.post("/login", loginLimiter, async (req, res, next) => {
+  // console.log removed: `[Auth] Incoming login request from IP: ${req.ip}`
   const { email, password } = req.body;
   try {
     // MODIFIED: Select new lockout_count column
@@ -103,6 +106,7 @@ router.post("/login", loginLimiter, async (req, res, next) => {
     );
 
     if (!rows.length) {
+      // console.log removed: `[Auth] User not found for email: ${email}`
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
@@ -112,13 +116,15 @@ router.post("/login", loginLimiter, async (req, res, next) => {
     if (user.lockout_until && new Date(user.lockout_until) > new Date()) {
       const remainingTimeMs = new Date(user.lockout_until).getTime() - new Date().getTime();
       const remainingMinutes = Math.ceil(remainingTimeMs / (1000 * 60));
-      return res.status(423).json({
+      // console.log removed: `[Auth] Account ${email} is locked until ${user.lockout_until}. Remaining: ${remainingMinutes} minutes.`
+      return res.status(423).json({ // 423 Locked status code
         message: `Account locked due to too many failed attempts. Please try again in ${remainingMinutes} minutes.`
       });
     }
 
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok) {
+      // console.log removed: `[Auth] Password mismatch for email: ${email}`
       // Increment failed login attempts
       const newFailedAttempts = user.failed_login_attempts + 1;
       let newLockoutUntil = null;
@@ -158,9 +164,11 @@ router.post("/login", loginLimiter, async (req, res, next) => {
         "UPDATE users SET failed_login_attempts = 0, lockout_until = NULL WHERE id = $1",
         [user.id]
       );
+      // console.log removed: `[Auth] Failed login attempts reset for ${email}.`
     }
 
     const permissions = await getUserPermissions(user.id);
+    // console.log removed: `[Auth] Permissions fetched for ${user.email}:`, permissions
 
     const tokenPayload = {
       id: user.id,
@@ -170,6 +178,7 @@ router.post("/login", loginLimiter, async (req, res, next) => {
     };
 
     if (user.totp_enabled) {
+      // console.log removed: `[Auth] 2FA enabled for ${user.email}. Issuing temporary token.`
       const tmp = jwt.sign(
         { id: user.id, step: "mfa", permissions: permissions, name: user.name, email: user.email },
         process.env.JWT_SECRET,
@@ -183,10 +192,11 @@ router.post("/login", loginLimiter, async (req, res, next) => {
     const refreshToken = issueRefreshToken(res, { id: user.id });
 
     await pool.query("UPDATE users SET refresh_token = $1 WHERE id = $2", [refreshToken, user.id]);
+    // console.log removed: `[Auth] Login successful for ${user.email}. Tokens issued.`
 
     res.json({ accessToken });
   } catch (e) {
-    console.error(`[Auth] Login error for email ${req.body.email}:`, e.message);
+    console.error(`[Auth] Login error for email ${req.body.email}:`, e.message); // Keep this for general error monitoring
     next(e);
   }
 });
@@ -245,7 +255,7 @@ router.post("/refresh", async (req, res, next) => {
   const oldRefreshToken = req.cookies.refreshToken;
 
   if (!oldRefreshToken) {
-    console.log("→ [Auth] Refresh token missing from cookie.");
+    console.log("→ [Auth] Refresh token missing from cookie."); // Keep this for debugging token refresh flow
     return res.status(401).json({ message: "Refresh token required" });
   }
 
@@ -255,7 +265,7 @@ router.post("/refresh", async (req, res, next) => {
 
     const { rows } = await pool.query("SELECT refresh_token FROM users WHERE id = $1", [userId]);
     if (!rows.length || rows[0].refresh_token !== oldRefreshToken) {
-      console.log("→ [Auth] Invalid or mismatched refresh token in DB.");
+      console.log("→ [Auth] Invalid or mismatched refresh token in DB."); // Keep this for debugging token refresh flow
       await pool.query("UPDATE users SET refresh_token = NULL WHERE id = $1", [userId]);
       res.clearCookie("refreshToken");
       return res.status(401).json({ message: "Invalid refresh token" });
@@ -265,7 +275,7 @@ router.post("/refresh", async (req, res, next) => {
 
     const userResult = await pool.query("SELECT id, name, email FROM users WHERE id = $1", [userId]);
     if (!userResult.rows.length) {
-        console.log("→ [Auth] User not found during refresh.");
+        console.log("→ [Auth] User not found during refresh."); // Keep this for debugging token refresh flow
         res.clearCookie("refreshToken");
         return res.status(401).json({ message: "User not found" });
     }
@@ -284,10 +294,10 @@ router.post("/refresh", async (req, res, next) => {
 
     await pool.query("UPDATE users SET refresh_token = $1 WHERE id = $2", [newRefreshToken, user.id]);
 
-    console.log("→ [Auth] Token refreshed successfully for user:", userId);
+    console.log("→ [Auth] Token refreshed successfully for user:", userId); // Keep this for debugging token refresh flow
     res.json({ accessToken: newAccessToken });
   } catch (e) {
-    console.error("→ [Auth] Error refreshing token:", e.message);
+    console.error("→ [Auth] Error refreshing token:", e.message); // Keep this for general error monitoring
     res.clearCookie("refreshToken");
     return res.status(401).json({ message: "Error refreshing token or refresh token invalid" });
   }
