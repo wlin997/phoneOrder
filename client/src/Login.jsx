@@ -13,53 +13,66 @@ export default function Login() {
   const recaptchaRef = useRef(null);
 
   // Function to load the reCAPTCHA script
+  // This function will also define a global callback for reCAPTCHA readiness
   const loadRecaptchaScript = () => {
     if (!document.getElementById('recaptcha-script')) {
       const script = document.createElement('script');
       script.id = 'recaptcha-script';
-      script.src = `https://www.google.com/recaptcha/api.js?render=explicit`;
+      // Use onload callback for grecaptcha readiness
+      script.src = `https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoadCallback&render=explicit`;
       script.async = true;
       script.defer = true;
       document.body.appendChild(script);
+
+      // Define the global callback function
+      window.onRecaptchaLoadCallback = () => {
+        // This function will be called by reCAPTCHA script once it's fully loaded
+        // and grecaptcha object is ready.
+        // We can then trigger the rendering if CAPTCHA is required.
+        if (recaptchaRef.current && requiresCaptcha && window.grecaptcha) {
+            renderRecaptchaWidget();
+        }
+      };
     }
   };
 
-  // Effect to handle reCAPTCHA rendering and resetting
+  // Function to render the reCAPTCHA widget
+  const renderRecaptchaWidget = () => {
+    if (recaptchaRef.current && window.grecaptcha) {
+      // Check if it's already rendered to avoid re-rendering the same div
+      if (recaptchaRef.current.dataset.recaptchaRendered !== 'true') {
+        window.grecaptcha.render(recaptchaRef.current, {
+          sitekey: import.meta.env.VITE_RECAPTCHA_SITE_KEY,
+          callback: (token) => { /* token is handled in handleSubmit */ },
+          'error-callback': () => {
+            setError("reCAPTCHA encountered an error. Please refresh the page.");
+          },
+          'expired-callback': () => {
+            setError("reCAPTCHA expired. Please re-verify.");
+            window.grecaptcha.reset();
+          }
+        });
+        recaptchaRef.current.dataset.recaptchaRendered = 'true'; // Mark as rendered
+      } else {
+        // If already rendered, just reset it for a new challenge
+        window.grecaptcha.reset();
+      }
+    }
+  };
+
+
+  // Main effect to handle CAPTCHA visibility and triggering script load
   useEffect(() => {
-    // NEW DEBUG LOG: Check the site key value
     console.log("DEBUG: VITE_RECAPTCHA_SITE_KEY:", import.meta.env.VITE_RECAPTCHA_SITE_KEY);
 
     if (requiresCaptcha) {
-      loadRecaptchaScript(); // Ensure script is loaded when CAPTCHA is required
+      loadRecaptchaScript(); // Load script if needed
 
-      const interval = setInterval(() => {
-        if (window.grecaptcha && recaptchaRef.current) {
-          clearInterval(interval); // Stop checking once ready
-
-          // Only render if not already rendered into this div
-          if (recaptchaRef.current.dataset.recaptchaRendered !== 'true') {
-            window.grecaptcha.render(recaptchaRef.current, {
-              sitekey: import.meta.env.VITE_RECAPTCHA_SITE_KEY,
-              callback: (token) => { /* token is handled in handleSubmit */ },
-              'error-callback': () => {
-                setError("reCAPTCHA encountered an error. Please refresh the page.");
-              },
-              'expired-callback': () => {
-                setError("reCAPTCHA expired. Please re-verify.");
-                window.grecaptcha.reset();
-              }
-            });
-            recaptchaRef.current.dataset.recaptchaRendered = 'true'; // Mark as rendered
-          } else {
-            // If already rendered, just reset it for a new challenge
-            window.grecaptcha.reset();
-          }
-        }
-      }, 200); // Check every 200ms
-
-      return () => {
-        clearInterval(interval); // Cleanup interval on unmount or if requiresCaptcha becomes false
-      };
+      // If grecaptcha is already loaded (e.g., from a previous attempt) and ref is ready, render immediately
+      if (window.grecaptcha && recaptchaRef.current) {
+        renderRecaptchaWidget();
+      }
+      // If not ready, window.onRecaptchaLoadCallback will handle it once script loads
     } else {
       // When CAPTCHA is no longer required, reset it if it was rendered
       if (window.grecaptcha && recaptchaRef.current && recaptchaRef.current.dataset.recaptchaRendered === 'true') {
@@ -67,7 +80,7 @@ export default function Login() {
         delete recaptchaRef.current.dataset.recaptchaRendered; // Clear marker
       }
     }
-  }, [requiresCaptcha]);
+  }, [requiresCaptcha]); // Depend on requiresCaptcha state
 
   const handleSubmit = async (e) => {
     e.preventDefault();
