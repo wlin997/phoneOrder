@@ -85,14 +85,14 @@ const loginLimiter = rateLimit({
         message: `Account locked due to too many failed attempts. Please try again in ${remainingMinutes} minutes.`
       });
     } else {
-      res.status(options.statusCode).send(options.message);
+      return res.status(options.statusCode).send(options.message); // Ensure return here
     }
   },
 });
 
 
 /*────────────────────────────────────────────────────
-  LOGIN  — Step 1 (Fixed Failed Login Attempts & CAPTCHA Flow)
+  LOGIN  — Step 1 (Final Fix for Failed Attempts & CAPTCHA Flow)
 ────────────────────────────────────────────────────*/
 router.post("/login", loginLimiter, async (req, res, next) => {
   const { email, password, recaptchaToken } = req.body;
@@ -138,7 +138,7 @@ router.post("/login", loginLimiter, async (req, res, next) => {
       const updatedUser = updatedUserResult.rows[0];
       console.log(`[Auth Debug] Re-fetched failed_login_attempts for ${user.email}: ${updatedUser.failed_login_attempts}`); // DEBUG
 
-      let responseMessage = "Invalid credentials"; // FIX: Always initialize responseMessage
+      let responseMessage = "Invalid credentials"; // FIX: Always initialize responseMessage here
 
       // CAPTCHA Check Logic (after failed attempt count is updated)
       if (updatedUser.failed_login_attempts >= CAPTCHA_REQUIRED_AFTER_ATTEMPTS) {
@@ -181,7 +181,7 @@ router.post("/login", loginLimiter, async (req, res, next) => {
           [newLockoutUntil, newLockoutCount, user.id]
         );
         console.log(`[Auth Debug] Account ${user.email} locked. Lockout count: ${newLockoutCount}`); // DEBUG
-        return res.status(401).json({ message: responseMessage }); // Use the defined message
+        return res.status(401).json({ message: responseMessage });
 
       } else {
         // If not yet locked, and no CAPTCHA needed yet, return generic invalid credentials
