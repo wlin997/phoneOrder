@@ -77,6 +77,7 @@ export default function Login() {
       script.src = "https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoadCallback&render=explicit";
       script.async = true;
       script.defer = true;
+      console.log("DEBUG: Adding reCAPTCHA script to DOM"); // Add this
       document.body.appendChild(script);
     } else if (requiresCaptcha && window.grecaptcha && recaptchaRef.current) {
       // If CAPTCHA is required AND script is already loaded AND ref is ready,
