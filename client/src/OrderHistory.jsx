@@ -35,27 +35,30 @@ export default function OrderHistory() {
   };
 
   const fetchFullOrderDetails = async (rowIndex) => {
-    try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/order-by-id/${rowIndex}`);
-      if (!res.ok) throw new Error('Failed to fetch full order details');
-      const data = await res.json();
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/order-by-id/${rowIndex}`, {
+      credentials: 'include'  // ✅ required to send cookie
+    });
 
-      // Normalize total_price_each
-      const enrichedItems = (data.items || []).map(item => {
-        const modifierDelta = item.modifiers?.reduce((sum, mod) => sum + (parseFloat(mod.price_delta) || 0), 0) || 0;
-        const computedPrice = item.base_price ? parseFloat(item.base_price) + modifierDelta : 0;
-        return {
-          ...item,
-          total_price_each: computedPrice.toFixed(2)
-        };
-      });
+    if (!res.ok) throw new Error('Failed to fetch full order details');
+    const data = await res.json();
 
-      setSelectedOrder({ ...data, items: enrichedItems });
-    } catch (err) {
-      console.error('[OrderHistory] Error fetching full order:', err);
-      alert('Failed to load order details.');
-    }
-  };
+    const enrichedItems = (data.items || []).map(item => {
+      const modifierDelta = item.modifiers?.reduce((sum, mod) => sum + (parseFloat(mod.price_delta) || 0), 0) || 0;
+      const computedPrice = item.base_price ? parseFloat(item.base_price) + modifierDelta : 0;
+      return {
+        ...item,
+        total_price_each: computedPrice.toFixed(2)
+      };
+    });
+
+    setSelectedOrder({ ...data, items: enrichedItems });
+  } catch (err) {
+    console.error('[OrderHistory] Error fetching full order:', err);
+    alert('Failed to load order details.');
+  }
+};
+
 
   const handleSort = (field) => {
     setSortField(field);
