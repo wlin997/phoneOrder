@@ -144,8 +144,9 @@ router.post("/login", loginLimiter, async (req, res, next) => {
         responseMessage = "CAPTCHA verification required.";
         statusCode = 412;
 
+        console.log(`[Auth Debug] Checking recaptchaToken for ${user.email}:`, { recaptchaToken });
         if (!recaptchaToken) {
-          console.log(`[Auth Debug] No recaptchaToken, sending 412 response for ${user.email}`);
+          console.log(`[Auth Debug] No recaptchaToken, sending 412 response for ${user.email}:`, { success: false, message: responseMessage, requiresCaptcha: true });
           return res.status(statusCode).json({
             success: false,
             message: responseMessage,
@@ -163,7 +164,6 @@ router.post("/login", loginLimiter, async (req, res, next) => {
           return res.status(400).json({ success: false, message: responseMessage, requiresCaptcha: true });
         }
         console.log(`[Auth Debug] CAPTCHA verification successful for ${user.email}. Score: ${score}`);
-        // Proceed to lockout check if password still fails
       }
 
       if (updatedUser.failed_login_attempts >= MAX_FAILED_ATTEMPTS) {
@@ -173,18 +173,17 @@ router.post("/login", loginLimiter, async (req, res, next) => {
         const lockoutDuration = LOCKOUT_DURATIONS[durationIndex];
         newLockoutUntil = new Date(Date.now() + lockoutDuration * 60 * 1000);
         responseMessage = `Account locked due to too many failed attempts. Please try again in ${lockoutDuration} minutes.`;
-        statusCode = 401;
 
         await pool.query(
           "UPDATE users SET failed_login_attempts = 0, lockout_until = $1, lockout_count = $2 WHERE id = $3",
           [newLockoutUntil, newLockoutCount, user.id]
         );
         console.log(`[Auth Debug] Account ${user.email} locked. Lockout count: ${newLockoutCount}`);
-        return res.status(statusCode).json({ success: false, message: responseMessage });
+        return res.status(401).json({ success: false, message: responseMessage });
       }
 
-      console.log(`[Auth Debug] Returning response for ${user.email}. Attempts: ${updatedUser.failed_login_attempts}, Status: ${statusCode}`);
-      return res.status(statusCode).json({ success: false, message: responseMessage, requiresCaptcha: (updatedUser.failed_login_attempts >= CAPTCHA_REQUIRED_AFTER_ATTEMPTS) });
+      console.log(`[Auth Debug] Returning response for ${user.email}. Attempts: ${updatedUser.failed_login_attempts}, Status: ${statusCode}, Response:`, { success: false, message: responseMessage, requiresCaptcha: false });
+      return res.status(statusCode).json({ success: false, message: responseMessage, requiresCaptcha: false });
     }
 
     // On successful login, reset failed attempts and lockout status
