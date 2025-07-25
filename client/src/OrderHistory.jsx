@@ -2,8 +2,11 @@
 import React, { useEffect, useState } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import NavMenu from './components/NavMenu';
+import { useAuth } from './AuthContext.jsx'; // Import useAuth
 
 export default function OrderHistory() {
+  const { api } = useAuth(); // Destructure api from useAuth
+
   const [orders, setOrders] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, pageSize: 25, total: 0 });
   const [sortField, setSortField] = useState('created_at');
@@ -20,10 +23,11 @@ export default function OrderHistory() {
   const fetchOrders = async () => {
     try {
       setIsLoading(true);
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/order-history?page=${pagination.page}&pageSize=${pagination.pageSize}&search=${encodeURIComponent(search)}&sort=${sortField}&dir=${sortDir}`
+      // Use the 'api' instance for authenticated requests
+      const res = await api.get( // Changed fetch to api.get
+        `/api/order-history?page=${pagination.page}&pageSize=${pagination.pageSize}&search=${encodeURIComponent(search)}&sort=${sortField}&dir=${sortDir}`
       );
-      const data = await res.json();
+      const data = res.data; // Axios puts response data in .data
       setOrders(data.orders || []);
       setPagination(prev => ({ ...prev, total: data.pagination.total }));
     } catch (err) {
@@ -34,14 +38,11 @@ export default function OrderHistory() {
     }
   };
 
-  const fetchFullOrderDetails = async (rowIndex) => {
+  const fetchFullOrderDetails = async (orderId) => { // Renamed rowIndex to orderId for clarity
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/order-by-id/${rowIndex}`, {
-      method: 'GET',
-      credentials: 'include'
-    });
-    if (!res.ok) throw new Error('Failed to fetch full order details');
-    const data = await res.json();
+    // Use the 'api' instance for authenticated requests
+    const res = await api.get(`/api/order-by-id/${orderId}`); // Changed fetch to api.get
+    const data = res.data; // Axios puts response data in .data
 
     const enrichedItems = (data.items || []).map(item => {
       const modifierDelta = item.modifiers?.reduce((sum, mod) => sum + (parseFloat(mod.price_delta) || 0), 0) || 0;
@@ -74,12 +75,9 @@ export default function OrderHistory() {
 
   const handleReprint = async (rowIndex) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/fire-order`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rowIndex })
-      });
-      if (!response.ok) throw new Error('Reprint failed');
+      // Use the 'api' instance for authenticated requests
+      const response = await api.post(`/api/fire-order`, { rowIndex }); // Changed fetch to api.post
+      if (response.status !== 200) throw new Error('Reprint failed'); // Axios throws for 4xx/5xx by default
       alert('Reprint successful!');
     } catch (err) {
       console.error('[OrderHistory] Reprint failed:', err);
