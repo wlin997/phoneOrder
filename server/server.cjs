@@ -6,7 +6,7 @@ process.env.TZ = 'America/New_York'; // Set default timezone
 const express = require("express");
 const adminRoutes = require("./admin.routes.cjs");
 const authRoutes = require("./auth.routes.cjs"); // Import the new auth routes
-const { authenticateToken, authorizePermissions } = require("./auth.middleware.cjs");
+const { authenticateToken, authorizePermission } = require("./auth.middleware.cjs");
 
 const fs = require("fs");
 const fsp = require("fs").promises;
