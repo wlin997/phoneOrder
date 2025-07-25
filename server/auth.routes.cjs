@@ -57,6 +57,7 @@ const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
   message: {
+    success: false,
     message: "Too many login attempts from this IP, please try again after 15 minutes."
   },
   standardHeaders: true,
@@ -82,10 +83,11 @@ const loginLimiter = rateLimit({
       const remainingTimeMs = new Date(user.lockout_until).getTime() - new Date().getTime();
       const remainingMinutes = Math.ceil(remainingTimeMs / (1000 * 60));
       return res.status(423).json({
+        success: false,
         message: `Account locked due to too many failed attempts. Please try again in ${remainingMinutes} minutes.`
       });
     } else {
-      return res.status(options.statusCode).send(options.message); // Ensure return here
+      return res.status(options.statusCode).json(options.message); // Ensure JSON response
     }
   },
 });
@@ -155,16 +157,26 @@ router.post("/login", loginLimiter, async (req, res, next) => {
         }
 
         const googleVerifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${RECAPTCHA_SECRET_KEY}&response=${recaptchaToken}`;
-        const googleResponse = await axios.post(googleVerifyUrl);
+        const googleResponse = await axios.post(googleVerifyUrl).catch((error) => {
+          console.error(`[Auth Debug] Error verifying reCAPTCHA for ${user.email}:`, error.message);
+          return { data: { success: false } }; // Fallback on error
+        });
         const { success: captchaSuccess, score } = googleResponse.data;
 
-        if (!captchaSuccess || (score && score < 0.5)) { // Require minimum score if using v3
+        if (!captchaSuccess) {
           console.log(`[Auth Debug] CAPTCHA verification failed for ${user.email}. Score: ${score || 'N/A'}`);
           responseMessage = "CAPTCHA verification failed. Please try again.";
           return res.status(412).json({ success: false, message: responseMessage, requiresCaptcha: true });
         }
+
+        // For v3, check score; for v2, success is sufficient
+        if (score !== undefined && score < 0.5) {
+          console.log(`[Auth Debug] CAPTCHA score too low for ${user.email}. Score: ${score}`);
+          responseMessage = "CAPTCHA score too low. Please try again.";
+          return res.status(412).json({ success: false, message: responseMessage, requiresCaptcha: true });
+        }
         console.log(`[Auth Debug] CAPTCHA verification successful for ${user.email}. Score: ${score || 'N/A'}`);
-        // CAPTCHA is valid, but login still fails due to incorrect password—keep requiresCaptcha: true
+        // CAPTCHA is valid, but login still depends on password
       }
 
       if (updatedUser.failed_login_attempts >= MAX_FAILED_ATTEMPTS) {
