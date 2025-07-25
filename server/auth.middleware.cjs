@@ -6,30 +6,22 @@ const pool = require("./db.js");
   JWT Authentication
 ────────────────────────────────────────────────────────────*/
 function authenticateToken(req, res, next) {
-  const header = req.headers.authorization || "";
-  const token  = header.startsWith("Bearer ") ? header.slice(7) : null;
+  const authHeader = req.headers.authorization || "";
+  const tokenFromHeader = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const tokenFromCookie = req.cookies?.accessToken || null;
 
-  // DEBUG – BEGIN (Removed for production)
-  // console.log("→ [auth] incoming:", req.method, req.originalUrl);
-  // console.log("→ [auth] header   :", header || "(none)");
-  // DEBUG – END
+  const token = tokenFromHeader || tokenFromCookie;
 
   if (!token) {
-    // console.log removed: "→ [auth] Missing access token in Authorization header."
     return res.status(401).json({ message: "Missing access token" });
   }
 
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) {
-      // console.log removed: "→ [auth] invalid access token:", err.message
       return res.status(401).json({ message: "Invalid access token" });
     }
-    req.user = user;               // { id, email, permissions, ... }
 
-    // DEBUG – BEGIN (Removed for production)
-    // console.log("→ [auth] decoded   :", req.user);
-    // DEBUG – END
-
+    req.user = user; // e.g., { id, email, permissions }
     next();
   });
 }

@@ -37,9 +37,9 @@ export default function OrderHistory() {
   const fetchFullOrderDetails = async (rowIndex) => {
   try {
     const res = await fetch(`${import.meta.env.VITE_API_URL}/api/order-by-id/${rowIndex}`, {
-      credentials: 'include'  // ✅ required to send cookie
+      method: 'GET',
+      credentials: 'include'
     });
-
     if (!res.ok) throw new Error('Failed to fetch full order details');
     const data = await res.json();
 
