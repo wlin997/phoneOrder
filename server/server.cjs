@@ -29,7 +29,7 @@ const { getUserPermissions } = require("./rbac.service.cjs");
 
 const app = express();
 // NEW: Tell Express to trust proxy headers
-app.set('trust proxy', true); // This will correctly identify the client's IP behind Render's load balancer
+app.set('trust proxy', 1); // This will correctly identify the client's IP behind Render's load balancer
 
 const PORT = process.env.PORT || 3001;
 const appSettingsFilePath = path.join(__dirname, 'appSettings.json');
@@ -268,6 +268,104 @@ app.get("/api/order-by-row/:orderId", async (req, res) => {
         });
     }
 });
+
+// =================================================================================
+// Order history
+// =================================================================================
+
+app.get("/api/order-history", async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const pageSize = parseInt(req.query.pageSize) || 25;
+        const offset = (page - 1) * pageSize;
+
+        const search = req.query.search?.trim().toLowerCase() || "";
+        const sort = req.query.sort || "created_at";
+        const dir = req.query.dir?.toUpperCase() === "ASC" ? "ASC" : "DESC";
+
+        const allowedSortFields = ["created_at", "order_type", "name", "phone", "total_price"];
+        const sortField = allowedSortFields.includes(sort) ? sort : "created_at";
+
+        // Sanitize sort field for SQL aliasing
+        const sortClause = (sortField === "name" || sortField === "phone")
+            ? `customers.${sortField}`
+            : `orders.${sortField}`;
+
+        const query = `
+            SELECT 
+                orders.id AS order_id,
+                orders.order_type,
+                orders.created_at,
+                orders.total_price,
+                customers.name,
+                customers.phone
+            FROM orders
+            JOIN customers ON orders.customer_id = customers.id
+            WHERE orders.archived = FALSE
+              AND (
+                  CAST(orders.id AS TEXT) ILIKE $1 OR
+                  LOWER(orders.order_type) ILIKE $1 OR
+                  TO_CHAR(orders.created_at, 'YYYY-MM-DD HH24:MI') ILIKE $1 OR
+                  LOWER(customers.name) ILIKE $1 OR
+                  customers.phone ILIKE $1 OR
+                  CAST(orders.total_price AS TEXT) ILIKE $1
+              )
+            ORDER BY ${sortClause} ${dir}
+            LIMIT $2 OFFSET $3
+        `;
+
+        const countQuery = `
+            SELECT COUNT(*) AS total
+            FROM orders
+            JOIN customers ON orders.customer_id = customers.id
+            WHERE orders.archived = FALSE
+              AND (
+                  CAST(orders.id AS TEXT) ILIKE $1 OR
+                  LOWER(orders.order_type) ILIKE $1 OR
+                  TO_CHAR(orders.created_at, 'YYYY-MM-DD HH24:MI') ILIKE $1 OR
+                  LOWER(customers.name) ILIKE $1 OR
+                  customers.phone ILIKE $1 OR
+                  CAST(orders.total_price AS TEXT) ILIKE $1
+              )
+        `;
+
+        const values = [`%${search}%`, pageSize, offset];
+
+        const [dataResult, countResult] = await Promise.all([
+            pool.query(query, values),
+            pool.query(countQuery, [`%${search}%`])
+        ]);
+
+        const orders = dataResult.rows.map(row => ({
+            order_id: row.order_id,
+            order_type: row.order_type,
+            created_at: DateTime.fromJSDate(row.created_at).setZone("America/New_York").toISO(),
+            total_price: parseFloat(row.total_price),
+            customer_name: row.name,
+            customer_phone: row.phone
+        }));
+
+        res.json({
+            orders,
+            pagination: {
+                page,
+                pageSize,
+                total: parseInt(countResult.rows[0].total)
+            }
+        });
+
+    } catch (err) {
+        console.error("[/api/order-history] Error:", err);
+        res.status(500).json({ error: "Failed to fetch order history." });
+    }
+});
+
+
+
+
+
+
+
 // =================================================================================
 // REPORTING AND SETTINGS ENDPOINTS (Refactored for PostgreSQL)
 // =================================================================================
