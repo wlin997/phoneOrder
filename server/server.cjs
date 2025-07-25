@@ -359,6 +359,88 @@ app.get("/api/order-history", async (req, res) => {
 });
 
 
+app.get("/api/order-by-id/:id", authenticateToken, authorizePermissions(["view_order_history"]), async (req, res) => {
+  const id = req.params.id;
+
+  try {
+    const query = `
+      SELECT
+        o.id AS order_id,
+        o.order_type,
+        o.total_price,
+        o.notes,
+        o.created_at,
+        o.utensil_request,
+        o.category,
+        o.order_update_status,
+        o.printed_count,
+        o.is_the_usual,
+        c.id AS customer_id,
+        c.name AS customer_name,
+        c.phone AS customer_phone,
+        c.email AS customer_email,
+        c.address AS customer_address,
+        i.id AS item_id,
+        i.item_name,
+        i.quantity AS qty,
+        i.base_price,
+        m.id AS modifier_id,
+        m.modifier_name AS name,
+        m.price_delta
+      FROM orders o
+      JOIN customers c ON o.customer_id = c.id
+      LEFT JOIN order_items i ON o.id = i.order_id
+      LEFT JOIN order_item_modifiers m ON i.id = m.order_item_id
+      WHERE o.id = $1
+    `;
+
+    const { rows } = await pool.query(query, [id]);
+
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    // Restructure to nested format
+    const order = {
+      order_id: rows[0].order_id,
+      order_type: rows[0].order_type,
+      created_at: rows[0].created_at,
+      customer_name: rows[0].customer_name,
+      customer_phone: rows[0].customer_phone,
+      total_price: parseFloat(rows[0].total_price),
+      items: []
+    };
+
+    const itemMap = new Map();
+
+    for (const row of rows) {
+      if (!row.item_id) continue;
+
+      if (!itemMap.has(row.item_id)) {
+        itemMap.set(row.item_id, {
+          item_name: row.item_name,
+          qty: row.qty,
+          base_price: parseFloat(row.base_price || 0),
+          modifiers: []
+        });
+      }
+
+      if (row.modifier_id) {
+        itemMap.get(row.item_id).modifiers.push({
+          name: row.name,
+          price_delta: parseFloat(row.price_delta || 0)
+        });
+      }
+    }
+
+    order.items = Array.from(itemMap.values());
+
+    res.json(order);
+  } catch (err) {
+    console.error("[/api/order-by-id/:id] Error fetching order:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 
 
