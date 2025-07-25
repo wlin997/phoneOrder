@@ -359,7 +359,7 @@ app.get("/api/order-history", async (req, res) => {
 });
 
 
-app.get("/api/order-by-id/:id", authenticateToken, authorizePermissions(["view_order_history"]), async (req, res) => {
+app.get("/api/order-by-id/:id", authenticateToken, authorizePermission(["view_order_history"]), async (req, res) => {
   const id = req.params.id;
 
   try {
