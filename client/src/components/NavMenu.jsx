@@ -138,6 +138,31 @@ const NavMenu = ({ isMenuOpen, handleMenuClose }) => {
               </li>
             </RequirePerms>
 
+            <RequirePerms perms="view_order_history">
+              <li className="mb-4">
+                <Link
+                  to="/order-history"
+                  onClick={handleMenuClose}
+                  className="flex items-center p-2 text-gray-700 rounded-lg hover:bg-cyan-50 hover:text-cyan-600"
+                >
+                  <svg
+                    className="w-6 h-6 mr-3"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M3 7h18M3 12h18M3 17h18"
+                    />
+                  </svg>
+                  <span>Order History</span>
+                </Link>
+              </li>
+            </RequirePerms>
+            
             <RequirePerms perms="edit_daily_specials">
               <li className="mb-4">
                 <Link
