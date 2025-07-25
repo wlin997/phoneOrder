@@ -301,7 +301,6 @@ app.get("/api/order-history", async (req, res) => {
                 customers.phone
             FROM orders
             JOIN customers ON orders.customer_id = customers.id
-            WHERE orders.archived = FALSE
               AND (
                   CAST(orders.id AS TEXT) ILIKE $1 OR
                   LOWER(orders.order_type) ILIKE $1 OR
@@ -318,8 +317,7 @@ app.get("/api/order-history", async (req, res) => {
             SELECT COUNT(*) AS total
             FROM orders
             JOIN customers ON orders.customer_id = customers.id
-            WHERE orders.archived = FALSE
-              AND (
+               AND (
                   CAST(orders.id AS TEXT) ILIKE $1 OR
                   LOWER(orders.order_type) ILIKE $1 OR
                   TO_CHAR(orders.created_at, 'YYYY-MM-DD HH24:MI') ILIKE $1 OR
