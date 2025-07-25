@@ -34,6 +34,29 @@ export default function OrderHistory() {
     }
   };
 
+  const fetchFullOrderDetails = async (rowIndex) => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/order-by-row/${rowIndex}`);
+      if (!res.ok) throw new Error('Failed to fetch full order details');
+      const data = await res.json();
+
+      // Normalize total_price_each
+      const enrichedItems = (data.items || []).map(item => {
+        const modifierDelta = item.modifiers?.reduce((sum, mod) => sum + (parseFloat(mod.price_delta) || 0), 0) || 0;
+        const computedPrice = item.base_price ? parseFloat(item.base_price) + modifierDelta : 0;
+        return {
+          ...item,
+          total_price_each: computedPrice.toFixed(2)
+        };
+      });
+
+      setSelectedOrder({ ...data, items: enrichedItems });
+    } catch (err) {
+      console.error('[OrderHistory] Error fetching full order:', err);
+      alert('Failed to load order details.');
+    }
+  };
+
   const handleSort = (field) => {
     setSortField(field);
     setSortDir(prev => (sortField === field && sortDir === 'desc' ? 'asc' : 'desc'));
@@ -46,12 +69,12 @@ export default function OrderHistory() {
     }));
   };
 
-  const handleReprint = async (orderId) => {
+  const handleReprint = async (rowIndex) => {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/fire-order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rowIndex: orderId })
+        body: JSON.stringify({ rowIndex })
       });
       if (!response.ok) throw new Error('Reprint failed');
       alert('Reprint successful!');
@@ -59,6 +82,10 @@ export default function OrderHistory() {
       console.error('[OrderHistory] Reprint failed:', err);
       alert('Failed to reprint order.');
     }
+  };
+
+  const handleRowClick = async (order) => {
+    await fetchFullOrderDetails(order.order_id);
   };
 
   const formatDate = (isoStr) => {
@@ -124,7 +151,7 @@ export default function OrderHistory() {
                   <tr
                     key={order.order_id}
                     className="hover:bg-gray-100 cursor-pointer"
-                    onClick={() => setSelectedOrder(order)}
+                    onClick={() => handleRowClick(order)}
                   >
                     <td className="px-4 py-2">{order.order_id}</td>
                     <td className="px-4 py-2">{order.order_type}</td>
@@ -139,7 +166,7 @@ export default function OrderHistory() {
           </table>
         </div>
 
-        {/* Dialog */}
+        {/* Order Details Dialog */}
         {selectedOrder && (
           <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
             <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -153,7 +180,31 @@ export default function OrderHistory() {
                 <p><strong>Time Ordered:</strong> {formatDate(selectedOrder.created_at)}</p>
                 <p><strong>Customer:</strong> {selectedOrder.customer_name}</p>
                 <p><strong>Phone:</strong> {selectedOrder.customer_phone}</p>
-                <p><strong>Total:</strong> ${selectedOrder.total_price.toFixed(2)}</p>
+              </div>
+
+              <div className="mt-4">
+                <h4 className="text-lg font-semibold mb-2">Items:</h4>
+                {selectedOrder.items && selectedOrder.items.length > 0 ? (
+                  <ul className="space-y-2">
+                    {selectedOrder.items.map((item, i) => (
+                      <li key={i} className="border rounded p-2 bg-gray-50">
+                        <div className="font-semibold text-gray-800">{item.qty} × {item.item_name}</div>
+                        <div className="text-gray-700 text-sm">Each: ${item.total_price_each}</div>
+                        {item.modifiers && item.modifiers.length > 0 && (
+                          <ul className="pl-4 mt-1 text-red-500 text-sm">
+                            {item.modifiers.map((mod, j) => (
+                              <li key={j}>
+                                Mod: {mod.name} {mod.price_delta ? `(+ $${parseFloat(mod.price_delta).toFixed(2)})` : ''}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-gray-500">No items found.</p>
+                )}
               </div>
 
               <div className="mt-6">
