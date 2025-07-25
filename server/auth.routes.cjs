@@ -17,19 +17,13 @@ const rateLimit = require("express-rate-limit");
 /*────────────────────────────────────────────────────
   Constants for Account Lockout
 ────────────────────────────────────────────────────*/
-const MAX_FAILED_ATTEMPTS = 5; // Max consecutive failed login attempts before lockout
-const LOCKOUT_DURATIONS = [
-  30,   // 1st lockout: 30 minutes
-  60,   // 2nd lockout: 1 hour
-  240,  // 3rd lockout: 4 hours
-  1440, // 4th lockout: 24 hours
-  10080 // 5th+ lockout: 7 days (effectively permanent for most users)
-];
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_DURATIONS = [30, 60, 240, 1440, 10080];
 
 /*────────────────────────────────────────────────────
   Constants for CAPTCHA
 ────────────────────────────────────────────────────*/
-const CAPTCHA_REQUIRED_AFTER_ATTEMPTS = 3; // Number of failed attempts before CAPTCHA is required
+const CAPTCHA_REQUIRED_AFTER_ATTEMPTS = 3;
 const RECAPTCHA_SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY;
 
 /*────────────────────────────────────────────────────
@@ -87,13 +81,13 @@ const loginLimiter = rateLimit({
         message: `Account locked due to too many failed attempts. Please try again in ${remainingMinutes} minutes.`
       });
     } else {
-      return res.status(options.statusCode).json(options.message); // Ensure JSON response
+      return res.status(options.statusCode).json(options.message);
     }
   },
 });
 
 /*────────────────────────────────────────────────────
-  LOGIN  — Step 1 (Final Fix for Failed Attempts & CAPTCHA Flow)
+  LOGIN
 ────────────────────────────────────────────────────*/
 router.post("/login", loginLimiter, async (req, res, next) => {
   const { email, password, recaptchaToken } = req.body;
@@ -108,7 +102,7 @@ router.post("/login", loginLimiter, async (req, res, next) => {
     }
 
     const user = rows[0];
-    console.log(`[Auth Debug] Initial failed_login_attempts for ${user.email}: ${user.failed_login_attempts}`); // DEBUG
+    console.log(`[Auth Debug] Initial failed_login_attempts for ${user.email}: ${user.failed_login_attempts}`);
 
     if (user.lockout_until && new Date(user.lockout_until) > new Date()) {
       const remainingTimeMs = new Date(user.lockout_until).getTime() - new Date().getTime();
@@ -148,7 +142,6 @@ router.post("/login", loginLimiter, async (req, res, next) => {
 
         console.log(`[Auth Debug] Checking recaptchaToken for ${user.email}:`, { recaptchaToken });
         if (!recaptchaToken) {
-          console.log(`[Auth Debug] No recaptchaToken, sending 412 response for ${user.email}:`, { success: false, message: responseMessage, requiresCaptcha: true });
           return res.status(statusCode).json({
             success: false,
             message: responseMessage,
@@ -156,12 +149,22 @@ router.post("/login", loginLimiter, async (req, res, next) => {
           });
         }
 
-        const googleVerifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${RECAPTCHA_SECRET_KEY}&response=${recaptchaToken}`;
-        const googleResponse = await axios.post(googleVerifyUrl).catch((error) => {
+        const googleResponse = await axios.post(
+          "https://www.google.com/recaptcha/api/siteverify",
+          new URLSearchParams({
+            secret: RECAPTCHA_SECRET_KEY,
+            response: recaptchaToken,
+          }),
+          {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+          }
+        ).catch((error) => {
           console.error(`[Auth Debug] Error verifying reCAPTCHA for ${user.email}:`, error.message);
-          return { data: { success: false } }; // Fallback on error
+          return { data: { success: false } };
         });
+
         const { success: captchaSuccess, score } = googleResponse.data;
+        console.log(`[Auth Debug] Full reCAPTCHA response for ${user.email}:`, googleResponse.data);
 
         if (!captchaSuccess) {
           console.log(`[Auth Debug] CAPTCHA verification failed for ${user.email}. Score: ${score || 'N/A'}`);
@@ -169,14 +172,13 @@ router.post("/login", loginLimiter, async (req, res, next) => {
           return res.status(412).json({ success: false, message: responseMessage, requiresCaptcha: true });
         }
 
-        // For v3, check score; for v2, success is sufficient
         if (score !== undefined && score < 0.5) {
           console.log(`[Auth Debug] CAPTCHA score too low for ${user.email}. Score: ${score}`);
           responseMessage = "CAPTCHA score too low. Please try again.";
           return res.status(412).json({ success: false, message: responseMessage, requiresCaptcha: true });
         }
+
         console.log(`[Auth Debug] CAPTCHA verification successful for ${user.email}. Score: ${score || 'N/A'}`);
-        // CAPTCHA is valid, but login still depends on password
       }
 
       if (updatedUser.failed_login_attempts >= MAX_FAILED_ATTEMPTS) {
@@ -191,25 +193,24 @@ router.post("/login", loginLimiter, async (req, res, next) => {
           "UPDATE users SET failed_login_attempts = 0, lockout_until = $1, lockout_count = $2 WHERE id = $3",
           [newLockoutUntil, newLockoutCount, user.id]
         );
-        console.log(`[Auth Debug] Account ${user.email} locked. Lockout count: ${newLockoutCount}`);
         return res.status(401).json({ success: false, message: responseMessage });
       }
 
-      console.log(`[Auth Debug] Returning response for ${user.email}. Attempts: ${updatedUser.failed_login_attempts}, Status: ${statusCode}, Response:`, { success: false, message: responseMessage, requiresCaptcha: updatedUser.failed_login_attempts >= CAPTCHA_REQUIRED_AFTER_ATTEMPTS });
-      return res.status(statusCode).json({ success: false, message: responseMessage, requiresCaptcha: updatedUser.failed_login_attempts >= CAPTCHA_REQUIRED_AFTER_ATTEMPTS });
+      return res.status(statusCode).json({
+        success: false,
+        message: responseMessage,
+        requiresCaptcha: updatedUser.failed_login_attempts >= CAPTCHA_REQUIRED_AFTER_ATTEMPTS
+      });
     }
 
-    // On successful login, reset failed attempts and lockout status
     if (user.failed_login_attempts > 0 || user.lockout_until) {
       await pool.query(
         "UPDATE users SET failed_login_attempts = 0, lockout_until = NULL WHERE id = $1",
         [user.id]
       );
-      console.log(`[Auth Debug] Successful login. Failed attempts reset for ${user.email}.`); // DEBUG
     }
 
     const permissions = await getUserPermissions(user.id);
-
     const tokenPayload = {
       id: user.id,
       name: user.name,
@@ -226,12 +227,9 @@ router.post("/login", loginLimiter, async (req, res, next) => {
       return res.json({ need2FA: true, tmp });
     }
 
-    /* ---------- main login success ---------- */
     const accessToken = issueAccessToken(tokenPayload);
     const refreshToken = issueRefreshToken(res, { id: user.id });
-
     await pool.query("UPDATE users SET refresh_token = $1 WHERE id = $2", [refreshToken, user.id]);
-
     res.json({ success: true, accessToken });
   } catch (e) {
     console.error(`[Auth] Login error for email ${req.body.email}:`, e.message);
@@ -240,15 +238,13 @@ router.post("/login", loginLimiter, async (req, res, next) => {
 });
 
 /*────────────────────────────────────────────────────
-  LOGIN  — Step 2 (TOTP)
+  TOTP 2FA Login
 ────────────────────────────────────────────────────*/
 router.post("/login/step2", async (req, res, next) => {
   const { tmpToken, code } = req.body;
   try {
     const decoded = jwt.verify(tmpToken, process.env.JWT_SECRET);
-    if (decoded.step !== "mfa") {
-      return res.status(400).json({ message: "Invalid step" });
-    }
+    if (decoded.step !== "mfa") return res.status(400).json({ message: "Invalid step" });
 
     const { rows } = await pool.query(
       "SELECT totp_secret FROM users WHERE id=$1",
@@ -266,7 +262,6 @@ router.post("/login/step2", async (req, res, next) => {
     if (!verified) return res.status(401).json({ message: "Bad code" });
 
     const permissions = await getUserPermissions(decoded.id);
-
     const tokenPayload = {
       id: decoded.id,
       name: decoded.name,
@@ -276,7 +271,6 @@ router.post("/login/step2", async (req, res, next) => {
 
     const accessToken = issueAccessToken(tokenPayload);
     const refreshToken = issueRefreshToken(res, { id: decoded.id });
-
     await pool.query("UPDATE users SET refresh_token = $1 WHERE id = $2", [refreshToken, decoded.id]);
 
     res.json({ success: true, accessToken });
@@ -286,15 +280,11 @@ router.post("/login/step2", async (req, res, next) => {
 });
 
 /*────────────────────────────────────────────────────
-  REFRESH TOKEN
+  Refresh Token
 ────────────────────────────────────────────────────*/
 router.post("/refresh", async (req, res, next) => {
   const oldRefreshToken = req.cookies.refreshToken;
-
-  if (!oldRefreshToken) {
-    console.log("→ [Auth] Refresh token missing from cookie.");
-    return res.status(401).json({ message: "Refresh token required" });
-  }
+  if (!oldRefreshToken) return res.status(401).json({ message: "Refresh token required" });
 
   try {
     const decoded = jwt.verify(oldRefreshToken, process.env.REFRESH_SECRET);
@@ -302,23 +292,20 @@ router.post("/refresh", async (req, res, next) => {
 
     const { rows } = await pool.query("SELECT refresh_token FROM users WHERE id = $1", [userId]);
     if (!rows.length || rows[0].refresh_token !== oldRefreshToken) {
-      console.log("→ [Auth] Invalid or mismatched refresh token in DB.");
       await pool.query("UPDATE users SET refresh_token = NULL WHERE id = $1", [userId]);
       res.clearCookie("refreshToken");
       return res.status(401).json({ message: "Invalid refresh token" });
     }
 
     await pool.query("UPDATE users SET refresh_token = NULL WHERE id = $1", [userId]);
-
     const userResult = await pool.query("SELECT id, name, email FROM users WHERE id = $1", [userId]);
     if (!userResult.rows.length) {
-        console.log("→ [Auth] User not found during refresh.");
-        res.clearCookie("refreshToken");
-        return res.status(401).json({ message: "User not found" });
+      res.clearCookie("refreshToken");
+      return res.status(401).json({ message: "User not found" });
     }
+
     const user = userResult.rows[0];
     const permissions = await getUserPermissions(user.id);
-
     const tokenPayload = {
       id: user.id,
       name: user.name,
@@ -328,44 +315,33 @@ router.post("/refresh", async (req, res, next) => {
 
     const newAccessToken = issueAccessToken(tokenPayload);
     const newRefreshToken = issueRefreshToken(res, { id: user.id });
-
     await pool.query("UPDATE users SET refresh_token = $1 WHERE id = $2", [newRefreshToken, user.id]);
 
-    console.log("→ [Auth] Token refreshed successfully for user:", userId);
     res.json({ success: true, accessToken: newAccessToken });
   } catch (e) {
-    console.error("→ [Auth] Error refreshing token:", e.message);
     res.clearCookie("refreshToken");
     return res.status(401).json({ message: "Error refreshing token or refresh token invalid" });
   }
 });
 
 /*────────────────────────────────────────────────────
-  2‑FA  Setup  (QR)
+  2FA Setup & Enable
 ────────────────────────────────────────────────────*/
 router.post("/2fa/setup", authenticateToken, async (req, res, next) => {
   try {
     const secret = speakeasy.generateSecret({ name: "Synthpify.ai" });
-    await pool.query(
-      "UPDATE users SET totp_secret=$1 WHERE id=$2",
-      [secret.base32, req.user.id]
-    );
+    await pool.query("UPDATE users SET totp_secret=$1 WHERE id=$2", [secret.base32, req.user.id]);
     const qr = await qrcode.toDataURL(secret.otpauth_url);
     res.json({ qr });
   } catch (e) {
     next(e);
   }
 });
-/*────────────────────────────────────────────────────
-  2‑FA  Enable  (confirm code)
-────────────────────────────────────────────────────*/
+
 router.post("/2fa/enable", authenticateToken, async (req, res, next) => {
   const { code } = req.body;
   try {
-    const { rows } = await pool.query(
-      "SELECT totp_secret FROM users WHERE id=$1",
-      [req.user.id]
-    );
+    const { rows } = await pool.query("SELECT totp_secret FROM users WHERE id=$1", [req.user.id]);
     const verified = speakeasy.totp.verify({
       secret: rows[0].totp_secret,
       encoding: "base32",
@@ -373,28 +349,25 @@ router.post("/2fa/enable", authenticateToken, async (req, res, next) => {
       window: 1,
     });
     if (!verified) return res.status(400).json({ message: "Invalid code" });
-
-    await pool.query("UPDATE users SET totp_enabled=true WHERE id=$1", [
-      req.user.id,
-    ]);
+    await pool.query("UPDATE users SET totp_enabled=true WHERE id=$1", [req.user.id]);
     res.sendStatus(204);
   } catch (e) {
     next(e);
   }
 });
+
 /*────────────────────────────────────────────────────
-  WHO AMI  (session probe)
+  WHOAMI
 ────────────────────────────────────────────────────*/
 router.get("/whoami", authenticateToken, (req, res) => {
   res.set({
     "Cache-Control": "no-store, no-cache, must-revalidate, private",
-    "Pragma":        "no-cache",
-    "Expires":       "0",
-    ETag:            false
+    "Pragma": "no-cache",
+    "Expires": "0",
+    ETag: false
   });
-
   res.json({
-    id:          req.user.id,
+    id: req.user.id,
     permissions: req.user.permissions,
   });
 });
@@ -406,10 +379,8 @@ router.post("/logout", authenticateToken, async (req, res) => {
   try {
     await pool.query("UPDATE users SET refresh_token = NULL WHERE id = $1", [req.user.id]);
     res.clearCookie("refreshToken");
-    console.log("→ [Auth] Logout successful. Cookies cleared and DB token removed.");
     res.sendStatus(204);
   } catch (e) {
-    console.error("→ [Auth] Error during logout:", e.message);
     res.status(500).json({ message: "Logout failed" });
   }
 });
