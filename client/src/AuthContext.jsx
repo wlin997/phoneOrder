@@ -64,18 +64,19 @@ export function AuthProvider({ children }) {
 
   /* login */
   const login = async (email, password, recaptchaToken) => {
-    try {
-      const response = await API.post("/api/auth/login", { email, password, recaptchaToken });
-      console.log("DEBUG: Login response data:", response.data); // Log the raw response
-      localStorage.setItem("accessToken", response.data.accessToken);
-      setAccessToken(response.data.accessToken);
-      setUser(jwtDecode(response.data.accessToken));
-      return { success: true };
-    } catch (error) {
-      console.log("DEBUG: Login error:", error.response?.data || error.message); // Log error details
-      return error.response?.data || { success: false, message: "Login failed", requiresCaptcha: false };
-    }
-  };
+  try {
+    const response = await API.post("/api/auth/login", { email, password, recaptchaToken });
+    console.log("DEBUG: Login response data:", response.data); // Log the raw response
+    localStorage.setItem("accessToken", response.data.accessToken);
+    setAccessToken(response.data.accessToken);
+    setUser(jwtDecode(response.data.accessToken));
+    return { success: true };
+  } catch (error) {
+    console.log("DEBUG: Login error - Full error object:", error); // Log the entire error object
+    console.log("DEBUG: Login error - Response data:", error.response?.data); // Log the response data specifically
+    return error.response?.data || { success: false, message: "Login failed", requiresCaptcha: false };
+  }
+};
 
   /* logout */
   const logout = useCallback(async () => {
@@ -100,7 +101,8 @@ export function AuthProvider({ children }) {
       (response) => response,
       async (error) => {
         const originalRequest = error.config;
-
+        console.log("DEBUG: Interceptor - Error status:", error.response?.status, "URL:", originalRequest.url, "Data:", error.response?.data);
+        
         if (
           error.response?.status === 401 &&
           !originalRequest._retry &&
