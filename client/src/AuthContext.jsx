@@ -30,11 +30,13 @@ export const useAuth = () => useContext(AuthContext);
 export function AuthProvider({ children }) {
   /* accessToken persists as "accessToken" */
   const [accessToken, setAccessToken] = useState(() => localStorage.getItem("accessToken"));
-  const [user, setUser]   = useState(() => {
+  const [user, setUser] = useState(() => {
     if (!accessToken) return null;
     try {
       return jwtDecode(accessToken);
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   });
   const [authReady, setAuthReady] = useState(false);
   const isRefreshing = useRef(false);
@@ -61,16 +63,17 @@ export function AuthProvider({ children }) {
   );
 
   /* login */
-  const login = async (email, password) => {
+  const login = async (email, password, recaptchaToken) => {
     try {
-      const { data } = await API.post("/api/auth/login", { email, password });
-      localStorage.setItem("accessToken", data.accessToken);
-      setAccessToken(data.accessToken);
-      setUser(jwtDecode(data.accessToken));
+      const response = await API.post("/api/auth/login", { email, password, recaptchaToken });
+      console.log("DEBUG: Login response data:", response.data); // Log the raw response
+      localStorage.setItem("accessToken", response.data.accessToken);
+      setAccessToken(response.data.accessToken);
+      setUser(jwtDecode(response.data.accessToken));
       return { success: true };
     } catch (error) {
-      console.error("Login failed:", error.response?.data?.message || error.message);
-      return { success: false, message: error.response?.data?.message || "Login failed" };
+      console.log("DEBUG: Login error:", error.response?.data || error.message); // Log error details
+      return error.response?.data || { success: false, message: "Login failed", requiresCaptcha: false };
     }
   };
 
@@ -131,12 +134,12 @@ export function AuthProvider({ children }) {
         }
 
         if (error.response?.status === 401) {
-            if (originalRequest.url.includes("/api/auth/refresh")) {
-                console.log("Refresh token endpoint failed, performing full logout.");
-                logout();
-            } else if (originalRequest.url.includes("/api/auth/login")) {
-                console.log("Login failed directly.");
-            }
+          if (originalRequest.url.includes("/api/auth/refresh")) {
+            console.log("Refresh token endpoint failed, performing full logout.");
+            logout();
+          } else if (originalRequest.url.includes("/api/auth/login")) {
+            console.log("Login failed directly.");
+          }
         }
 
         return Promise.reject(error);
