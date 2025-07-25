@@ -9,6 +9,7 @@ import DailySpecialsManager from "./dailySpecials.jsx";
 import Admin                from "./Admin.jsx";
 import Login                from "./Login.jsx";
 import RoleManager          from "./RoleManager.jsx";
+import OrderHistory from "./OrderHistory.jsx";
 
 import { RequireAuth, RequirePerms, useAuth } from "./AuthContext.jsx";
 import NavMenu from "./components/NavMenu.jsx";
@@ -111,6 +112,14 @@ export default function App() {
           element={
             <RequirePerms perms="manage_kds" fallback={<Navigate to="/unauthorized" replace />}>
               <KDS />
+            </RequirePerms>
+          }
+        />
+        <Route
+          path="order-history"
+          element={
+            <RequirePerms perms="view_order_history" fallback={<Navigate to="/unauthorized" replace />}>
+              <OrderHistory />
             </RequirePerms>
           }
         />
