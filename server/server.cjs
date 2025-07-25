@@ -6,7 +6,7 @@ process.env.TZ = 'America/New_York'; // Set default timezone
 const express = require("express");
 const adminRoutes = require("./admin.routes.cjs");
 const authRoutes = require("./auth.routes.cjs"); // Import the new auth routes
-const { authenticateToken, authorizePermission } = require("./auth.middleware.cjs");
+const { authenticateToken, requirePermission } = require("./auth.middleware.cjs");
 
 const fs = require("fs");
 const fsp = require("fs").promises;
@@ -359,7 +359,7 @@ app.get("/api/order-history", async (req, res) => {
 });
 
 
-app.get("/api/order-by-id/:id", authenticateToken, authorizePermission(["view_order_history"]), async (req, res) => {
+app.get("/api/order-by-id/:id", authenticateToken, requirePermission(["view_order_history"]), async (req, res) => {
   const id = req.params.id;
 
   try {
