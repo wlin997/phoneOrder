@@ -1,23 +1,27 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React</title>
+    <!doctype html>
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8" />
+        <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Vite + React</title>
 
-    <script>
-      if (typeof window.onRecaptchaLoadCallback === 'undefined') {
-        window.onRecaptchaLoadCallback = function () {
-          console.log("DEBUG: onRecaptchaLoadCallback fired from index.html. grecaptcha is ready.");
-          // Dispatch a custom event so React components can react to grecaptcha being ready
-          window.dispatchEvent(new Event("recaptchaLoaded"));
-        };
-      }
-    </script>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="../src/main.jsx"></script> 
-  </body>
-</html>
+        <!-- NEW: Define the global onRecaptchaLoadCallback function BEFORE the reCAPTCHA script is loaded -->
+        <!-- This is crucial for reCAPTCHA v2 explicit rendering -->
+        <script>
+          if (typeof window.onRecaptchaLoadCallback === 'undefined') {
+            window.onRecaptchaLoadCallback = function () {
+              console.log("DEBUG: onRecaptchaLoadCallback fired from index.html. grecaptcha is ready.");
+              // Dispatch a custom event so React components can react to grecaptcha being ready
+              window.dispatchEvent(new Event("recaptchaLoaded"));
+            };
+          }
+        </script>
+      </head>
+      <body>
+        <div id="root"></div>
+        <!-- FIXED: Adjust script path and add a cache-busting parameter -->
+        <script type="module" src="../src/main.jsx?v=1"></script> 
+      </body>
+    </html>
+    
