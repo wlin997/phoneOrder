@@ -749,7 +749,7 @@ ${items}
 ${totalLine}Fired at: ${firedAt}
 </pre>`;
 }
-
+ 
 app.post("/api/fire-order", async (req, res) => {
   const { rowIndex: orderId } = req.body;
   if (!orderId || typeof orderId !== "number") {
