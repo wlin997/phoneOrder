@@ -90,7 +90,6 @@ const loginLimiter = rateLimit({
   },
 });
 
-
 /*────────────────────────────────────────────────────
   LOGIN  — Step 1 (Final Fix for Failed Attempts & CAPTCHA Flow)
 ────────────────────────────────────────────────────*/
@@ -103,7 +102,7 @@ router.post("/login", loginLimiter, async (req, res, next) => {
     );
 
     if (!rows.length) {
-      return res.status(401).json({ message: "Invalid credentials" });
+      return res.status(401).json({ success: false, message: "Invalid credentials", requiresCaptcha: false });
     }
 
     const user = rows[0];
@@ -113,6 +112,7 @@ router.post("/login", loginLimiter, async (req, res, next) => {
       const remainingTimeMs = new Date(user.lockout_until).getTime() - new Date().getTime();
       const remainingMinutes = Math.ceil(remainingTimeMs / (1000 * 60));
       return res.status(423).json({
+        success: false,
         message: `Account locked due to too many failed attempts. Please try again in ${remainingMinutes} minutes.`
       });
     }
@@ -156,14 +156,15 @@ router.post("/login", loginLimiter, async (req, res, next) => {
 
         const googleVerifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${RECAPTCHA_SECRET_KEY}&response=${recaptchaToken}`;
         const googleResponse = await axios.post(googleVerifyUrl);
-        const { success, score } = googleResponse.data;
+        const { success: captchaSuccess, score } = googleResponse.data;
 
-        if (!success) {
-          console.log(`[Auth Debug] CAPTCHA verification failed for ${user.email}.`);
+        if (!captchaSuccess || (score && score < 0.5)) { // Require minimum score if using v3
+          console.log(`[Auth Debug] CAPTCHA verification failed for ${user.email}. Score: ${score || 'N/A'}`);
           responseMessage = "CAPTCHA verification failed. Please try again.";
-          return res.status(400).json({ success: false, message: responseMessage, requiresCaptcha: true });
+          return res.status(412).json({ success: false, message: responseMessage, requiresCaptcha: true });
         }
-        console.log(`[Auth Debug] CAPTCHA verification successful for ${user.email}. Score: ${score}`);
+        console.log(`[Auth Debug] CAPTCHA verification successful for ${user.email}. Score: ${score || 'N/A'}`);
+        // CAPTCHA is valid, but login still fails due to incorrect password—keep requiresCaptcha: true
       }
 
       if (updatedUser.failed_login_attempts >= MAX_FAILED_ATTEMPTS) {
@@ -182,8 +183,8 @@ router.post("/login", loginLimiter, async (req, res, next) => {
         return res.status(401).json({ success: false, message: responseMessage });
       }
 
-      console.log(`[Auth Debug] Returning response for ${user.email}. Attempts: ${updatedUser.failed_login_attempts}, Status: ${statusCode}, Response:`, { success: false, message: responseMessage, requiresCaptcha: false });
-      return res.status(statusCode).json({ success: false, message: responseMessage, requiresCaptcha: false });
+      console.log(`[Auth Debug] Returning response for ${user.email}. Attempts: ${updatedUser.failed_login_attempts}, Status: ${statusCode}, Response:`, { success: false, message: responseMessage, requiresCaptcha: updatedUser.failed_login_attempts >= CAPTCHA_REQUIRED_AFTER_ATTEMPTS });
+      return res.status(statusCode).json({ success: false, message: responseMessage, requiresCaptcha: updatedUser.failed_login_attempts >= CAPTCHA_REQUIRED_AFTER_ATTEMPTS });
     }
 
     // On successful login, reset failed attempts and lockout status
@@ -219,13 +220,12 @@ router.post("/login", loginLimiter, async (req, res, next) => {
 
     await pool.query("UPDATE users SET refresh_token = $1 WHERE id = $2", [refreshToken, user.id]);
 
-    res.json({ accessToken });
+    res.json({ success: true, accessToken });
   } catch (e) {
     console.error(`[Auth] Login error for email ${req.body.email}:`, e.message);
     next(e);
   }
 });
-
 
 /*────────────────────────────────────────────────────
   LOGIN  — Step 2 (TOTP)
@@ -267,7 +267,7 @@ router.post("/login/step2", async (req, res, next) => {
 
     await pool.query("UPDATE users SET refresh_token = $1 WHERE id = $2", [refreshToken, decoded.id]);
 
-    res.json({ accessToken });
+    res.json({ success: true, accessToken });
   } catch (e) {
     next(e);
   }
@@ -320,7 +320,7 @@ router.post("/refresh", async (req, res, next) => {
     await pool.query("UPDATE users SET refresh_token = $1 WHERE id = $2", [newRefreshToken, user.id]);
 
     console.log("→ [Auth] Token refreshed successfully for user:", userId);
-    res.json({ accessToken: newAccessToken });
+    res.json({ success: true, accessToken: newAccessToken });
   } catch (e) {
     console.error("→ [Auth] Error refreshing token:", e.message);
     res.clearCookie("refreshToken");
