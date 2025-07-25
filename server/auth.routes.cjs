@@ -121,32 +121,33 @@ router.post("/login", loginLimiter, async (req, res, next) => {
 
     if (!ok) {
       const newFailedAttempts = user.failed_login_attempts + 1;
-      console.log(`[Auth Debug] Password mismatch. newFailedAttempts: ${newFailedAttempts}`); // DEBUG
+      console.log(`[Auth Debug] Password mismatch. newFailedAttempts: ${newFailedAttempts}`);
 
-      // Perform the update first
       await pool.query(
         "UPDATE users SET failed_login_attempts = $1 WHERE id = $2",
         [newFailedAttempts, user.id]
       );
-      console.log(`[Auth Debug] Database update for failed_login_attempts sent for ${user.email}.`); // DEBUG
+      console.log(`[Auth Debug] Database update for failed_login_attempts sent for ${user.email}.`);
 
-      // Re-fetch user data to get the most up-to-date values from DB
       const updatedUserResult = await pool.query(
         "SELECT failed_login_attempts, lockout_until, lockout_count FROM users WHERE id=$1",
         [user.id]
       );
       const updatedUser = updatedUserResult.rows[0];
-      console.log(`[Auth Debug] Re-fetched failed_login_attempts for ${user.email}: ${updatedUser.failed_login_attempts}`); // DEBUG
+      console.log(`[Auth Debug] Re-fetched failed_login_attempts for ${user.email}: ${updatedUser.failed_login_attempts}`);
 
-      let responseMessage = "Invalid credentials"; // FIX: Always initialize responseMessage here
+      let responseMessage = "Invalid credentials";
+      let statusCode = 401;
 
-      // CAPTCHA Check Logic (after failed attempt count is updated)
       if (updatedUser.failed_login_attempts >= CAPTCHA_REQUIRED_AFTER_ATTEMPTS) {
-        console.log(`[Auth Debug] CAPTCHA required. Current attempts: ${updatedUser.failed_login_attempts}`); // DEBUG
-        responseMessage = "CAPTCHA verification required."; // Set message for CAPTCHA
+        console.log(`[Auth Debug] CAPTCHA required. Current attempts: ${updatedUser.failed_login_attempts}`);
+        responseMessage = "CAPTCHA verification required.";
+        statusCode = 412;
 
         if (!recaptchaToken) {
-          return res.status(412).json({
+          console.log(`[Auth Debug] No recaptchaToken, sending 412 response for ${user.email}`);
+          return res.status(statusCode).json({
+            success: false,
             message: responseMessage,
             requiresCaptcha: true
           });
@@ -157,38 +158,34 @@ router.post("/login", loginLimiter, async (req, res, next) => {
         const { success, score } = googleResponse.data;
 
         if (!success) {
-          console.log(`[Auth Debug] CAPTCHA verification failed for ${user.email}.`); // DEBUG
-          responseMessage = "CAPTCHA verification failed. Please try again."; // Update message
-          return res.status(400).json({ message: responseMessage, requiresCaptcha: true });
+          console.log(`[Auth Debug] CAPTCHA verification failed for ${user.email}.`);
+          responseMessage = "CAPTCHA verification failed. Please try again.";
+          return res.status(400).json({ success: false, message: responseMessage, requiresCaptcha: true });
         }
-        console.log(`[Auth Debug] CAPTCHA verification successful for ${user.email}. Score: ${score}`); // DEBUG
-        // If CAPTCHA passed but password was wrong, we still proceed to lockout check
+        console.log(`[Auth Debug] CAPTCHA verification successful for ${user.email}. Score: ${score}`);
+        // Proceed to lockout check if password still fails
       }
 
-      // Account Lockout Logic (after failed attempt count is updated and CAPTCHA if applicable)
       if (updatedUser.failed_login_attempts >= MAX_FAILED_ATTEMPTS) {
         let newLockoutUntil = null;
         let newLockoutCount = updatedUser.lockout_count + 1;
-
         const durationIndex = Math.min(newLockoutCount - 1, LOCKOUT_DURATIONS.length - 1);
         const lockoutDuration = LOCKOUT_DURATIONS[durationIndex];
-
         newLockoutUntil = new Date(Date.now() + lockoutDuration * 60 * 1000);
         responseMessage = `Account locked due to too many failed attempts. Please try again in ${lockoutDuration} minutes.`;
-        
+        statusCode = 401;
+
         await pool.query(
           "UPDATE users SET failed_login_attempts = 0, lockout_until = $1, lockout_count = $2 WHERE id = $3",
           [newLockoutUntil, newLockoutCount, user.id]
         );
-        console.log(`[Auth Debug] Account ${user.email} locked. Lockout count: ${newLockoutCount}`); // DEBUG
-        return res.status(401).json({ message: responseMessage });
-
-      } else {
-        // If not yet locked, and no CAPTCHA needed yet, return generic invalid credentials
-        // The responseMessage is already set correctly based on CAPTCHA logic above
-        console.log(`[Auth Debug] Returning invalid credentials for ${user.email}. Attempts: ${updatedUser.failed_login_attempts}`); // DEBUG
-        return res.status(401).json({ message: responseMessage, requiresCaptcha: (updatedUser.failed_login_attempts >= CAPTCHA_REQUIRED_AFTER_ATTEMPTS) });
+        console.log(`[Auth Debug] Account ${user.email} locked. Lockout count: ${newLockoutCount}`);
+        return res.status(statusCode).json({ success: false, message: responseMessage });
       }
+
+      console.log(`[Auth Debug] Returning response for ${user.email}. Attempts: ${updatedUser.failed_login_attempts}, Status: ${statusCode}`);
+      return res.status(statusCode).json({ success: false, message: responseMessage, requiresCaptcha: (updatedUser.failed_login_attempts >= CAPTCHA_REQUIRED_AFTER_ATTEMPTS) });
+    }
 
     }
 
