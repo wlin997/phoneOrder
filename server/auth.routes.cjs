@@ -187,8 +187,6 @@ router.post("/login", loginLimiter, async (req, res, next) => {
       return res.status(statusCode).json({ success: false, message: responseMessage, requiresCaptcha: (updatedUser.failed_login_attempts >= CAPTCHA_REQUIRED_AFTER_ATTEMPTS) });
     }
 
-    }
-
     // On successful login, reset failed attempts and lockout status
     if (user.failed_login_attempts > 0 || user.lockout_until) {
       await pool.query(
