@@ -112,6 +112,7 @@ export default function Login() {
     const result = await login(email, password, recaptchaToken);
 
     if (!result.success) {
+      console.log("DEBUG: Setting error to:", result.message, "and requiresCaptcha to:", result.requiresCaptcha)
       setError(result.message);
       setRequiresCaptcha(result.requiresCaptcha || false);
     } else {
