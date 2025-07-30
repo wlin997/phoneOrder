@@ -1136,7 +1136,7 @@ app.post('/api/daily-specials', async (req, res) => {
 
 
 //=================================================================================
-// get daily special from postgre
+// get daily special from postgre (old)
 //=================================================================================
 app.get('/api/businesses', async (req, res) => {
   try {
@@ -1186,6 +1186,59 @@ app.post('/api/daily-specials/postgres', async (req, res) => {
     res.status(500).json({ error: 'Failed to update daily specials in PostgreSQL: ' + err.message });
   }
 });
+
+//=================================================================================
+// get daily special from postgre (new)
+//=================================================================================
+
+app.get('/api/menu-items', async (req, res) => {
+  const { category } = req.query;
+  try {
+    const result = await pool.query(
+      `SELECT item_id, item_name, description, base_price FROM menu_items WHERE category = $1 ORDER BY item_id ASC`,
+      [category || 'special']
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching menu items:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/menu-items', async (req, res) => {
+  const items = req.body.daily_specials;
+  if (!Array.isArray(items)) {
+    return res.status(400).json({ error: 'Invalid payload: expected daily_specials array' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Clear out existing specials
+    await client.query(`DELETE FROM menu_items WHERE category = 'special'`);
+
+    for (const item of items) {
+      const { name, price, description } = item;
+      await client.query(
+        `INSERT INTO menu_items (item_name, base_price, description, category)
+         VALUES ($1, $2, $3, 'special')`,
+        [name, parseFloat(price) || 0, description || '']
+      );
+    }
+
+    await client.query('COMMIT');
+    res.json({ message: 'Specials successfully updated in menu_items.' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error updating menu_items:', err);
+    res.status(500).json({ error: 'Failed to update specials in menu_items.' });
+  } finally {
+    client.release();
+  }
+});
+
+
 
 
 // ── Login route (inline) ─────────────────────────────────
