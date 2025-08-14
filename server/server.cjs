@@ -26,6 +26,7 @@ const bcrypt = require("bcryptjs");
 const jwt    = require("jsonwebtoken");
 const { getUserPermissions } = require("./rbac.service.cjs");
 
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 // NEW: Tell Express to trust proxy headers
