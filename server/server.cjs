@@ -58,6 +58,9 @@ const allowedOrigins = [
   'http://127.0.0.1:3000',
   'http://127.0.0.1:3001',
   'http://127.0.0.1:5173',
+  'https://synthpify.ai',
+  'https://www.synthpify.ai',
+  'https://synthpify-phoneorder-front.onrender.com',
   process.env.RENDER_FRONTEND_URL
 ].filter(Boolean);
 app.use(cors({
@@ -1348,6 +1351,53 @@ async function generateAccessToken(user) {
   return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "24h" });
 }
 */
+
+// =================================================================================
+// reCAPTHA + Rate-limited endpoint for synthpify.ai - ai chatbot protection
+// =================================================================================
+
+// POST /api/vapi/allow — verify reCAPTCHA token and rate-limit
+const allowLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 20,             // 20 requests per IP per minute
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.post('/api/vapi/allow', allowLimiter, async (req, res) => {
+  try {
+    const { token } = req.body || {};
+    if (!token) {
+      return res.status(400).json({ ok: false, error: 'missing_token' });
+    }
+
+    const secret = process.env.RECAPTCHA_SECRET;
+    if (!secret) {
+      return res.status(500).json({ ok: false, error: 'missing_server_secret' });
+    }
+
+    // Verify with Google
+    const params = new URLSearchParams({ secret, response: token }).toString();
+    const resp = await axios.post(
+      'https://www.google.com/recaptcha/api/siteverify',
+      params,
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+    const data = resp.data;
+
+    // Accept only success; if v3, enforce score threshold
+    if (!data.success || (typeof data.score === 'number' && data.score < 0.5)) {
+      return res.status(403).json({ ok: false, error: 'captcha_failed', score: data.score });
+    }
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('captcha verify error:', err);
+    return res.status(500).json({ ok: false });
+  }
+});
+
+
 
 pool.connect()
   .then(() => {
