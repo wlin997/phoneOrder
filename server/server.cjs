@@ -1365,10 +1365,13 @@ const allowLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Optional: tune the minimum acceptable v3 score via env (defaults to 0.5)
+const RECAPTCHA_MIN_SCORE = Number(process.env.RECAPTCHA_MIN_SCORE || 0.5);
+
 app.post('/api/vapi/allow', allowLimiter, async (req, res) => {
   try {
     const { token } = req.body || {};
-    if (!token) {
+    if (typeof token !== 'string' || token.length < 10) {
       return res.status(400).json({ ok: false, error: 'missing_token' });
     }
 
@@ -1377,24 +1380,45 @@ app.post('/api/vapi/allow', allowLimiter, async (req, res) => {
       return res.status(500).json({ ok: false, error: 'missing_server_secret' });
     }
 
-    // Verify with Google
-    const params = new URLSearchParams({ secret, response: token }).toString();
-    const resp = await axios.post(
-      'https://www.google.com/recaptcha/api/siteverify',
-      params,
-      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-    );
-    const data = resp.data;
+    // Best-effort client IP for Google verification
+    const remoteip =
+      (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
+      req.ip ||
+      undefined;
 
-    // Accept only success; if v3, enforce score threshold
-    if (!data.success || (typeof data.score === 'number' && data.score < 0.5)) {
-      return res.status(403).json({ ok: false, error: 'captcha_failed', score: data.score });
+    const params = new URLSearchParams({ secret, response: token });
+    if (remoteip) params.append('remoteip', remoteip);
+
+    const g = await axios.post(
+      'https://www.google.com/recaptcha/api/siteverify',
+      params.toString(),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 5000 }
+    );
+    const data = g.data;
+
+    // 1) Must be successful
+    if (!data.success) {
+      return res
+        .status(403)
+        .json({ ok: false, error: 'captcha_failed', errorCodes: data['error-codes'] || null });
     }
 
-    return res.json({ ok: true });
+    // 2) If v3, enforce score
+    if (typeof data.score === 'number' && data.score < RECAPTCHA_MIN_SCORE) {
+      return res.status(403).json({ ok: false, error: 'low_score', score: data.score });
+    }
+
+    // 3) Optional: validate expected action sent from grecaptcha.execute(..., { action: 'open_chat' })
+    if (data.action && data.action !== 'open_chat') {
+      return res.status(403).json({ ok: false, error: 'bad_action', action: data.action });
+    }
+
+    // ✅ Success — always return JSON (avoid 204/empty body)
+    return res.status(200).json({ ok: true, score: data.score ?? null, action: data.action ?? null });
   } catch (err) {
-    console.error('captcha verify error:', err);
-    return res.status(500).json({ ok: false });
+    // Log useful details if Google responds with an error body
+    console.error('captcha verify error:', err?.response?.data || err.message || err);
+    return res.status(500).json({ ok: false, error: 'internal' });
   }
 });
 
